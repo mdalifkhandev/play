@@ -68,7 +68,7 @@ export const FeedItem = ({
   };
 
   return (
-    <View style={{ height: WINDOW_HEIGHT, width: WINDOW_WIDTH }} className="bg-black">
+    <View style={{ height: WINDOW_HEIGHT, width: WINDOW_WIDTH }} className="">
       <Pressable className="absolute inset-0" onPress={togglePlay}>
         {type === 'video' ? (
           <VideoView
@@ -90,9 +90,9 @@ export const FeedItem = ({
 
       {/* Bottom Gradient Overlay for better text readability */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.8)']}
+        colors={['transparent', 'rgba(141, 141, 141, 1)']}
         className="absolute left-0 right-0 bottom-0 h-1/2"
-        style={{ paddingBottom: insets.bottom + 80 }}
+        style={{ paddingBottom: insets.bottom + 40 }}
       />
 
       {/* Right Action Buttons */}

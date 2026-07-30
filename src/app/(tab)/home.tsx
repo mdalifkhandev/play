@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useRef, useState } from "react";
-import { Dimensions, FlatList, Pressable, StyleSheet, Text, View, ViewToken } from "react-native";
+import { Dimensions, FlatList, Pressable, Text, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
 
@@ -60,13 +60,16 @@ export default function Home() {
   }).current;
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.topNav, { top: insets.top + 10 }]}>
+    <View className="flex-1">
+      <View
+        className="absolute left-4 right-4 z-10 flex-row justify-between items-center "
+        style={{ top: insets.top + 10 }}
+      >
         <View style={{ width: 32 }} />
-        <View style={styles.topNavCenter}>
-          <Text style={styles.topNavText}>For You</Text>
-          <Text style={[styles.topNavText, styles.topNavTextActive]}>Following</Text>
-          <Text style={styles.topNavText}>Live</Text>
+        <View className="flex-row gap-5">
+          <Text className="text-white/60 text-base font-semibold">For You</Text>
+          <Text className="text-white text-base font-semibold underline">Following</Text>
+          <Text className="text-white/60 text-base font-semibold">Live</Text>
         </View>
         <Pressable>
           <Ionicons name="search" size={28} color="#FFF" />
@@ -94,31 +97,3 @@ export default function Home() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  topNav: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  topNavCenter: {
-    flexDirection: 'row',
-    gap: 20,
-  },
-  topNavText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  topNavTextActive: {
-    color: '#FFF',
-    textDecorationLine: 'underline',
-  }
-});
