@@ -53,7 +53,10 @@ export default function SignUp() {
           <Text className="text-gray-300 font-inter-regular">Accept <Text className="text-gray-400 underline font-inter-regular">terms & conditions</Text></Text>
         </Pressable>
 
-        <Pressable className="bg-[#98D83A] h-14 rounded-xl items-center justify-center mb-10 active:opacity-80">
+        <Pressable 
+          className="bg-[#98D83A] h-14 rounded-xl items-center justify-center mb-10 active:opacity-80"
+          onPress={() => router.push({ pathname: '/auth/verify-otp', params: { type: 'signup' } })}
+        >
           <Text className="text-black font-inter-bold text-lg">Sign Up</Text>
         </Pressable>
 

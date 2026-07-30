@@ -44,10 +44,15 @@ export default function Login() {
             </View>
             <Text className="text-gray-300 font-inter-regular">Remember me</Text>
           </Pressable>
-          <Text className="text-red-500 font-inter-regular py-2">Forgot password?</Text>
+          <Pressable onPress={() => router.push('/auth/forgot-password')}>
+            <Text className="text-red-500 font-inter-regular py-2">Forgot password?</Text>
+          </Pressable>
         </View>
 
-        <Pressable className="bg-[#98D83A] h-14 rounded-xl items-center justify-center mb-10 active:opacity-80">
+        <Pressable 
+          className="bg-[#98D83A] h-14 rounded-xl items-center justify-center mb-10 active:opacity-80"
+          onPress={() => router.push('/home')}
+        >
           <Text className="text-black font-inter-bold text-lg">Login</Text>
         </Pressable>
 
