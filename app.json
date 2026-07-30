@@ -15,17 +15,12 @@
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/icon.png"
       },
-      "notification": {
-        "icon": "./assets/images/icon.png",
-        "color": "#000000"
-      },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.play"
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png",
-
       "bundler": "metro"
     },
     "plugins": [
@@ -37,7 +32,9 @@
           "image": "./assets/images/logo.png",
           "imageWidth": 170
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
