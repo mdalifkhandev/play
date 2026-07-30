@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dimensions, Image, Text, View } from "react-native";
 import PagerView from "react-native-pager-view";
 
@@ -9,12 +9,28 @@ const { width } = Dimensions.get("window");
 export default function Onboarding() {
   const pagerRef = useRef<PagerView>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [hasNavigated, setHasNavigated] = useState(false);
+
+  useEffect(() => {
+    if (hasNavigated) return;
+
+    const timer = setTimeout(() => {
+      if (currentPage < 2) {
+        pagerRef.current?.setPage(currentPage + 1);
+      } else {
+        setHasNavigated(true);
+        router.push("/auth/login");
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [currentPage, hasNavigated]);
 
   const goToNextPage = () => {
     if (currentPage < 2) {
       pagerRef.current?.setPage(currentPage + 1);
     } else {
-      router.push("/auth/login");
+      router.replace("/auth/login");
     }
   };
 
@@ -25,7 +41,18 @@ export default function Onboarding() {
         style={{ flex: 1 }}
         initialPage={0}
         ref={pagerRef}
-        onPageSelected={(e: any) => setCurrentPage(e.nativeEvent.position)}
+        onPageSelected={(e: any) => {
+          const position = e.nativeEvent.position;
+          if (position === 3) {
+            setHasNavigated(true);
+            router.push("/auth/login");
+            setTimeout(() => {
+              pagerRef.current?.setPageWithoutAnimation(2);
+            }, 100);
+          } else {
+            setCurrentPage(position);
+          }
+        }}
       >
         {/* Screen 2: Loading/Welcome */}
 
@@ -79,6 +106,9 @@ export default function Onboarding() {
           />
 
         </View>
+
+        {/* Dummy Screen 4: For Swipe-to-Login */}
+        <View key="4" className="flex-1 bg-[#121212]" />
       </PagerView>
 
 
