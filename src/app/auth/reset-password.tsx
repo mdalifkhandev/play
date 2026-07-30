@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } fro
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { Header } from "../../components/ui/Header";
+import { CustomButton } from "../../components/ui/CustomButton";
 
 export default function ResetPassword() {
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -47,12 +48,10 @@ export default function ResetPassword() {
           <Text className="text-gray-300 font-inter-regular">Accept <Text className="text-gray-400 underline font-inter-regular">terms & conditions</Text></Text>
         </Pressable>
 
-        <Pressable 
-          className="bg-[#98D83A] h-14 rounded-xl items-center justify-center active:opacity-80"
+        <CustomButton
+          title="Update Password"
           onPress={() => router.push("/home")}
-        >
-          <Text className="text-black font-inter-bold text-lg">Update Password</Text>
-        </Pressable>
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

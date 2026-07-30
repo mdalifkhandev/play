@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Header } from "../../components/ui/Header";
+import { CustomButton } from "../../components/ui/CustomButton";
 
 export default function VerifyOtp() {
   const { type } = useLocalSearchParams<{ type: string }>();
@@ -67,12 +68,11 @@ export default function VerifyOtp() {
 
         <Text className="text-white font-inter-bold text-center mb-8">Paste Code</Text>
 
-        <Pressable 
-          className="bg-[#98D83A] h-14 rounded-xl items-center justify-center active:opacity-80 mb-8"
+        <CustomButton
+          title="Verify"
+          containerStyle="mb-8"
           onPress={handleVerify}
-        >
-          <Text className="text-black font-inter-bold text-lg">Verify</Text>
-        </Pressable>
+        />
 
         <View className="flex-row justify-center mb-4">
           <Text className="text-gray-400 font-inter-regular">Didn't receive the code? </Text>

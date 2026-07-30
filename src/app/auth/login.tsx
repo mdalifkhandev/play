@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { Header } from "../../components/ui/Header";
+import { CustomButton } from "../../components/ui/CustomButton";
 
 export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
@@ -50,12 +51,12 @@ export default function Login() {
           </Pressable>
         </View>
 
-        <Pressable 
-          className="bg-[#98D83A] h-14 rounded-xl items-center justify-center mb-10 active:opacity-80"
+        <CustomButton
+          title="Login"
+          variant="primary"
+          containerStyle="mb-10"
           onPress={() => router.push('/home')}
-        >
-          <Text className="text-black font-inter-bold text-lg">Login</Text>
-        </Pressable>
+        />
 
         <View className="flex-row items-center mb-8">
           <View className="flex-1 h-[1px] bg-gray-700" />

@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text } from "rea
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { Header } from "../../components/ui/Header";
+import { CustomButton } from "../../components/ui/CustomButton";
 
 export default function ForgotPassword() {
   const insets = useSafeAreaInsets();
@@ -25,12 +26,10 @@ export default function ForgotPassword() {
           containerStyle="mb-10"
         />
 
-        <Pressable 
-          className="bg-[#98D83A] h-14 rounded-xl items-center justify-center active:opacity-80"
+        <CustomButton
+          title="Send Code"
           onPress={() => router.push({ pathname: '/auth/verify-otp', params: { type: 'forgot' } })}
-        >
-          <Text className="text-black font-inter-bold text-lg">Send Code</Text>
-        </Pressable>
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

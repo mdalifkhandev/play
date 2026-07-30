@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { Header } from "../../components/ui/Header";
+import { CustomButton } from "../../components/ui/CustomButton";
 
 export default function SignUp() {
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -54,12 +55,12 @@ export default function SignUp() {
           <Text className="text-gray-300 font-inter-regular">Accept <Text className="text-gray-400 underline font-inter-regular">terms & conditions</Text></Text>
         </Pressable>
 
-        <Pressable 
-          className="bg-[#98D83A] h-14 rounded-xl items-center justify-center mb-10 active:opacity-80"
+        <CustomButton
+          title="Sign Up"
+          variant="primary"
+          containerStyle="mb-10"
           onPress={() => router.push({ pathname: '/auth/verify-otp', params: { type: 'signup' } })}
-        >
-          <Text className="text-black font-inter-bold text-lg">Sign Up</Text>
-        </Pressable>
+        />
 
         <View className="flex-row items-center mb-8">
           <View className="flex-1 h-[1px] bg-gray-700" />

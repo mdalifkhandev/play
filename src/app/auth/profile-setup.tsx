@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CustomInput } from "../../components/inputs/CustomInput";
+import { CustomButton } from "../../components/ui/CustomButton";
 import { Header } from "../../components/ui/Header";
 export default function ProfileSetup() {
   const insets = useSafeAreaInsets();
@@ -67,19 +68,19 @@ export default function ProfileSetup() {
           containerStyle="mb-8"
         />
 
-        <Pressable
-          className="bg-[#98D83A] h-14 rounded-xl items-center justify-center active:opacity-80 mb-4"
+        <CustomButton
+          title="Complete Setup"
+          variant="primary"
+          containerStyle="mb-4"
           onPress={() => router.push("/home")}
-        >
-          <Text className="text-black font-inter-bold text-lg">Complete Setup</Text>
-        </Pressable>
+        />
 
-        <Pressable
-          className="border border-gray-600 h-14 rounded-xl items-center justify-center active:opacity-80 mb-8"
+        <CustomButton
+          title="Skip"
+          variant="outline"
+          containerStyle="mb-8"
           onPress={() => router.push("/home")}
-        >
-          <Text className="text-[#98D83A] font-inter-bold text-lg">Skip</Text>
-        </Pressable>
+        />
         <View className="pb-52" />
       </ScrollView>
     </KeyboardAvoidingView>
