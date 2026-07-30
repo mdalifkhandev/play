@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Header } from "../../components/ui/Header";
 import { CustomButton } from "../../components/ui/CustomButton";
+import { Header } from "../../components/ui/Header";
 
 export default function VerifyOtp() {
   const { type } = useLocalSearchParams<{ type: string }>();
@@ -16,14 +16,14 @@ export default function VerifyOtp() {
 
   const handleVerify = () => {
     if (type === 'forgot') {
-      router.push("/auth/reset-password");
+      router.push("/(auth)/reset-password");
     } else {
-      router.push("/auth/profile-setup");
+      router.push("/(auth)/profile-setup");
     }
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-[#121212]"
     >
@@ -46,7 +46,7 @@ export default function VerifyOtp() {
               const digit = code[index] || "";
               const isFocused = index === code.length || (index === CODE_LENGTH - 1 && code.length === CODE_LENGTH);
               return (
-                <View 
+                <View
                   key={index}
                   className={`w-12 h-14 rounded-xl border items-center justify-center bg-transparent ${isFocused ? 'border-[#98D83A]' : 'border-gray-600'}`}
                 >

@@ -1,16 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CustomInput } from "../../components/inputs/CustomInput";
-import { Header } from "../../components/ui/Header";
 import { CustomButton } from "../../components/ui/CustomButton";
+import { Header } from "../../components/ui/Header";
 
 export default function ForgotPassword() {
   const insets = useSafeAreaInsets();
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-[#121212]"
     >
@@ -28,7 +27,7 @@ export default function ForgotPassword() {
 
         <CustomButton
           title="Send Code"
-          onPress={() => router.push({ pathname: '/auth/verify-otp', params: { type: 'forgot' } })}
+          onPress={() => router.push({ pathname: '/(auth)/verify-otp', params: { type: 'forgot' } })}
         />
       </ScrollView>
     </KeyboardAvoidingView>
