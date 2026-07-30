@@ -81,7 +81,7 @@ export default function VerifyOtp() {
           </Pressable>
         </View>
 
-        <Pressable className="items-center" onPress={() => router.push("/auth/login")}>
+        <Pressable className="items-center" onPress={() => router.push("/(auth)/login")}>
           <Text className="text-white font-inter-bold">Back to Login</Text>
         </Pressable>
       </ScrollView>

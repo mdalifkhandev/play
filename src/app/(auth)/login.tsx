@@ -78,7 +78,7 @@ export default function Login() {
 
         <View className="flex-row justify-center mt-[24px]">
           <Text className="text-gray-400 font-inter-regular">Don't have an account? </Text>
-          <Link href="/auth/signup" asChild>
+          <Link href="/(auth)/signup" asChild>
             <Pressable>
               <Text className="text-[#98D83A] font-inter-bold">Sign Up</Text>
             </Pressable>

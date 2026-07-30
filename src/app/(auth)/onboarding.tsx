@@ -19,7 +19,7 @@ export default function Onboarding() {
         pagerRef.current?.setPage(currentPage + 1);
       } else {
         setHasNavigated(true);
-        router.push("/auth/login");
+        router.push("/(auth)/login");
       }
     }, 1000);
 
@@ -30,7 +30,7 @@ export default function Onboarding() {
     if (currentPage < 2) {
       pagerRef.current?.setPage(currentPage + 1);
     } else {
-      router.replace("/auth/login");
+      router.replace("/(auth)/login");
     }
   };
 
@@ -45,7 +45,7 @@ export default function Onboarding() {
           const position = e.nativeEvent.position;
           if (position === 3) {
             setHasNavigated(true);
-            router.push("/auth/login");
+            router.push("/(auth)/login");
             setTimeout(() => {
               pagerRef.current?.setPageWithoutAnimation(2);
             }, 100);
