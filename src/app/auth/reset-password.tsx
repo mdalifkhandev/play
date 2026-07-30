@@ -2,20 +2,21 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CustomInput } from "../../components/inputs/CustomInput";
+import { Header } from "../../components/ui/Header";
 
 export default function ResetPassword() {
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const insets = useSafeAreaInsets();
 
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-[#121212]"
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6 pt-16 pb-16">
-        <Pressable onPress={() => router.back()} className="mb-8 w-10">
-          <Ionicons name="chevron-back" size={28} color="white" />
-        </Pressable>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 24 }} className="px-6 pt-16">
+        <Header showBackButton={true} />
 
         <Text className="text-3xl font-inter-bold text-white mb-2">Set a new password</Text>
         <Text className="text-gray-400 font-inter-regular mb-10">Please set a new password for your account to continue</Text>

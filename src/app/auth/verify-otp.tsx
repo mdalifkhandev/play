@@ -2,11 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState, useRef } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Header } from "../../components/ui/Header";
 
 export default function VerifyOtp() {
   const { type } = useLocalSearchParams<{ type: string }>();
   const [code, setCode] = useState("");
   const inputRef = useRef<TextInput>(null);
+  const insets = useSafeAreaInsets();
 
   const CODE_LENGTH = 6;
 
@@ -23,10 +26,8 @@ export default function VerifyOtp() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-[#121212]"
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6 pt-16 pb-16">
-        <Pressable onPress={() => router.back()} className="mb-8 w-10">
-          <Ionicons name="chevron-back" size={28} color="white" />
-        </Pressable>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 24 }} className="px-6 pt-16">
+        <Header showBackButton={true} />
 
         <View className="items-center mb-8">
           <View className="w-20 h-20 bg-[#98D83A] rounded-full items-center justify-center mb-6">
