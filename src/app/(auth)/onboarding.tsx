@@ -36,7 +36,7 @@ export default function Onboarding() {
 
   return (
     <View className="flex-1 bg-[#121212]">
-      {/* @ts-expect-error - React 19 types mismatch with PagerView */}
+      {/* @ts-ignore - React 19 types mismatch with PagerView */}
       <PagerView
         style={{ flex: 1 }}
         initialPage={0}
@@ -91,7 +91,6 @@ export default function Onboarding() {
             colors={['transparent', 'rgba(18,18,18,0.8)', '#121212']}
             style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%' }}
           />
-
         </View>
 
         {/* Screen 4: Scholarship */}
