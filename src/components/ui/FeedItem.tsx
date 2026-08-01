@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useState } from 'react';
-import { Dimensions, Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, Easing, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: WINDOW_HEIGHT, width: WINDOW_WIDTH } = Dimensions.get('window');
@@ -79,11 +79,30 @@ export const FeedItem = ({
 
   // State to delay video initialization until Activity is guaranteed to be ready
   const [isReady, setIsReady] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsReady(true), 500);
     return () => clearTimeout(timer);
   }, []);
+
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 1,
+        duration: 4000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [spinValue]);
+
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg']
+  });
 
   return (
     <View style={{ height: WINDOW_HEIGHT, width: WINDOW_WIDTH }} className="">
@@ -103,11 +122,19 @@ export const FeedItem = ({
         <View className="absolute inset-0 bg-black" />
       )}
 
-      {/* Gradient Overlay */}
+      {/* Top Gradient Overlay */}
       <LinearGradient
-        colors={['rgba(133, 138, 138, 0.7)', 'transparent']}
-        className="absolute left-0 right-0 top-0 h-1/2"
+        colors={['rgba(0, 0, 0, 0.4)', 'transparent']}
+        className="absolute left-0 right-0 top-0 h-1/4"
         style={{ paddingTop: insets.top }}
+        pointerEvents="none"
+      />
+
+      {/* Bottom Gradient Overlay for text readability */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.8)']}
+        className="absolute left-0 right-0 bottom-0 h-2/5"
+        pointerEvents="none"
       />
 
 
@@ -143,30 +170,46 @@ export const FeedItem = ({
         </Pressable>
 
         {/* Record/Music Icon */}
-        <View className="mt-2.5">
+        <Animated.View className="mt-2.5" style={{ transform: [{ rotate: spin }] }}>
           <Image
             source={require('../../../assets/icon/musicdisc.svg')}
             className="w-11 h-11"
             style={{ width: 44, height: 44 }}
             contentFit="contain"
           />
-        </View>
+        </Animated.View>
+      </View>
+
+      {/* Centered Full Screen Button */}
+      <View className="absolute left-0 right-0 items-center pointer-events-auto" style={{ bottom: insets.bottom + 130 }}>
+        <Pressable className="flex-row items-center bg-black/50 px-3 py-1.5 rounded-2xl">
+          <Ionicons name="scan-outline" size={16} color="#FFF" />
+          <Text className="text-white ml-1.5 text-xs font-medium">Full screen</Text>
+        </Pressable>
       </View>
 
       {/* Bottom Text Details */}
-      <View className="absolute left-4 right-20" style={{ bottom: insets.bottom + 60 }}>
-        <View className="flex-row items-center bg-black/50 px-3 py-1.5 rounded-2xl self-start mb-3">
-          <Ionicons name="scan-outline" size={16} color="#FFF" />
-          <Text className="text-white ml-1.5 text-xs font-medium">Full screen</Text>
-        </View>
+      <View className="absolute left-4 right-20 pb-2" style={{ bottom: insets.bottom + 60 }} pointerEvents="box-none">
 
-        <Text className="text-white text-base font-bold mb-1.5">
+        <Text 
+          className="text-white text-base font-bold mb-1.5"
+          style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
+        >
           {user.username} <Text className="font-normal text-[#CCC]">• {date}</Text>
         </Text>
 
-        <Text className="text-white text-sm leading-5" numberOfLines={2}>
-          {description} <Text className="text-[#CCC] font-bold">more</Text>
-        </Text>
+        <Pressable onPress={() => setIsExpanded(!isExpanded)}>
+          <Text 
+            className="text-white text-sm leading-5" 
+            numberOfLines={isExpanded ? undefined : 2}
+            style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
+          >
+            {description}
+            {!isExpanded && (
+              <Text className="text-[#CCC] font-bold"> more</Text>
+            )}
+          </Text>
+        </Pressable>
       </View>
     </View>
   );

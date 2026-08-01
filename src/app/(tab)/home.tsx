@@ -34,7 +34,7 @@ const MOCK_DATA: FeedItemProps[] = [
       username: "Photography Daily",
       profileImage: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
     },
-    description: "Behind the scenes of our latest studio shoot! 📸✨",
+    description: "Behind the scenes of our latest studio shoot!Behind the scenes of our latest studio shoot!Behind the scenes of our latest studio shoot! 📸✨",
     date: "12 Aug 2026",
     stats: {
       likes: "45.2K",

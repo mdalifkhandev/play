@@ -74,9 +74,9 @@ export default function Onboarding() {
           {/* Bottom Dots */}
           <View className="items-center pb-24">
             <View className="flex-row gap-2">
-              <View className="w-6 h-6 rounded-full bg-[#98D83A]" />
-              <View className="w-6 h-6 rounded-full bg-gray-500" />
-              <View className="w-6 h-6 rounded-full bg-gray-500" />
+              <View className="w-3.5 h-3.5 rounded-full bg-[#98D83A]" />
+              <View className="w-3.5 h-3.5 rounded-full bg-gray-500" />
+              <View className="w-3.5 h-3.5 rounded-full bg-gray-500" />
             </View>
           </View>
         </View>

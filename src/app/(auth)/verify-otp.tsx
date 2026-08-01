@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CustomButton } from "../../components/ui/CustomButton";
@@ -9,10 +9,25 @@ import { Header } from "../../components/ui/Header";
 export default function VerifyOtp() {
   const { type } = useLocalSearchParams<{ type: string }>();
   const [code, setCode] = useState("");
+  const [timeLeft, setTimeLeft] = useState(60);
   const inputRef = useRef<TextInput>(null);
   const insets = useSafeAreaInsets();
 
   const CODE_LENGTH = 6;
+
+  useEffect(() => {
+    if (timeLeft === 0) return;
+    const timerId = setInterval(() => {
+      setTimeLeft(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(timerId);
+  }, [timeLeft]);
+
+  const handleResend = () => {
+    if (timeLeft > 0) return;
+    // Add logic to trigger actual resend API here if needed
+    setTimeLeft(60);
+  };
 
   const handleVerify = () => {
     if (type === 'forgot') {
@@ -76,8 +91,10 @@ export default function VerifyOtp() {
 
         <View className="flex-row justify-center mb-4">
           <Text className="text-gray-400 font-inter-regular">Didn't receive the code? </Text>
-          <Pressable>
-            <Text className="text-[#98D83A] font-inter-regular">Resend</Text>
+          <Pressable onPress={handleResend} disabled={timeLeft > 0}>
+            <Text className={`font-inter-regular ${timeLeft > 0 ? 'text-gray-500' : 'text-[#98D83A]'}`}>
+              {timeLeft > 0 ? `Resend in 00:${timeLeft.toString().padStart(2, '0')}` : 'Resend'}
+            </Text>
           </Pressable>
         </View>
 
