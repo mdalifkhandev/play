@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect } from 'react';
 import { Dimensions, Pressable, Text, View } from 'react-native';
@@ -89,11 +88,11 @@ export const FeedItem = ({
       </Pressable>
 
       {/* Bottom Gradient Overlay for better text readability */}
-      <LinearGradient
+      {/* <LinearGradient
         colors={['transparent', 'rgba(141, 141, 141, 1)']}
         className="absolute left-0 right-0 bottom-0 h-1/2"
         style={{ paddingBottom: insets.bottom + 40 }}
-      />
+      /> */}
 
       {/* Right Action Buttons */}
       <View className="absolute right-3 items-center gap-5" style={{ bottom: insets.bottom + 100 }}>
@@ -129,7 +128,7 @@ export const FeedItem = ({
         {/* Record/Music Icon */}
         <View className="mt-2.5">
           <Image
-            source={require('../../../assets/images/musicdisc.svg')}
+            source={require('../../../assets/icon/musicdisc.svg')}
             className="w-11 h-11"
             style={{ width: 44, height: 44 }}
             contentFit="contain"

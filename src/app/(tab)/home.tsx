@@ -1,4 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { Link } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Dimensions, FlatList, Pressable, Text, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -69,10 +70,16 @@ export default function Home() {
         <View className="flex-row gap-5">
           <Text className="text-white/60 text-base font-semibold">For You</Text>
           <Text className="text-white text-base font-semibold underline">Following</Text>
-          <Text className="text-white/60 text-base font-semibold">Live</Text>
+          <Link href="/live" asChild>
+            <Text className="text-white/60 text-base font-semibold">Live</Text>
+          </Link>
         </View>
         <Pressable>
-          <Ionicons name="search" size={28} color="#FFF" />
+          <Image 
+            source={require('../../../assets/icon/search.svg')} 
+            style={{ width: 28, height: 28 }} 
+            contentFit="contain" 
+          />
         </Pressable>
       </View>
 
