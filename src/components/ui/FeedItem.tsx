@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState } from 'react';
 import { Dimensions, Pressable, Text, View } from 'react-native';
@@ -75,7 +76,7 @@ export const FeedItem = ({
   isActive
 }: FeedItemProps) => {
   const insets = useSafeAreaInsets();
-  
+
   // State to delay video initialization until Activity is guaranteed to be ready
   const [isReady, setIsReady] = useState(false);
 
@@ -86,7 +87,7 @@ export const FeedItem = ({
 
   return (
     <View style={{ height: WINDOW_HEIGHT, width: WINDOW_WIDTH }} className="">
-      
+
       {type === 'video' && isReady ? (
         <FeedVideo source={source} isActive={isActive} />
       ) : type === 'image' ? (
@@ -101,6 +102,14 @@ export const FeedItem = ({
       ) : (
         <View className="absolute inset-0 bg-black" />
       )}
+
+      {/* Gradient Overlay */}
+      <LinearGradient
+        colors={['rgba(133, 138, 138, 0.7)', 'transparent']}
+        className="absolute left-0 right-0 top-0 h-1/2"
+        style={{ paddingTop: insets.top }}
+      />
+
 
       {/* Right Action Buttons */}
       <View className="absolute right-3 items-center gap-5" style={{ bottom: insets.bottom + 100 }}>

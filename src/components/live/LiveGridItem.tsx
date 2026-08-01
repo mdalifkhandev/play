@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEventListener } from 'expo';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState } from 'react';
-import { Dimensions, Pressable, Text, View, ActivityIndicator } from 'react-native';
-import { useEventListener } from 'expo';
+import { ActivityIndicator, Dimensions, Pressable, Text, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = Math.floor((width - 16 - 24) / 2);
@@ -60,7 +60,8 @@ export function LiveGridItem({ item, variant = 'live' }: { item: LiveStreamData,
           {item.isVideo && item.videoUrl && (
             <VideoView
               player={player}
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 8, overflow: 'hidden' }}
+              style={{ width: '100%', height: '100%', borderRadius: 2, overflow: 'hidden' }}
+              // style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 8, overflow: 'hidden' }}
               nativeControls={false}
               contentFit="fill"
             />
@@ -108,20 +109,20 @@ export function LiveGridItem({ item, variant = 'live' }: { item: LiveStreamData,
             <Text className="text-white text-sm font-medium leading-tight mb-2" numberOfLines={2}>
               {item.title}
             </Text>
-            
+
             {/* Author info & Likes */}
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center flex-1 pr-2">
-                <Image 
-                  source={{ uri: item.hostAvatar }} 
-                  style={{ width: 24, height: 24, borderRadius: 12 }} 
+                <Image
+                  source={{ uri: item.hostAvatar }}
+                  style={{ width: 24, height: 24, borderRadius: 12 }}
                 />
                 <View className="ml-2">
                   <Text className="text-white text-xs font-semibold" numberOfLines={1}>{item.hostName}</Text>
                   <Text className="text-[#888] text-[10px] mt-0.5">{item.date}</Text>
                 </View>
               </View>
-              
+
               <View className="flex-row items-center">
                 <Ionicons name="heart-outline" size={14} color="#FFF" />
                 <Text className="text-white text-[10px] ml-1">{item.likes}</Text>
