@@ -11,7 +11,7 @@ const MOCK_DATA: FeedItemProps[] = [
   {
     id: "1",
     type: "video",
-    source: "https://www.w3schools.com/html/mov_bbb.mp4",
+    source: require('../../../assets/videos/mov_bbb.mp4'),
     user: {
       username: "Motin Mia",
       profileImage: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80",

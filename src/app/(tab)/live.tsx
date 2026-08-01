@@ -53,7 +53,7 @@ export const MOCK_LIVES: LiveStreamData[] = [
     viewers: '12k',
     badge: 'Live',
     isVideo: true,
-    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4'
+    videoUrl: require('../../../assets/videos/mov_bbb.mp4')
   },
   {
     id: '6',

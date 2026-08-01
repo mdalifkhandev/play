@@ -24,7 +24,7 @@ const MOCK_SEARCH_RESULTS: LiveStreamData[] = [
     date: '14 Aug 2026',
     likes: '12k',
     isVideo: true,
-    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    videoUrl: require('../../../../assets/videos/mov_bbb.mp4'),
     viewers: '12k',
   },
   {
@@ -37,7 +37,7 @@ const MOCK_SEARCH_RESULTS: LiveStreamData[] = [
     date: '14 Aug 2026',
     likes: '12k',
     isVideo: true,
-    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    videoUrl: require('../../../../assets/videos/mov_bbb.mp4'),
     viewers: '8k',
   },
   {
@@ -50,7 +50,7 @@ const MOCK_SEARCH_RESULTS: LiveStreamData[] = [
     date: '14 Aug 2026',
     likes: '12k',
     isVideo: true,
-    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    videoUrl: require('../../../../assets/videos/mov_bbb.mp4'),
     viewers: '12k',
   },
   {
@@ -64,7 +64,7 @@ const MOCK_SEARCH_RESULTS: LiveStreamData[] = [
     likes: '12k',
     viewers: '12k',
     isVideo: true,
-    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    videoUrl: require('../../../../assets/videos/mov_bbb.mp4'),
   },
 ];
 

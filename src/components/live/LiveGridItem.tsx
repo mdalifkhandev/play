@@ -3,7 +3,8 @@ import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState } from 'react';
-import { Dimensions, Pressable, Text, View } from 'react-native';
+import { Dimensions, Pressable, Text, View, ActivityIndicator } from 'react-native';
+import { useEventListener } from 'expo';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = Math.floor((width - 16 - 24) / 2);
@@ -16,7 +17,7 @@ export type LiveStreamData = {
   viewers: string;
   badge: 'Live' | 'Top like';
   isVideo?: boolean;
-  videoUrl?: string;
+  videoUrl?: string | number; // Number for required local assets
   title?: string;
   date?: string;
   likes?: string;
@@ -31,6 +32,12 @@ export function LiveGridItem({ item, variant = 'live' }: { item: LiveStreamData,
     if (item.isVideo && item.videoUrl) {
       player.play();
     }
+  });
+
+  const [isLoading, setIsLoading] = useState(player.status === 'loading');
+
+  useEventListener(player, 'statusChange', (payload) => {
+    setIsLoading(payload.status === 'loading');
   });
 
   useEffect(() => {
@@ -59,7 +66,13 @@ export function LiveGridItem({ item, variant = 'live' }: { item: LiveStreamData,
             />
           )}
 
-          <View className="absolute inset-0 bg-black/10" />
+          {isLoading && (
+            <View className="absolute inset-0 items-center justify-center bg-black/30">
+              <ActivityIndicator size="large" color="#FF3B30" />
+            </View>
+          )}
+
+          <View className="absolute inset-0 bg-black/10" pointerEvents="none" />
 
           {/* Top Badges */}
           <View className="absolute top-2 left-2 right-2 flex-row justify-between items-center">
