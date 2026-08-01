@@ -17,7 +17,7 @@ export function LiveSingleHeader({ hostAvatar, hostName, viewers, hostId = '1' }
           <Ionicons name="arrow-back" size={28} color="#FFF" />
         </Pressable>
         
-        <Link href={{ pathname: '/user/[id]', params: { id: hostId } }} asChild>
+        <Link href={{ pathname: '/screens/user/[id]', params: { id: hostId } }} asChild>
           <Pressable className="flex-row items-center bg-black/40 rounded-full pr-4 py-1">
             <View className="relative ml-1">
               <Image source={{ uri: hostAvatar }} style={{ width: 36, height: 36, borderRadius: 18 }} />

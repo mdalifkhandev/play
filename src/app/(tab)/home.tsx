@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Dimensions, FlatList, Pressable, Text, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -46,7 +46,8 @@ const MOCK_DATA: FeedItemProps[] = [
   },
 ];
 
-export default function Home() {
+export default function HomeScreen() {
+  const router = useRouter();
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const insets = useSafeAreaInsets();
 
@@ -74,11 +75,11 @@ export default function Home() {
             <Text className="text-white/60 text-base font-semibold">Live</Text>
           </Link>
         </View>
-        <Pressable>
-          <Image 
-            source={require('../../../assets/icon/search.svg')} 
-            style={{ width: 28, height: 28 }} 
-            contentFit="contain" 
+        <Pressable onPress={() => router.push('/screens/search' as any)}>
+          <Image
+            source={require('../../../assets/icon/search.svg')}
+            style={{ width: 28, height: 28 }}
+            contentFit="contain"
           />
         </Pressable>
       </View>

@@ -17,9 +17,12 @@ export type LiveStreamData = {
   badge: 'Live' | 'Top like';
   isVideo?: boolean;
   videoUrl?: string;
+  title?: string;
+  date?: string;
+  likes?: string;
 };
 
-export function LiveGridItem({ item }: { item: LiveStreamData }) {
+export function LiveGridItem({ item, variant = 'live' }: { item: LiveStreamData, variant?: 'live' | 'search' }) {
   const [isMuted, setIsMuted] = useState(true);
 
   const player = useVideoPlayer(item.videoUrl ?? '', player => {
@@ -40,12 +43,12 @@ export function LiveGridItem({ item }: { item: LiveStreamData }) {
   }, [isMuted, player, item.isVideo, item.videoUrl]);
 
   return (
-    <Link href={{ pathname: '/live/[id]', params: { id: item.id } }} asChild>
+    <Link href={{ pathname: '/screens/live/[id]', params: { id: item.id } }} asChild>
       <Pressable
-        style={{ width: ITEM_WIDTH, aspectRatio: 3 / 4 }}
-        className="m-1.5 rounded-lg overflow-hidden bg-[#1A1A1A] relative border border-white/10"
+        style={{ width: ITEM_WIDTH }}
+        className={`rounded-lg overflow-hidden bg-[#1A1A1A] relative border border-white/10 ${variant === 'live' ? 'm-1.5' : 'mb-4'}`}
       >
-        <View className="flex-1 relative">
+        <View style={{ width: ITEM_WIDTH, aspectRatio: 3 / 4 }} className="relative">
           <Image source={{ uri: item.thumbnail }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} contentFit="cover" />
           {item.isVideo && item.videoUrl && (
             <VideoView
@@ -60,13 +63,15 @@ export function LiveGridItem({ item }: { item: LiveStreamData }) {
 
           {/* Top Badges */}
           <View className="absolute top-2 left-2 right-2 flex-row justify-between items-center">
-            <View className={`px-2 py-1 rounded-full ${item.badge === 'Live' ? 'bg-[#FF453A]' : 'bg-[#FF453A]'}`}>
+            <View className={`px-2 py-1 rounded-full ${item.badge === 'Live' ? 'bg-[#FF3B30]' : 'bg-[#FF9500]'}`}>
               <Text className="text-white text-[10px] font-bold">{item.badge}</Text>
             </View>
-            <View className="flex-row items-center bg-[#1C1C1E]/90 px-2 py-1 rounded-md">
-              <Ionicons name="eye-outline" size={12} color="#FFF" />
-              <Text className="text-white text-[10px] ml-1 font-semibold">{item.viewers}</Text>
-            </View>
+            {variant === 'live' && (
+              <View className="flex-row items-center bg-[#1C1C1E]/90 px-2 py-1 rounded-md">
+                <Ionicons name="eye-outline" size={12} color="#FFF" />
+                <Text className="text-white text-[10px] ml-1 font-semibold">{item.viewers}</Text>
+              </View>
+            )}
           </View>
 
           {/* Speaker Icon for Video */}
@@ -83,11 +88,39 @@ export function LiveGridItem({ item }: { item: LiveStreamData }) {
           )}
         </View>
 
-        {/* Bottom User Info */}
-        <View className="flex-row items-center bg-[#1A1A1A] p-2.5">
-          <Image source={{ uri: item.hostAvatar }} style={{ width: 22, height: 22, borderRadius: 11 }} />
-          <Text className="text-white text-xs font-medium ml-2 flex-1" numberOfLines={1}>{item.hostName}</Text>
-        </View>
+        {/* Bottom Info Section */}
+        {variant === 'search' ? (
+          <View className="p-2.5">
+            {/* Title */}
+            <Text className="text-white text-sm font-medium leading-tight mb-2" numberOfLines={2}>
+              {item.title}
+            </Text>
+            
+            {/* Author info & Likes */}
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1 pr-2">
+                <Image 
+                  source={{ uri: item.hostAvatar }} 
+                  style={{ width: 24, height: 24, borderRadius: 12 }} 
+                />
+                <View className="ml-2">
+                  <Text className="text-white text-xs font-semibold" numberOfLines={1}>{item.hostName}</Text>
+                  <Text className="text-[#888] text-[10px] mt-0.5">{item.date}</Text>
+                </View>
+              </View>
+              
+              <View className="flex-row items-center">
+                <Ionicons name="heart-outline" size={14} color="#FFF" />
+                <Text className="text-white text-[10px] ml-1">{item.likes}</Text>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View className="flex-row items-center bg-[#1A1A1A] p-2.5">
+            <Image source={{ uri: item.hostAvatar }} style={{ width: 22, height: 22, borderRadius: 11 }} />
+            <Text className="text-white text-xs font-medium ml-2 flex-1" numberOfLines={1}>{item.hostName}</Text>
+          </View>
+        )}
       </Pressable>
     </Link>
   );

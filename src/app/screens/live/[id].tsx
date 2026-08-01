@@ -1,14 +1,14 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { StatusBar, StyleSheet, View, KeyboardAvoidingView, Platform } from 'react-native';
-import { LiveBottomActions } from '../../components/live/LiveBottomActions';
-import { LiveChatStream } from '../../components/live/LiveChatStream';
-import { LiveSingleHeader } from '../../components/live/LiveSingleHeader';
-import { FloatingReactions, FloatingReactionsHandle } from '../../components/live/FloatingReactions';
+import { KeyboardAvoidingView, Platform, StatusBar, StyleSheet, View } from 'react-native';
+import { FloatingReactions, FloatingReactionsHandle } from '../../../components/live/FloatingReactions';
+import { LiveBottomActions } from '../../../components/live/LiveBottomActions';
+import { LiveChatStream } from '../../../components/live/LiveChatStream';
+import { LiveSingleHeader } from '../../../components/live/LiveSingleHeader';
 
-import { useState, useRef } from 'react';
-import { MOCK_LIVES } from '../(tab)/live';
-import { MOCK_CHAT, ChatMessage } from '../../components/live/LiveChatStream';
+import { useRef, useState } from 'react';
+import { MOCK_LIVES } from '../../(tab)/live';
+import { ChatMessage, MOCK_CHAT } from '../../../components/live/LiveChatStream';
 
 export default function LiveSingleScreen() {
   const { id } = useLocalSearchParams();
@@ -29,7 +29,7 @@ export default function LiveSingleScreen() {
 
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_CHAT);
   const [inputText, setInputText] = useState('');
-  
+
   const floatingReactionsRef = useRef<FloatingReactionsHandle>(null);
 
   const handleSend = () => {
@@ -49,8 +49,8 @@ export default function LiveSingleScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={{ flex: 1 }} 
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
       className="bg-black relative"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
@@ -72,10 +72,10 @@ export default function LiveSingleScreen() {
       />
 
       <LiveChatStream messages={messages} />
-      
+
       <FloatingReactions ref={floatingReactionsRef} />
 
-      <LiveBottomActions 
+      <LiveBottomActions
         inputText={inputText}
         onChangeText={setInputText}
         onSend={handleSend}

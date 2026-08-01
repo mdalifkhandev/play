@@ -52,7 +52,7 @@ export function LiveChatStream({ messages = MOCK_CHAT }: { messages?: ChatMessag
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
         {messages.map((chat) => (
-          <Link key={chat.id} href={{ pathname: '/user/[id]', params: { id: chat.id } }} asChild>
+          <Link key={chat.id} href={{ pathname: '/screens/user/[id]', params: { id: chat.id } }} asChild>
             <Pressable className="flex-row items-center bg-black/40 self-start rounded-full pr-4 py-1.5 pl-1.5">
               <Image source={{ uri: chat.userAvatar }} style={{ width: 32, height: 32, borderRadius: 16 }} />
               <View className="ml-2">
