@@ -80,6 +80,16 @@ export const FeedItem = ({
   // State to delay video initialization until Activity is guaranteed to be ready
   const [isReady, setIsReady] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const lastTap = useRef(0);
+
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      setIsLiked(true);
+    }
+    lastTap.current = now;
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setIsReady(true), 500);
@@ -89,13 +99,15 @@ export const FeedItem = ({
   const spinValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    spinValue.setValue(0);
     Animated.loop(
       Animated.timing(spinValue, {
         toValue: 1,
         duration: 4000,
         easing: Easing.linear,
         useNativeDriver: true,
-      })
+      }),
+      { iterations: -1 }
     ).start();
   }, [spinValue]);
 
@@ -122,6 +134,9 @@ export const FeedItem = ({
         <View className="absolute inset-0 bg-black" />
       )}
 
+      {/* Double tap area spanning the entire media */}
+      <Pressable onPress={handleDoubleTap} className="absolute inset-0" />
+
       {/* Top Gradient Overlay */}
       <LinearGradient
         colors={['rgba(0, 0, 0, 0.4)', 'transparent']}
@@ -139,18 +154,18 @@ export const FeedItem = ({
 
 
       {/* Right Action Buttons */}
-      <View className="absolute right-3 items-center gap-5" style={{ bottom: insets.bottom + 100 }}>
+      <View className="absolute right-4 items-center gap-5" style={{ bottom: insets.bottom + 100 }}>
         <View className="items-center justify-center">
           <View className="w-12 h-12 mb-2">
             <Image source={{ uri: user.profileImage }} className="w-12 h-12 rounded-full border border-white" style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: 'white' }} />
-            <View className="absolute -bottom-2 self-center bg-[#E4FB52] w-5 h-5 rounded-full items-center justify-center">
+            <View className="absolute -bottom-1.5 right-2 self-center bg-[#E4FB52] w-6 h-6 rounded-full items-center justify-center">
               <Ionicons name="add" size={14} color="#000" />
             </View>
           </View>
         </View>
 
-        <Pressable className="items-center justify-center">
-          <Ionicons name="heart" size={36} color="#E4FB52" />
+        <Pressable className="items-center justify-center" onPress={() => setIsLiked(!isLiked)}>
+          <Ionicons name={isLiked ? "heart" : "heart-outline"} size={36} color={isLiked ? "#E4FB52" : "#FFF"} style={{ textShadowColor: 'rgba(255,255,255,0.8)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 }} />
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{stats.likes}</Text>
         </Pressable>
 
@@ -191,7 +206,7 @@ export const FeedItem = ({
       {/* Bottom Text Details */}
       <View className="absolute left-4 right-20 pb-2" style={{ bottom: insets.bottom + 60 }} pointerEvents="box-none">
 
-        <Text 
+        <Text
           className="text-white text-base font-bold mb-1.5"
           style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
         >
@@ -199,8 +214,8 @@ export const FeedItem = ({
         </Text>
 
         <Pressable onPress={() => setIsExpanded(!isExpanded)}>
-          <Text 
-            className="text-white text-sm leading-5" 
+          <Text
+            className="text-white text-sm leading-5"
             numberOfLines={isExpanded ? undefined : 2}
             style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
           >
