@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Dimensions, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,7 +23,46 @@ export interface FeedItemProps {
     bookmarks: string;
     shares: string;
   };
-  isActive: boolean; // Tells if this item is currently visible to play/pause
+  isActive: boolean;
+}
+
+// Extract video to its own component to safely delay its mounting
+function FeedVideo({ source, isActive }: { source: any, isActive: boolean }) {
+  const player = useVideoPlayer(source, player => {
+    player.loop = true;
+  });
+
+  useEffect(() => {
+    if (player) {
+      if (isActive) {
+        player.play();
+      } else {
+        player.pause();
+      }
+    }
+  }, [isActive, player]);
+
+  const togglePlay = () => {
+    if (player) {
+      if (player.playing) {
+        player.pause();
+      } else {
+        player.play();
+      }
+    }
+  };
+
+  return (
+    <Pressable className="absolute inset-0" onPress={togglePlay}>
+      <VideoView
+        player={player}
+        className="absolute inset-0"
+        style={{ width: '100%', height: '100%' }}
+        nativeControls={false}
+        contentFit="cover"
+      />
+    </Pressable>
+  );
 }
 
 export const FeedItem = ({
@@ -36,63 +75,32 @@ export const FeedItem = ({
   isActive
 }: FeedItemProps) => {
   const insets = useSafeAreaInsets();
+  
+  // State to delay video initialization until Activity is guaranteed to be ready
+  const [isReady, setIsReady] = useState(false);
 
-  // Setup video player if type is video
-  const player = useVideoPlayer(source, player => {
-    player.loop = true;
-    if (isActive) {
-      player.play();
-    }
-  });
-
-  // Play/pause based on visibility
   useEffect(() => {
-    if (type === 'video' && player) {
-      if (isActive) {
-        player.play();
-      } else {
-        player.pause();
-      }
-    }
-  }, [isActive, type, player]);
-
-  const togglePlay = () => {
-    if (type === 'video' && player) {
-      if (player.playing) {
-        player.pause();
-      } else {
-        player.play();
-      }
-    }
-  };
+    const timer = setTimeout(() => setIsReady(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <View style={{ height: WINDOW_HEIGHT, width: WINDOW_WIDTH }} className="">
-      <Pressable className="absolute inset-0" onPress={togglePlay}>
-        {type === 'video' ? (
-          <VideoView
-            player={player}
-            className="absolute inset-0"
-            style={{ width: '100%', height: '100%' }}
-            nativeControls={false}
-            contentFit="cover"
-          />
-        ) : (
+      
+      {type === 'video' && isReady ? (
+        <FeedVideo source={source} isActive={isActive} />
+      ) : type === 'image' ? (
+        <Pressable className="absolute inset-0">
           <Image
             source={{ uri: source }}
             className="absolute inset-0"
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
           />
-        )}
-      </Pressable>
-
-      {/* Bottom Gradient Overlay for better text readability */}
-      {/* <LinearGradient
-        colors={['transparent', 'rgba(141, 141, 141, 1)']}
-        className="absolute left-0 right-0 bottom-0 h-1/2"
-        style={{ paddingBottom: insets.bottom + 40 }}
-      /> */}
+        </Pressable>
+      ) : (
+        <View className="absolute inset-0 bg-black" />
+      )}
 
       {/* Right Action Buttons */}
       <View className="absolute right-3 items-center gap-5" style={{ bottom: insets.bottom + 100 }}>
@@ -132,7 +140,6 @@ export const FeedItem = ({
             className="w-11 h-11"
             style={{ width: 44, height: 44 }}
             contentFit="contain"
-
           />
         </View>
       </View>

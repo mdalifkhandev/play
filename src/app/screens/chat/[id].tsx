@@ -1,14 +1,19 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View, Keyboard } from 'react-native';
+import { KeyboardAvoidingView, Platform, View, Keyboard, Text, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { Ionicons } from '@expo/vector-icons';
 
-const INITIAL_MESSAGES = [
+import { ChatHeader } from '../../../components/chat/ChatHeader';
+import { MessageList } from '../../../components/chat/MessageList';
+import { ChatInputArea } from '../../../components/chat/ChatInputArea';
+import { AttachmentMenu } from '../../../components/chat/AttachmentMenu';
+import { MessageType } from '../../../components/chat/MessageBubble';
+import { BottomSheetModal } from '../../../components/ui/BottomSheetModal';
+
+const INITIAL_MESSAGES: MessageType[] = [
   { id: '1', text: 'Hey! How was the new design project coming along?', time: '10:30 AM', sender: 'other', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100' },
   { id: '2', text: 'Hey! How was the new design project coming along?', time: '10:30 AM', sender: 'me' },
   { id: '3', text: 'Hey! How was the new design project coming along?', time: '10:30 AM', sender: 'other', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100' },
@@ -16,22 +21,19 @@ const INITIAL_MESSAGES = [
   { id: '5', text: 'Hey! How was the new design project coming along?', time: '10:30 AM', sender: 'other', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100' },
 ];
 
-function VideoMessage({ uri }: { uri: string }) {
-  const player = useVideoPlayer(uri, (player) => {
-    player.loop = true;
-    player.muted = true;
-  });
-  return <VideoView player={player} style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 8 }} />;
-}
-
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<any[]>(INITIAL_MESSAGES);
+  const [messages, setMessages] = useState<MessageType[]>(INITIAL_MESSAGES);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  // Bottom Sheet States
+  const [showOptionsSheet, setShowOptionsSheet] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<'delete' | 'block' | null>(null);
 
   useEffect(() => {
     const showSubscription = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => {
@@ -118,169 +120,115 @@ export default function ChatScreen() {
     }
   };
 
+  const handleConfirmAction = () => {
+    if (confirmAction === 'delete') {
+      alert('Conversation deleted');
+      setShowOptionsSheet(false);
+      setTimeout(() => router.back(), 300);
+    } else if (confirmAction === 'block') {
+      alert('User blocked');
+      setShowOptionsSheet(false);
+      setTimeout(() => router.back(), 300);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#0A0A0A' }}
       behavior="padding"
     >
       <View className="flex-1" style={{ paddingTop: insets.top, paddingBottom: isKeyboardVisible ? 0 : insets.bottom }}>
+        
+        <ChatHeader 
+          onBack={() => router.back()}
+          onOptions={() => {
+            setConfirmAction(null);
+            setShowOptionsSheet(true);
+          }}
+          userName="Rokey"
+          avatarUrl="https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100"
+          status="Online"
+        />
 
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-4 py-3 border-b border-[#1C1C1E]">
-          <View className="flex-row items-center flex-1">
-            <Pressable onPress={() => router.back()} className="mr-3 p-1">
-              <Ionicons name="arrow-back" size={24} color="#FFF" />
-            </Pressable>
+        <MessageList messages={messages} />
 
-            <View className="relative">
-              <Image
-                source={{ uri: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100' }}
-                style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
-                contentFit="cover"
-              />
-              <View className="absolute bottom-0 right-3 w-3 h-3 bg-[#00C853] rounded-full border-2 border-[#0A0A0A]" />
-            </View>
-
-            <View>
-              <Text className="text-white font-bold text-base">Rokey</Text>
-              <Text className="text-[#888] text-xs">Online</Text>
-            </View>
-          </View>
-
-          <Pressable className="p-1">
-            <Ionicons name="ellipsis-horizontal" size={24} color="#FFF" />
-          </Pressable>
-        </View>
-
-        {/* Messages */}
-        <ScrollView
-          className="flex-1 px-4 pt-4"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 20 }}
-        >
-          {messages.map((msg) => {
-            const isMe = msg.sender === 'me';
-            return (
-              <View
-                key={msg.id}
-                className={`flex-row mb-6 ${isMe ? 'justify-end' : 'justify-start'}`}
-              >
-                {!isMe && (
-                  <View className="mr-2 justify-end pb-1 relative">
-                    <Image
-                      source={{ uri: msg.avatar }}
-                      style={{ width: 32, height: 32, borderRadius: 16 }}
-                      contentFit="cover"
-                    />
-                    <View className="absolute bottom-1 right-0 w-2.5 h-2.5 bg-[#00C853] rounded-full border-2 border-[#0A0A0A]" />
-                  </View>
-                )}
-
-                <View
-                  className={`max-w-[75%] px-4 py-3 rounded-2xl ${isMe
-                    ? 'bg-[#1C1C1E] rounded-br-sm'
-                    : 'bg-[#A3E635] rounded-bl-sm'
-                    }`}
-                >
-                  {msg.attachmentType === 'image' && (
-                    <Image source={{ uri: msg.attachmentUrl }} style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 8 }} contentFit="cover" />
-                  )}
-                  {msg.attachmentType === 'video' && (
-                    <VideoMessage uri={msg.attachmentUrl} />
-                  )}
-                  {msg.attachmentType === 'audio' && (
-                    <View className="flex-row items-center mb-2 bg-[#333] p-2 rounded-lg">
-                      <Ionicons name="musical-notes" size={24} color="#FFF" />
-                      <Text className="text-white ml-2">Audio File</Text>
-                    </View>
-                  )}
-                  {msg.attachmentType === 'file' && (
-                    <View className="flex-row items-center mb-2 bg-[#333] p-2 rounded-lg">
-                      <Ionicons name="document" size={24} color="#FFF" />
-                      <Text className="text-white ml-2">Document</Text>
-                    </View>
-                  )}
-                  <Text className={`text-base ${isMe ? 'text-white' : 'text-black'}`}>
-                    {msg.text}
-                  </Text>
-                  <Text className={`text-[10px] mt-1 ${isMe ? 'text-[#888]' : 'text-black/60'}`}>
-                    {msg.time}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-
-        {/* Attachment Menu */}
         {showAttachMenu && (
-          <View className="px-4 py-4 bg-[#1C1C1E] rounded-t-2xl flex-row justify-around border-t border-[#333]">
-            <Pressable className="items-center" onPress={handleCamera}>
-              <View className="w-12 h-12 rounded-full bg-[#3b82f6] items-center justify-center mb-1">
-                <Ionicons name="camera" size={24} color="#FFF" />
-              </View>
-              <Text className="text-white text-xs">Camera</Text>
-            </Pressable>
-            <Pressable className="items-center" onPress={handleGallery}>
-              <View className="w-12 h-12 rounded-full bg-[#10b981] items-center justify-center mb-1">
-                <Ionicons name="image" size={24} color="#FFF" />
-              </View>
-              <Text className="text-white text-xs">Gallery</Text>
-            </Pressable>
-            <Pressable className="items-center" onPress={() => handleDocumentPick('video')}>
-              <View className="w-12 h-12 rounded-full bg-[#f59e0b] items-center justify-center mb-1">
-                <Ionicons name="videocam" size={24} color="#FFF" />
-              </View>
-              <Text className="text-white text-xs">Video</Text>
-            </Pressable>
-            <Pressable className="items-center" onPress={() => handleDocumentPick('audio')}>
-              <View className="w-12 h-12 rounded-full bg-[#ef4444] items-center justify-center mb-1">
-                <Ionicons name="musical-notes" size={24} color="#FFF" />
-              </View>
-              <Text className="text-white text-xs">Audio</Text>
-            </Pressable>
-            <Pressable className="items-center" onPress={() => handleDocumentPick('file')}>
-              <View className="w-12 h-12 rounded-full bg-[#8b5cf6] items-center justify-center mb-1">
-                <Ionicons name="document" size={24} color="#FFF" />
-              </View>
-              <Text className="text-white text-xs">File</Text>
-            </Pressable>
-          </View>
+          <AttachmentMenu 
+            onCamera={handleCamera}
+            onGallery={handleGallery}
+            onVideo={() => handleDocumentPick('video')}
+            onAudio={() => handleDocumentPick('audio')}
+            onFile={() => handleDocumentPick('file')}
+          />
         )}
 
-        {/* Input Area */}
-        <View className="flex-row items-center px-4 py-3 bg-[#0A0A0A] z-20 border-t border-[#1C1C1E]">
-          <Pressable
-            className="w-12 h-12 rounded-full border border-[#333] items-center justify-center mr-3"
-            onPress={() => setShowAttachMenu(!showAttachMenu)}
-          >
-            <Ionicons name={showAttachMenu ? "close" : "add"} size={36} color="#FFF" />
-          </Pressable>
-
-          <View className="flex-1 h-12 border border-[#333] rounded-full px-4 justify-center mr-3">
-            <TextInput
-              className="text-white text-sm"
-              placeholder="Type a message..."
-              placeholderTextColor="#888"
-              value={message}
-              onChangeText={setMessage}
-              onFocus={() => setShowAttachMenu(false)}
-            />
-          </View>
-
-          <Pressable 
-            className="w-12 h-12 rounded-full border border-[#333] items-center justify-center"
-            onPress={handleSend}
-          >
-            <Image
-              source={require('../../../../assets/icon/send.svg')}
-              style={{ width: 24, height: 24, tintColor: '#FFF', marginLeft: -2, marginTop: -2 }}
-              contentFit="contain"
-            />
-          </Pressable>
-        </View>
-
+        <ChatInputArea 
+          message={message}
+          onChangeMessage={setMessage}
+          onFocus={() => setShowAttachMenu(false)}
+          onSend={handleSend}
+          onToggleAttachMenu={() => setShowAttachMenu(!showAttachMenu)}
+          showAttachMenu={showAttachMenu}
+        />
+        
       </View>
+
+      {/* Options Bottom Sheet */}
+      <BottomSheetModal 
+        visible={showOptionsSheet} 
+        onClose={() => setShowOptionsSheet(false)}
+      >
+        {!confirmAction ? (
+          <View>
+            <View className="items-center mb-6">
+              <Text className="text-white text-lg font-bold">Chat Options</Text>
+            </View>
+            <Pressable 
+              className="flex-row items-center py-4 border-b border-[#333]"
+              onPress={() => setConfirmAction('delete')}
+            >
+              <View className="w-10 h-10 rounded-full bg-red-500/10 items-center justify-center mr-4">
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </View>
+              <Text className="text-red-500 font-semibold text-base">Delete Conversation</Text>
+            </Pressable>
+            <Pressable 
+              className="flex-row items-center py-4"
+              onPress={() => setConfirmAction('block')}
+            >
+              <View className="w-10 h-10 rounded-full bg-red-500/10 items-center justify-center mr-4">
+                <Ionicons name="ban-outline" size={20} color="#ef4444" />
+              </View>
+              <Text className="text-red-500 font-semibold text-base">Block User</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View>
+            <View className="items-center mb-6">
+              <Text className="text-white text-lg font-bold">Are you sure?</Text>
+              <Text className="text-[#888] text-sm mt-2 text-center">
+                {confirmAction === 'delete' 
+                  ? 'This conversation will be permanently deleted from your inbox.' 
+                  : 'You will no longer receive messages from this user.'}
+              </Text>
+            </View>
+            <View className="flex-row justify-between">
+              <Pressable 
+                className="flex-1 bg-[#333] py-3 rounded-xl mr-2 items-center"
+                onPress={() => setConfirmAction(null)}
+              >
+                <Text className="text-white font-semibold">Cancel</Text>
+              </Pressable>
+              <Pressable 
+                className="flex-1 bg-red-500 py-3 rounded-xl ml-2 items-center"
+                onPress={handleConfirmAction}
+              >
+                <Text className="text-white font-semibold">Confirm</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </BottomSheetModal>
     </KeyboardAvoidingView>
   );
 }
