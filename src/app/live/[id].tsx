@@ -1,11 +1,14 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import { StatusBar, StyleSheet, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { LiveBottomActions } from '../../components/live/LiveBottomActions';
 import { LiveChatStream } from '../../components/live/LiveChatStream';
 import { LiveSingleHeader } from '../../components/live/LiveSingleHeader';
+import { FloatingReactions, FloatingReactionsHandle } from '../../components/live/FloatingReactions';
 
+import { useState, useRef } from 'react';
 import { MOCK_LIVES } from '../(tab)/live';
+import { MOCK_CHAT, ChatMessage } from '../../components/live/LiveChatStream';
 
 export default function LiveSingleScreen() {
   const { id } = useLocalSearchParams();
@@ -24,8 +27,33 @@ export default function LiveSingleScreen() {
     viewers: '41.3K',
   };
 
+  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_CHAT);
+  const [inputText, setInputText] = useState('');
+  
+  const floatingReactionsRef = useRef<FloatingReactionsHandle>(null);
+
+  const handleSend = () => {
+    if (!inputText.trim()) return;
+    const newMessage: ChatMessage = {
+      id: Date.now().toString(),
+      userAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+      userName: 'You',
+      message: inputText.trim(),
+    };
+    setMessages([...messages, newMessage]);
+    setInputText('');
+  };
+
+  const handleHeartPress = () => {
+    floatingReactionsRef.current?.addReaction();
+  };
+
   return (
-    <View className="flex-1 bg-black relative">
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      className="bg-black relative"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       <VideoView
@@ -43,9 +71,16 @@ export default function LiveSingleScreen() {
         viewers={streamData.viewers}
       />
 
-      <LiveChatStream />
+      <LiveChatStream messages={messages} />
+      
+      <FloatingReactions ref={floatingReactionsRef} />
 
-      <LiveBottomActions />
-    </View>
+      <LiveBottomActions 
+        inputText={inputText}
+        onChangeText={setInputText}
+        onSend={handleSend}
+        onHeartPress={handleHeartPress}
+      />
+    </KeyboardAvoidingView>
   );
 }
