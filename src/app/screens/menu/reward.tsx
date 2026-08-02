@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, Pressable, ScrollView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import React from 'react';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const CREATORS = [
@@ -35,7 +35,7 @@ export default function RewardScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-        
+
         {/* Analytic Card */}
         <View className="bg-[#151515] border border-[#222] rounded-2xl p-5 mt-4 mb-6">
           <View className="flex-row items-center justify-between mb-6">
@@ -65,7 +65,7 @@ export default function RewardScreen() {
         {/* Trending Creators */}
         <View className="bg-[#151515] border border-[#222] rounded-2xl p-5 mb-6">
           <Text className="text-white font-medium text-base mb-6">Trending Creators</Text>
-          
+
           {CREATORS.map((creator) => (
             <View key={creator.id} className="flex-row items-center mb-5">
               <View className="w-6 h-6 rounded-full items-center justify-center mr-3" style={{ backgroundColor: creator.rankColor }}>
@@ -86,7 +86,7 @@ export default function RewardScreen() {
             <Text className="text-white font-medium text-sm">Get more inspiration</Text>
           </Pressable>
         </View>
-        
+
       </ScrollView>
 
       {/* Floating Button */}
