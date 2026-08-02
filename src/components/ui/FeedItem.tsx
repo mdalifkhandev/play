@@ -139,16 +139,16 @@ export const FeedItem = ({
 
       {/* Top Gradient Overlay */}
       <LinearGradient
-        colors={['rgba(0, 0, 0, 0.4)', 'transparent']}
-        className="absolute left-0 right-0 top-0 h-1/4"
-        style={{ paddingTop: insets.top }}
+        colors={['rgba(0, 0, 0, 0.5)', 'transparent']}
+        style={{ position: 'absolute', left: 0, right: 0, top: 0, height: '25%', paddingTop: insets.top }}
         pointerEvents="none"
       />
 
       {/* Bottom Gradient Overlay for text readability */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.8)']}
-        className="absolute left-0 right-0 bottom-0 h-2/5"
+        colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.95)']}
+        locations={[0, 0.5, 0.85, 1]}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '35%' }}
         pointerEvents="none"
       />
 
