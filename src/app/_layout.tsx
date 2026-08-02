@@ -11,8 +11,19 @@ import {
 } from "@expo-google-fonts/inter";
 import "../../global.css";
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -33,9 +44,9 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }} />
-    </>
+    </QueryClientProvider>
   );
 }
