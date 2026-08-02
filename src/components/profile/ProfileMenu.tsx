@@ -1,8 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Modal, Pressable, Animated, Dimensions, Switch, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { apiClient } from '../../api/client';
+import { useAppStore } from '../../store';
+import { toast } from 'sonner-native';
 
 const { width } = Dimensions.get('window');
 
@@ -16,6 +19,21 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(width)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const logoutAction = useAppStore((state) => state.logout);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await apiClient.post('/auth/logout');
+    } catch (e) {
+      // Ignore errors during logout on backend
+    }
+    logoutAction();
+    setLogoutModalVisible(false);
+    toast.success('Logged out successfully');
+    onClose();
+    router.replace('/(auth)/login');
+  };
 
   useEffect(() => {
     if (visible) {
@@ -190,11 +208,48 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
                 <Ionicons name="chevron-forward" size={20} color="#888" />
               </Pressable>
 
+              <View className="h-[1px] bg-[#222] my-2" />
+
+              <Pressable onPress={() => setLogoutModalVisible(true)} className="flex-row items-center justify-between py-3">
+                <View className="flex-row items-center">
+                  <Ionicons name="log-out-outline" size={22} color="#EF4444" />
+                  <Text className="text-[#EF4444] text-base ml-4 font-medium">Log out</Text>
+                </View>
+              </Pressable>
+
             </View>
 
           </ScrollView>
         </Animated.View>
       </View>
+
+      {/* Logout Confirmation Bottom Sheet */}
+      <Modal visible={logoutModalVisible} transparent animationType="fade" onRequestClose={() => setLogoutModalVisible(false)}>
+        <View className="flex-1 justify-end bg-black/50">
+          <Pressable className="flex-1" onPress={() => setLogoutModalVisible(false)} />
+          <View className="bg-[#111] rounded-t-3xl p-6" style={{ paddingBottom: insets.bottom + 24 }}>
+            <Text className="text-white text-xl font-bold text-center mb-2">Logout</Text>
+            <Text className="text-[#888] text-center mb-8">Are you sure you want to log out?</Text>
+            
+            <View className="flex-row justify-between gap-4">
+              <Pressable 
+                onPress={() => setLogoutModalVisible(false)}
+                className="flex-1 py-4 rounded-xl border border-[#333] items-center"
+              >
+                <Text className="text-white font-semibold">Cancel</Text>
+              </Pressable>
+              
+              <Pressable 
+                onPress={handleLogout}
+                className="flex-1 py-4 rounded-xl bg-[#EF4444] items-center"
+              >
+                <Text className="text-white font-semibold">Yes, Logout</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </Modal>
   );
 }
