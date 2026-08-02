@@ -1,11 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View, Alert } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMutation } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
-import { apiClient, handleApiError } from "../../../src/api/client";
+import { toast } from "sonner-native";
+import { handleApiError } from "../../../src/api/client";
+import { useSignupMutation } from "../../../src/api/auth";
 import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { CustomButton } from "../../components/ui/CustomButton";
@@ -18,39 +18,40 @@ export default function SignUp() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const insets = useSafeAreaInsets();
 
-  const mutation = useMutation({
-    mutationFn: (data: any) => {
-      return apiClient.post('/auth/sign-up', data);
-    },
-    onSuccess: (response) => {
-      toast.success('Signup Successful!');
-      // Assuming success means we can proceed to OTP
-      router.push({ pathname: '/(auth)/verify-otp', params: { type: 'signup', email } });
-    },
-    onError: (error: any) => {
-      if (error?.response?.status === 409) {
-        toast.error('User already exists. Please login.');
-      } else {
-        toast.error(handleApiError(error, 'Failed to sign up'));
-      }
-    }
-  });
+  const signupMutation = useSignupMutation();
 
   const handleSignUp = () => {
     if (!email || !password || !confirmPassword) {
-      toast.error('Please fill all fields');
+      toast.error('Please fill in all fields');
       return;
     }
+
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
-    mutation.mutate({
-      email,
-      password,
-      confirmPassword,
-      acceptTerms
-    });
+
+    if (!acceptTerms) {
+      toast.error('Please accept the Terms of Service');
+      return;
+    }
+
+    signupMutation.mutate(
+      { email, password, confirmPassword, acceptTerms },
+      {
+        onSuccess: (response) => {
+          toast.success('Signup Successful!');
+          router.push({ pathname: '/(auth)/verify-otp', params: { type: 'signup', email } });
+        },
+        onError: (error: any) => {
+          if (error?.response?.status === 409) {
+            toast.error('User already exists. Please login.');
+          } else {
+            toast.error(handleApiError(error, 'Failed to sign up'));
+          }
+        }
+      }
+    );
   };
 
   return (
@@ -105,11 +106,11 @@ export default function SignUp() {
         </Pressable>
 
         <CustomButton
-          title={mutation.isPending ? "Signing Up..." : "Sign Up"}
+          title={signupMutation.isPending ? "Signing Up..." : "Sign Up"}
           variant="primary"
           containerStyle="mb-10"
           onPress={handleSignUp}
-          disabled={!acceptTerms || mutation.isPending}
+          disabled={!acceptTerms || signupMutation.isPending}
         />
 
         <View className="flex-row items-center mb-8">

@@ -3,9 +3,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner-native";
-import { apiClient, handleApiError } from "../../../src/api/client";
+import { useResetPasswordMutation } from "../../../src/api/auth";
+import { handleApiError } from "../../../src/api/client";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { Header } from "../../components/ui/Header";
 import { CustomButton } from "../../components/ui/CustomButton";
@@ -17,18 +17,7 @@ export default function ResetPassword() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const insets = useSafeAreaInsets();
 
-  const resetMutation = useMutation({
-    mutationFn: (data: { resetToken: string, newPassword: string, confirmPassword: string, acceptTerms: boolean }) => {
-      return apiClient.post('/auth/reset-password', data);
-    },
-    onSuccess: () => {
-      toast.success('Password updated successfully!');
-      router.push("/(auth)/login");
-    },
-    onError: (error: any) => {
-      toast.error(handleApiError(error, 'Failed to reset password'));
-    }
-  });
+  const resetMutation = useResetPasswordMutation();
 
   const handleResetPassword = () => {
     if (!newPassword || !confirmPassword) {
@@ -39,12 +28,23 @@ export default function ResetPassword() {
       toast.error('Passwords do not match');
       return;
     }
-    resetMutation.mutate({
-      resetToken: resetToken || '',
-      newPassword,
-      confirmPassword,
-      acceptTerms
-    });
+    resetMutation.mutate(
+      {
+        resetToken: resetToken || '',
+        newPassword,
+        confirmPassword,
+        acceptTerms
+      },
+      {
+        onSuccess: () => {
+          toast.success('Password updated successfully!');
+          router.push("/(auth)/login");
+        },
+        onError: (error: any) => {
+          toast.error(handleApiError(error, 'Failed to reset password'));
+        }
+      }
+    );
   };
 
   return (

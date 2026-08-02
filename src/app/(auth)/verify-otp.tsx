@@ -8,6 +8,7 @@ import { toast } from 'sonner-native';
 import { apiClient, handleApiError } from "../../../src/api/client";
 import { CustomButton } from "../../components/ui/CustomButton";
 import { Header } from "../../components/ui/Header";
+import { useResendOtpMutation, useVerifyOtpMutation, useVerifyResetCodeMutation } from "../../../src/api/auth";
 
 export default function VerifyOtp() {
   const { type, email: paramEmail } = useLocalSearchParams<{ type: string; email: string }>();
@@ -27,54 +28,24 @@ export default function VerifyOtp() {
     return () => clearInterval(timerId);
   }, [timeLeft]);
 
-  const verifyMutation = useMutation({
-    mutationFn: (data: { email: string, code: string }) => {
-      return apiClient.post('/auth/verify-email', data);
-    },
-    onSuccess: () => {
-      toast.success('Email verified successfully!');
-      if (type === 'forgot') {
-        router.push("/(auth)/reset-password");
-      } else {
-        router.push("/(auth)/profile-setup");
-      }
-    },
-    onError: (error: any) => {
-      toast.error(handleApiError(error, 'Failed to verify email'));
-    }
-  });
-
-  const resendMutation = useMutation({
-    mutationFn: (data: { email: string }) => {
-      return apiClient.post('/auth/resend-verification', data);
-    },
-    onSuccess: () => {
-      toast.success('Verification code resent successfully!');
-      setTimeLeft(60);
-    },
-    onError: (error: any) => {
-      toast.error(handleApiError(error, 'Failed to resend code'));
-    }
-  });
-
-  const verifyResetMutation = useMutation({
-    mutationFn: (data: { email: string, code: string }) => {
-      return apiClient.post('/auth/verify-reset-code', data);
-    },
-    onSuccess: (response) => {
-      toast.success('Code verified successfully!');
-      // Get resetToken from response
-      const resetToken = response.data?.data?.resetToken || response.data?.resetToken;
-      router.push({ pathname: "/(auth)/reset-password", params: { resetToken, email } });
-    },
-    onError: (error: any) => {
-      toast.error(handleApiError(error, 'Failed to verify code'));
-    }
-  });
+  const verifyMutation = useVerifyOtpMutation();
+  const resendMutation = useResendOtpMutation();
+  const verifyResetMutation = useVerifyResetCodeMutation();
 
   const handleResend = () => {
     if (timeLeft > 0 || resendMutation.isPending) return;
-    resendMutation.mutate({ email });
+    resendMutation.mutate(
+      { email },
+      {
+        onSuccess: () => {
+          toast.success('Verification code resent successfully!');
+          setTimeLeft(60);
+        },
+        onError: (error: any) => {
+          toast.error(handleApiError(error, 'Failed to resend code'));
+        }
+      }
+    );
   };
 
   const handleVerify = () => {
@@ -84,9 +55,32 @@ export default function VerifyOtp() {
     }
     
     if (type === 'forgot') {
-      verifyResetMutation.mutate({ email, code });
+      verifyResetMutation.mutate(
+        { email, code },
+        {
+          onSuccess: (response: any) => {
+            toast.success('Code verified successfully!');
+            const resetToken = response.data?.data?.resetToken || response.data?.resetToken;
+            router.push({ pathname: "/(auth)/reset-password", params: { resetToken, email } });
+          },
+          onError: (error: any) => {
+            toast.error(handleApiError(error, 'Failed to verify code'));
+          }
+        }
+      );
     } else {
-      verifyMutation.mutate({ email, code });
+      verifyMutation.mutate(
+        { email, code },
+        {
+          onSuccess: () => {
+            toast.success('Email verified successfully!');
+            router.push("/(auth)/profile-setup");
+          },
+          onError: (error: any) => {
+            toast.error(handleApiError(error, 'Failed to verify email'));
+          }
+        }
+      );
     }
   };
 

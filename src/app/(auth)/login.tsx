@@ -3,10 +3,10 @@ import { Link, router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner-native";
-import { apiClient, handleApiError } from "../../../src/api/client";
+import { handleApiError } from "../../../src/api/client";
 import { useAppStore } from "../../../src/store";
+import { useLoginMutation } from "../../../src/api/auth";
 import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { CustomButton } from "../../components/ui/CustomButton";
@@ -19,30 +19,31 @@ export default function Login() {
   const insets = useSafeAreaInsets();
   const setAuth = useAppStore((state) => state.setAuth);
 
-  const loginMutation = useMutation({
-    mutationFn: (data: { email: string; password: string; rememberMe: boolean }) => {
-      return apiClient.post('/auth/login', data);
-    },
-    onSuccess: (response) => {
-      const accessToken = response.data?.data?.tokens?.accessToken;
-      const user = response.data?.data?.user;
-      if (accessToken) {
-        setAuth(accessToken, user);
-      }
-      toast.success('Login Successful!');
-      router.push('/home');
-    },
-    onError: (error: any) => {
-      toast.error(handleApiError(error, 'Failed to login'));
-    }
-  });
+  const loginMutation = useLoginMutation();
 
   const handleLogin = () => {
     if (!email || !password) {
       toast.error('Please enter email and password');
       return;
     }
-    loginMutation.mutate({ email, password, rememberMe });
+    
+    loginMutation.mutate(
+      { email, password, rememberMe },
+      {
+        onSuccess: (response) => {
+          const accessToken = response.data?.data?.tokens?.accessToken;
+          const user = response.data?.data?.user;
+          if (accessToken) {
+            setAuth(accessToken, user);
+          }
+          toast.success('Login Successful!');
+          router.push('/home');
+        },
+        onError: (error: any) => {
+          toast.error(handleApiError(error, 'Failed to login'));
+        }
+      }
+    );
   };
 
   return (
