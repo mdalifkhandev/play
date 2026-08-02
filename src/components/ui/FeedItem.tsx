@@ -158,7 +158,7 @@ export const FeedItem = ({
         <View className="items-center justify-center">
           <View className="w-12 h-12 mb-2">
             <Image source={{ uri: user.profileImage }} className="w-12 h-12 rounded-full border border-white" style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: 'white' }} />
-            <View className="absolute -bottom-1.5 right-2 self-center bg-[#E4FB52] w-6 h-6 rounded-full items-center justify-center">
+            <View className="absolute -bottom-4 right-1.5 self-center bg-[#E4FB52] w-6 h-6 rounded-full items-center justify-center">
               <Ionicons name="add" size={14} color="#000" />
             </View>
           </View>

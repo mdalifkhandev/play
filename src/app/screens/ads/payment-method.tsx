@@ -5,14 +5,14 @@ import { useRouter } from 'expo-router';
 import { Header } from '../../../components/ui/Header';
 import { PaymentMethodSelection } from '../../../components/payment/PaymentMethodSelection';
 
-export default function PaymentMethodScreen() {
+export default function AdsPaymentMethodScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       <Header title="Payment" />
-      <PaymentMethodSelection onContinue={() => router.push('/screens/subscription/card-details')} />
+      <PaymentMethodSelection onContinue={() => router.push('/screens/ads/card-details')} />
     </View>
   );
 }
