@@ -81,6 +81,7 @@ export const FeedItem = ({
   const [isReady, setIsReady] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const lastTap = useRef(0);
 
   const handleDoubleTap = () => {
@@ -174,8 +175,8 @@ export const FeedItem = ({
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{stats.comments}</Text>
         </Pressable>
 
-        <Pressable className="items-center justify-center">
-          <Ionicons name="bookmark" size={32} color="#FFF" />
+        <Pressable className="items-center justify-center" onPress={() => setIsSaved(!isSaved)}>
+          <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={32} color={isSaved ? "#FFF" : "#FFF"} style={isSaved ? { textShadowColor: 'rgba(255,255,255,0.8)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 } : undefined} />
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{stats.bookmarks}</Text>
         </Pressable>
 
@@ -196,12 +197,14 @@ export const FeedItem = ({
       </View>
 
       {/* Centered Full Screen Button */}
-      <View className="absolute left-0 right-0 items-center pointer-events-auto" style={{ bottom: insets.bottom + 130 }}>
-        <Pressable className="flex-row items-center bg-black/50 px-3 py-1.5 rounded-2xl">
-          <Ionicons name="scan-outline" size={16} color="#FFF" />
-          <Text className="text-white ml-1.5 text-xs font-medium">Full screen</Text>
-        </Pressable>
-      </View>
+      {!isExpanded && (
+        <View className="absolute left-0 right-0 items-center pointer-events-auto" style={{ bottom: insets.bottom + 130 }}>
+          <Pressable className="flex-row items-center bg-black/50 px-3 py-1.5 rounded-2xl">
+            <Ionicons name="scan-outline" size={16} color="#FFF" />
+            <Text className="text-white ml-1.5 text-xs font-medium">Full screen</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* Bottom Text Details */}
       <View className="absolute left-4 right-20 pb-2" style={{ bottom: insets.bottom + 60 }} pointerEvents="box-none">
@@ -216,11 +219,10 @@ export const FeedItem = ({
         <Pressable onPress={() => setIsExpanded(!isExpanded)}>
           <Text
             className="text-white text-sm leading-5"
-            numberOfLines={isExpanded ? undefined : 2}
             style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
           >
-            {description}
-            {!isExpanded && (
+            {isExpanded || description.length <= 85 ? description : `${description.substring(0, 85)}...`}
+            {!isExpanded && description.length > 85 && (
               <Text className="text-[#CCC] font-bold"> more</Text>
             )}
           </Text>

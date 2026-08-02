@@ -16,7 +16,7 @@ const MOCK_DATA: FeedItemProps[] = [
       username: "Motin Mia",
       profileImage: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80",
     },
-    description: "Norway beat Brazil 2-1 in the Round of 16 of the 2026 World Cup...",
+    description: "Norway beat Brazil 2-1 in the Round of 16 of the 2026 World Cup. It was an amazing match with lots of unexpected twists and turns. The fans were going wild in the stadium, cheering for every single goal and save. Truly a historic moment in football history!",
     date: "14 Aug 2026",
     stats: {
       likes: "133.1K",
@@ -34,7 +34,7 @@ const MOCK_DATA: FeedItemProps[] = [
       username: "Photography Daily",
       profileImage: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
     },
-    description: "Behind the scenes of our latest studio shoot!Behind the scenes of our latest studio shoot!Behind the scenes of our latest studio shoot! 📸✨",
+    description: "Behind the scenes of our latest studio shoot! 📸✨ We spent the whole day setting up the perfect lighting, adjusting the props, and making sure every single shot captured the essence of our new collection. It was exhausting but totally worth it. Check out these exclusive sneak peeks!",
     date: "12 Aug 2026",
     stats: {
       likes: "45.2K",
@@ -48,6 +48,7 @@ const MOCK_DATA: FeedItemProps[] = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('following');
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const insets = useSafeAreaInsets();
 
@@ -68,9 +69,22 @@ export default function HomeScreen() {
         style={{ top: insets.top + 10 }}
       >
         <View style={{ width: 32 }} />
-        <View className="flex-row gap-5">
-          <Text className="text-white/60 text-base font-semibold">For You</Text>
-          <Text className="text-white text-base font-semibold underline">Following</Text>
+        <View className="flex-row gap-5 items-center">
+          
+          <Pressable onPress={() => setActiveTab('foryou')} className="relative items-center">
+            <Text className={`text-base font-semibold ${activeTab === 'foryou' ? 'text-white' : 'text-white/60'}`}>For You</Text>
+            {activeTab === 'foryou' && (
+              <View className="absolute -bottom-1.5 w-6 h-[3px] bg-white rounded-full" />
+            )}
+          </Pressable>
+
+          <Pressable onPress={() => setActiveTab('following')} className="relative items-center">
+            <Text className={`text-base font-semibold ${activeTab === 'following' ? 'text-white' : 'text-white/60'}`}>Following</Text>
+            {activeTab === 'following' && (
+              <View className="absolute -bottom-1.5 w-6 h-[3px] bg-white rounded-full" />
+            )}
+          </Pressable>
+
           <Link href="/live" asChild>
             <Text className="text-white/60 text-base font-semibold">Live</Text>
           </Link>

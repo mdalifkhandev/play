@@ -26,7 +26,7 @@ export function LiveBottomActions({ inputText, onChangeText, onSend, onHeartPres
   const bottomPadding = isKeyboardVisible ? 10 : Math.max(insets.bottom, 10);
 
   return (
-    <View style={{ paddingBottom: bottomPadding }} className="absolute bottom-0 left-0 right-0 px-4 flex-row items-center z-10 pt-2">
+    <View style={{ paddingBottom: bottomPadding }} className="absolute bottom-2 left-0 right-0 px-4 flex-row items-center z-10 pt-2">
       <View className="flex-row flex-1 bg-black/40 rounded-full items-center p-1 pl-3">
         <Pressable>
           <Ionicons name="gift-outline" size={24} color="#FFD700" />

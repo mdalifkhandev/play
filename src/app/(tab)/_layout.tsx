@@ -15,9 +15,11 @@ export default function TabLayout() {
           height: 60 + insets.bottom,
           paddingBottom: insets.bottom,
           paddingTop: 10,
+          marginBottom: 5
         },
         tabBarActiveTintColor: '#FFFFFF',
         tabBarInactiveTintColor: '#888888',
+
       }}
     >
       <Tabs.Screen

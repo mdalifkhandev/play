@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import { AudioPlayer, createAudioPlayer } from 'expo-audio';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
-import { Pressable, Text, TextInput, View, ScrollView, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LiveGridItem, LiveStreamData } from '../../../components/live/LiveGridItem';
-import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 
 const MOCK_SOUNDS = [
   { id: '1', title: 'Summer Vibes', author: 'DJ Motin', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', time: '00:15', usage: '1.5M' },
@@ -69,13 +69,13 @@ const MOCK_SEARCH_RESULTS: LiveStreamData[] = [
 ];
 
 const TABS = ['Top', 'Users', 'Video', 'Photo', 'Sound', 'Hashtags'];
-const FILTERS = ['All', 'Unwatch', 'Wath', 'Recent uploaded'];
+const FILTERS = ['All', 'Unwatch', 'Watch', 'Recent uploaded'];
 
 export default function SearchResultsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { q } = useLocalSearchParams<{ q: string }>();
-  
+
   const [query, setQuery] = useState(q || '');
   const [activeTab, setActiveTab] = useState('Top');
   const [activeFilter, setActiveFilter] = useState('All');
@@ -87,8 +87,8 @@ export default function SearchResultsScreen() {
   useEffect(() => {
     return sound
       ? () => {
-          sound.remove();
-        }
+        sound.remove();
+      }
       : undefined;
   }, [sound]);
 
@@ -117,7 +117,7 @@ export default function SearchResultsScreen() {
       const newSound = createAudioPlayer(item.url);
       newSound.play();
       setSound(newSound);
-      
+
       newSound.addListener('playbackStatusUpdate', (status) => {
         if (status.isLoaded && status.playing) {
           setLoadingId(null);
@@ -141,14 +141,14 @@ export default function SearchResultsScreen() {
   return (
     <View className="flex-1 bg-black">
       {/* Header with Search Bar */}
-      <View 
+      <View
         className="flex-row items-center px-4 pt-4 pb-2"
         style={{ paddingTop: insets.top + 10 }}
       >
         <Pressable onPress={() => router.back()} className="mr-3">
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </Pressable>
-        
+
         <View className="flex-1 flex-row items-center bg-[#2A2A2A] rounded-md px-3 h-10">
           <Ionicons name="search" size={20} color="#888" />
           <TextInput
@@ -172,8 +172,8 @@ export default function SearchResultsScreen() {
       <View className="border-b border-[#2A2A2A]">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
           {TABS.map((tab) => (
-            <Pressable 
-              key={tab} 
+            <Pressable
+              key={tab}
               onPress={() => setActiveTab(tab)}
               className="mr-6 py-3 border-b-2"
               style={{ borderBottomColor: activeTab === tab ? '#98FF2F' : 'transparent' }}
@@ -188,8 +188,8 @@ export default function SearchResultsScreen() {
       <View className="py-3 px-4 border-b border-[#2A2A2A]">
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {FILTERS.map((filter) => (
-            <Pressable 
-              key={filter} 
+            <Pressable
+              key={filter}
               onPress={() => setActiveFilter(filter)}
               className={`mr-3 px-4 py-1.5 rounded-md ${activeFilter === filter ? 'bg-[#98FF2F]' : 'bg-[#2A2A2A]'}`}
             >
@@ -220,11 +220,11 @@ export default function SearchResultsScreen() {
                   <Ionicons name="chevron-forward" size={14} color="#888" />
                 </Pressable>
               </View>
-              
+
               {/* Sound Items List */}
               {MOCK_SOUNDS.slice(0, 3).map((item) => (
-                <Pressable 
-                  key={item.id} 
+                <Pressable
+                  key={item.id}
                   className="flex-row items-center justify-between px-4 py-2"
                   onPress={() => {
                     if (sound) sound.remove();
@@ -245,17 +245,17 @@ export default function SearchResultsScreen() {
                       <Text className="text-[#888] text-xs mt-1">{item.time} • {item.usage} video</Text>
                     </View>
                   </View>
-                  <Pressable 
+                  <Pressable
                     onPress={() => toggleSound(item)}
                     className={`h-8 w-8 rounded-full items-center justify-center ${playingId === item.id ? 'bg-[#FF3333]' : 'bg-[#98FF2F]'}`}
                   >
                     {loadingId === item.id ? (
                       <ActivityIndicator size="small" color="#000" />
                     ) : (
-                      <Ionicons 
-                        name={playingId === item.id ? "stop" : "play"} 
-                        size={16} 
-                        color={playingId === item.id ? "#FFF" : "#000"} 
+                      <Ionicons
+                        name={playingId === item.id ? "stop" : "play"}
+                        size={16}
+                        color={playingId === item.id ? "#FFF" : "#000"}
                       />
                     )}
                   </Pressable>

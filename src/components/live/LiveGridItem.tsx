@@ -80,12 +80,12 @@ export function LiveGridItem({ item, variant = 'live' }: { item: LiveStreamData,
             <View className={`px-2 py-1 rounded-full ${item.badge === 'Live' ? 'bg-[#FF3B30]' : 'bg-[#FF9500]'}`}>
               <Text className="text-white text-[10px] font-bold">{item.badge}</Text>
             </View>
-            {variant === 'live' && (
-              <View className="flex-row items-center bg-[#1C1C1E]/90 px-2 py-1 rounded-md">
-                <Ionicons name="eye-outline" size={12} color="#FFF" />
-                <Text className="text-white text-[10px] ml-1 font-semibold">{item.viewers}</Text>
-              </View>
-            )}
+
+            <View className="flex-row items-center bg-[#1C1C1E]/90 px-2 py-1 rounded-md">
+              <Ionicons name="eye-outline" size={12} color="#FFF" />
+              <Text className="text-white text-[10px] ml-1 font-semibold">{item.viewers}</Text>
+            </View>
+
           </View>
 
           {/* Speaker Icon for Video */}
