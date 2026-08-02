@@ -1,15 +1,51 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner-native";
+import { apiClient, handleApiError } from "../../../src/api/client";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { Header } from "../../components/ui/Header";
 import { CustomButton } from "../../components/ui/CustomButton";
 
 export default function ResetPassword() {
+  const { resetToken, email } = useLocalSearchParams<{ resetToken: string, email: string }>();
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
   const insets = useSafeAreaInsets();
+
+  const resetMutation = useMutation({
+    mutationFn: (data: { resetToken: string, newPassword: string, confirmPassword: string, acceptTerms: boolean }) => {
+      return apiClient.post('/auth/reset-password', data);
+    },
+    onSuccess: () => {
+      toast.success('Password updated successfully!');
+      router.push("/(auth)/login");
+    },
+    onError: (error: any) => {
+      toast.error(handleApiError(error, 'Failed to reset password'));
+    }
+  });
+
+  const handleResetPassword = () => {
+    if (!newPassword || !confirmPassword) {
+      toast.error('Please fill all fields');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    resetMutation.mutate({
+      resetToken: resetToken || '',
+      newPassword,
+      confirmPassword,
+      acceptTerms
+    });
+  };
 
   return (
     <KeyboardAvoidingView 
@@ -28,6 +64,8 @@ export default function ResetPassword() {
           iconName="lock-closed-outline"
           isPassword
           containerStyle="mb-6"
+          value={newPassword}
+          onChangeText={setNewPassword}
         />
 
         <CustomInput
@@ -36,6 +74,8 @@ export default function ResetPassword() {
           iconName="lock-closed-outline"
           isPassword
           containerStyle="mb-6"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
         />
 
         <Pressable 
@@ -49,9 +89,9 @@ export default function ResetPassword() {
         </Pressable>
 
         <CustomButton
-          title="Update Password"
-          onPress={() => router.push("/home")}
-          disabled={!acceptTerms}
+          title={resetMutation.isPending ? "Updating..." : "Update Password"}
+          onPress={handleResetPassword}
+          disabled={!acceptTerms || resetMutation.isPending}
         />
       </ScrollView>
     </KeyboardAvoidingView>

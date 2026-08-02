@@ -9,6 +9,8 @@ import {
   Inter_600SemiBold, 
   Inter_700Bold 
 } from "@expo-google-fonts/inter";
+import { Toaster } from 'sonner-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import "../../global.css";
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -44,9 +46,12 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }} />
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <StatusBar style="light" />
+        <Stack screenOptions={{ headerShown: false }} />
+        <Toaster />
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

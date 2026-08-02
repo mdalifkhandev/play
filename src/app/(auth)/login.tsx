@@ -3,14 +3,47 @@ import { Link, router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner-native";
+import { apiClient, handleApiError } from "../../../src/api/client";
+import { useAppStore } from "../../../src/store";
 import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { CustomButton } from "../../components/ui/CustomButton";
 import { Header } from "../../components/ui/Header";
 
 export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const insets = useSafeAreaInsets();
+  const setAuth = useAppStore((state) => state.setAuth);
+
+  const loginMutation = useMutation({
+    mutationFn: (data: { email: string; password: string; rememberMe: boolean }) => {
+      return apiClient.post('/auth/login', data);
+    },
+    onSuccess: (response) => {
+      const accessToken = response.data?.data?.tokens?.accessToken;
+      const user = response.data?.data?.user;
+      if (accessToken) {
+        setAuth(accessToken, user);
+      }
+      toast.success('Login Successful!');
+      router.push('/home');
+    },
+    onError: (error: any) => {
+      toast.error(handleApiError(error, 'Failed to login'));
+    }
+  });
+
+  const handleLogin = () => {
+    if (!email || !password) {
+      toast.error('Please enter email and password');
+      return;
+    }
+    loginMutation.mutate({ email, password, rememberMe });
+  };
 
   return (
     <KeyboardAvoidingView
@@ -27,6 +60,10 @@ export default function Login() {
           label="Enter Your E-mail"
           placeholder="E-mail address or number"
           containerStyle="mb-6"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
         />
 
         <CustomInput
@@ -34,6 +71,8 @@ export default function Login() {
           placeholder="••••••••"
           iconName="lock-closed-outline"
           isPassword
+          value={password}
+          onChangeText={setPassword}
         />
 
         <View className="flex-row justify-between items-center mb-8">
@@ -52,10 +91,11 @@ export default function Login() {
         </View>
 
         <CustomButton
-          title="Login"
+          title={loginMutation.isPending ? "Logging in..." : "Login"}
           variant="primary"
           containerStyle="mb-10"
-          onPress={() => router.push('/home')}
+          onPress={handleLogin}
+          disabled={loginMutation.isPending}
         />
 
         <View className="flex-row items-center mb-8">

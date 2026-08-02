@@ -1,16 +1,57 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner-native';
+import { apiClient, handleApiError } from "../../../src/api/client";
 import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { CustomButton } from "../../components/ui/CustomButton";
 import { Header } from "../../components/ui/Header";
 
 export default function SignUp() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
   const insets = useSafeAreaInsets();
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => {
+      return apiClient.post('/auth/sign-up', data);
+    },
+    onSuccess: (response) => {
+      toast.success('Signup Successful!');
+      // Assuming success means we can proceed to OTP
+      router.push({ pathname: '/(auth)/verify-otp', params: { type: 'signup', email } });
+    },
+    onError: (error: any) => {
+      if (error?.response?.status === 409) {
+        toast.error('User already exists. Please login.');
+      } else {
+        toast.error(handleApiError(error, 'Failed to sign up'));
+      }
+    }
+  });
+
+  const handleSignUp = () => {
+    if (!email || !password || !confirmPassword) {
+      toast.error('Please fill all fields');
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    mutation.mutate({
+      email,
+      password,
+      confirmPassword,
+      acceptTerms
+    });
+  };
 
   return (
     <KeyboardAvoidingView
@@ -27,6 +68,10 @@ export default function SignUp() {
           label="Enter Your E-mail"
           placeholder="E-mail address"
           containerStyle="mb-6"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
         />
 
         <CustomInput
@@ -35,6 +80,8 @@ export default function SignUp() {
           iconName="lock-closed-outline"
           isPassword
           containerStyle="mb-6"
+          value={password}
+          onChangeText={setPassword}
         />
 
         <CustomInput
@@ -43,6 +90,8 @@ export default function SignUp() {
           iconName="lock-closed-outline"
           isPassword
           containerStyle="mb-4"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
         />
 
         <Pressable
@@ -56,11 +105,11 @@ export default function SignUp() {
         </Pressable>
 
         <CustomButton
-          title="Sign Up"
+          title={mutation.isPending ? "Signing Up..." : "Sign Up"}
           variant="primary"
           containerStyle="mb-10"
-          onPress={() => router.push({ pathname: '/(auth)/verify-otp', params: { type: 'signup' } })}
-          disabled={!acceptTerms}
+          onPress={handleSignUp}
+          disabled={!acceptTerms || mutation.isPending}
         />
 
         <View className="flex-row items-center mb-8">

@@ -10,13 +10,15 @@ export const apiClient = axios.create({
   },
 });
 
+import { useAppStore } from '../store';
+
 // Example of how you might add an interceptor for authentication tokens later
 apiClient.interceptors.request.use(
   (config) => {
-    // const token = useAuthStore.getState().token;
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
+    const token = useAppStore.getState().token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
@@ -31,3 +33,13 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export const handleApiError = (error: any, defaultMessage: string = 'Something went wrong') => {
+  const errorData = error?.response?.data?.error;
+  
+  if (errorData?.fieldErrors && errorData.fieldErrors.length > 0) {
+    return errorData.fieldErrors[0].message;
+  }
+  
+  return errorData?.message || error?.response?.data?.message || error?.message || defaultMessage;
+};

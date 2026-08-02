@@ -3,11 +3,15 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner-native';
+import { apiClient, handleApiError } from "../../../src/api/client";
 import { CustomButton } from "../../components/ui/CustomButton";
 import { Header } from "../../components/ui/Header";
 
 export default function VerifyOtp() {
-  const { type } = useLocalSearchParams<{ type: string }>();
+  const { type, email: paramEmail } = useLocalSearchParams<{ type: string; email: string }>();
+  const [email, setEmail] = useState(paramEmail || "");
   const [code, setCode] = useState("");
   const [timeLeft, setTimeLeft] = useState(60);
   const inputRef = useRef<TextInput>(null);
@@ -23,18 +27,76 @@ export default function VerifyOtp() {
     return () => clearInterval(timerId);
   }, [timeLeft]);
 
+  const verifyMutation = useMutation({
+    mutationFn: (data: { email: string, code: string }) => {
+      return apiClient.post('/auth/verify-email', data);
+    },
+    onSuccess: () => {
+      toast.success('Email verified successfully!');
+      if (type === 'forgot') {
+        router.push("/(auth)/reset-password");
+      } else {
+        router.push("/(auth)/profile-setup");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(handleApiError(error, 'Failed to verify email'));
+    }
+  });
+
+  const resendMutation = useMutation({
+    mutationFn: (data: { email: string }) => {
+      return apiClient.post('/auth/resend-verification', data);
+    },
+    onSuccess: () => {
+      toast.success('Verification code resent successfully!');
+      setTimeLeft(60);
+    },
+    onError: (error: any) => {
+      toast.error(handleApiError(error, 'Failed to resend code'));
+    }
+  });
+
+  const verifyResetMutation = useMutation({
+    mutationFn: (data: { email: string, code: string }) => {
+      return apiClient.post('/auth/verify-reset-code', data);
+    },
+    onSuccess: (response) => {
+      toast.success('Code verified successfully!');
+      // Get resetToken from response
+      const resetToken = response.data?.data?.resetToken || response.data?.resetToken;
+      router.push({ pathname: "/(auth)/reset-password", params: { resetToken, email } });
+    },
+    onError: (error: any) => {
+      toast.error(handleApiError(error, 'Failed to verify code'));
+    }
+  });
+
   const handleResend = () => {
-    if (timeLeft > 0) return;
-    // Add logic to trigger actual resend API here if needed
-    setTimeLeft(60);
+    if (timeLeft > 0 || resendMutation.isPending) return;
+    resendMutation.mutate({ email });
   };
 
   const handleVerify = () => {
-    if (type === 'forgot') {
-      router.push("/(auth)/reset-password");
-    } else {
-      router.push("/(auth)/profile-setup");
+    if (code.length !== CODE_LENGTH) {
+      toast.error('Please enter the full 6-digit code');
+      return;
     }
+    
+    if (type === 'forgot') {
+      verifyResetMutation.mutate({ email, code });
+    } else {
+      verifyMutation.mutate({ email, code });
+    }
+  };
+
+  const maskEmail = (emailStr: string) => {
+    if (!emailStr || !emailStr.includes('@')) return emailStr;
+    const [localPart, domain] = emailStr.split('@');
+    if (localPart.length <= 2) {
+      return `${localPart[0]}***@${domain}`;
+    }
+    return `${localPart[0]}***${localPart[localPart.length - 1]}@${domain}`;
   };
 
   return (
@@ -51,7 +113,7 @@ export default function VerifyOtp() {
           </View>
           <Text className="text-3xl font-inter-bold text-white mb-2">Enter Verification Code</Text>
           <Text className="text-gray-400 font-inter-regular text-center">
-            We've sent a 6-digit code to j***5@gmail.com
+            We've sent a 6-digit code to {email ? maskEmail(email) : 'your email'}
           </Text>
         </View>
 
@@ -81,19 +143,18 @@ export default function VerifyOtp() {
           />
         </View>
 
-
-
         <CustomButton
-          title="Verify"
+          title={(verifyMutation.isPending || verifyResetMutation.isPending) ? "Verifying..." : "Verify"}
           containerStyle="mb-8"
           onPress={handleVerify}
+          disabled={verifyMutation.isPending || verifyResetMutation.isPending || code.length !== CODE_LENGTH}
         />
 
         <View className="flex-row justify-center mb-4">
           <Text className="text-gray-400 font-inter-regular">Didn't receive the code? </Text>
-          <Pressable onPress={handleResend} disabled={timeLeft > 0}>
-            <Text className={`font-inter-regular ${timeLeft > 0 ? 'text-gray-500' : 'text-[#98D83A]'}`}>
-              {timeLeft > 0 ? `Resend in 00:${timeLeft.toString().padStart(2, '0')}` : 'Resend'}
+          <Pressable onPress={handleResend} disabled={timeLeft > 0 || resendMutation.isPending}>
+            <Text className={`font-inter-regular ${(timeLeft > 0 || resendMutation.isPending) ? 'text-gray-500' : 'text-[#98D83A]'}`}>
+              {resendMutation.isPending ? 'Resending...' : timeLeft > 0 ? `Resend in 00:${timeLeft.toString().padStart(2, '0')}` : 'Resend'}
             </Text>
           </Pressable>
         </View>
