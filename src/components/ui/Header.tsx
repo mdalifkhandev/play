@@ -5,11 +5,12 @@ import { Pressable, Text, View } from "react-native";
 interface HeaderProps {
   title?: string;
   showBackButton?: boolean;
+  containerStyle?: string;
 }
 
-export const Header = ({ title, showBackButton = true }: HeaderProps) => {
+export const Header = ({ title, showBackButton = true, containerStyle }: HeaderProps) => {
   return (
-    <View className="flex-row items-center mb-6 mt-4 px-4">
+    <View className={`flex-row items-center mb-6 mt-4 px-4 ${containerStyle || ''}`}>
       <View className="w-10 h-10 justify-center">
         {showBackButton && (
           <Pressable

@@ -116,7 +116,7 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
             <View className="px-5 py-2">
               <Text className="text-[#888] text-xs font-semibold mb-4">Account Information</Text>
               
-              <Pressable className="flex-row items-center justify-between py-3 mb-2">
+              <Pressable onPress={() => navigateTo('/screens/personal-info')} className="flex-row items-center justify-between py-3 mb-2">
                 <View className="flex-row items-center">
                   <Ionicons name="person-outline" size={22} color="white" />
                   <Text className="text-white text-base ml-4 font-medium">Personal info</Text>
@@ -200,7 +200,7 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
 
               <View className="h-[1px] bg-[#222] my-2" />
 
-              <Pressable className="flex-row items-center justify-between py-3">
+              <Pressable onPress={() => navigateTo('/screens/settings')} className="flex-row items-center justify-between py-3">
                 <View className="flex-row items-center">
                   <Ionicons name="settings-outline" size={22} color="white" />
                   <Text className="text-white text-base ml-4 font-medium">Settings and Privacy</Text>

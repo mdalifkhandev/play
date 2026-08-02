@@ -7,6 +7,7 @@ interface CustomInputProps extends TextInputProps {
   iconName?: keyof typeof Ionicons.glyphMap;
   rightIcon?: keyof typeof Ionicons.glyphMap;
   isPassword?: boolean;
+  isDark?: boolean;
   containerStyle?: string;
   inputContainerStyle?: string;
   labelStyle?: string;
@@ -17,6 +18,7 @@ export const CustomInput: React.FC<CustomInputProps> = ({
   iconName,
   rightIcon,
   isPassword,
+  isDark = false,
   containerStyle = "",
   inputContainerStyle = "",
   labelStyle = "",
@@ -27,25 +29,25 @@ export const CustomInput: React.FC<CustomInputProps> = ({
   return (
     <View className={`mb-4 ${containerStyle}`}>
       {label && (
-        <Text className={`text-gray-300 mb-2 font-inter-regular ${labelStyle}`}>
+        <Text className={`mb-2 font-inter-regular ${isDark ? 'text-gray-300' : 'text-gray-300'} ${labelStyle}`}>
           {label}
         </Text>
       )}
-      <View className={`flex-row items-center bg-white rounded-xl px-4 h-14 ${inputContainerStyle}`}>
-        {iconName && <Ionicons name={iconName} size={20} color="#9CA3AF" className="mr-2" />}
+      <View className={`flex-row items-center rounded-xl px-4 h-14 ${isDark ? 'bg-transparent border border-[#333]' : 'bg-white'} ${inputContainerStyle}`}>
+        {iconName && <Ionicons name={iconName} size={20} color={isDark ? "#888" : "#9CA3AF"} className="mr-2" />}
         <TextInput
-          className="flex-1 text-black h-full font-inter-regular"
-          placeholderTextColor="#9CA3AF"
+          className={`flex-1 h-full font-inter-regular ${isDark ? 'text-white' : 'text-black'}`}
+          placeholderTextColor={isDark ? "#666" : "#9CA3AF"}
           secureTextEntry={isPassword && !showPassword}
           {...props}
         />
         {isPassword && (
           <Pressable onPress={() => setShowPassword(!showPassword)} className="p-2">
-            <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#9CA3AF" />
+            <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={isDark ? "#888" : "#9CA3AF"} />
           </Pressable>
         )}
         {!isPassword && rightIcon && (
-          <Ionicons name={rightIcon} size={20} color="#555" className="ml-2" />
+          <Ionicons name={rightIcon} size={20} color={isDark ? "#888" : "#555"} className="ml-2" />
         )}
       </View>
     </View>
