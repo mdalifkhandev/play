@@ -5,6 +5,7 @@ import { Pressable, Text, TextInput, TextInputProps, View } from "react-native";
 interface CustomInputProps extends TextInputProps {
   label?: string;
   iconName?: keyof typeof Ionicons.glyphMap;
+  rightIcon?: keyof typeof Ionicons.glyphMap;
   isPassword?: boolean;
   containerStyle?: string;
   inputContainerStyle?: string;
@@ -14,6 +15,7 @@ interface CustomInputProps extends TextInputProps {
 export const CustomInput: React.FC<CustomInputProps> = ({
   label,
   iconName,
+  rightIcon,
   isPassword,
   containerStyle = "",
   inputContainerStyle = "",
@@ -41,6 +43,9 @@ export const CustomInput: React.FC<CustomInputProps> = ({
           <Pressable onPress={() => setShowPassword(!showPassword)} className="p-2">
             <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#9CA3AF" />
           </Pressable>
+        )}
+        {!isPassword && rightIcon && (
+          <Ionicons name={rightIcon} size={20} color="#555" className="ml-2" />
         )}
       </View>
     </View>
