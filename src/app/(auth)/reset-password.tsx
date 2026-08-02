@@ -51,6 +51,7 @@ export default function ResetPassword() {
         <CustomButton
           title="Update Password"
           onPress={() => router.push("/home")}
+          disabled={!acceptTerms}
         />
       </ScrollView>
     </KeyboardAvoidingView>

@@ -60,6 +60,7 @@ export default function SignUp() {
           variant="primary"
           containerStyle="mb-10"
           onPress={() => router.push({ pathname: '/(auth)/verify-otp', params: { type: 'signup' } })}
+          disabled={!acceptTerms}
         />
 
         <View className="flex-row items-center mb-8">

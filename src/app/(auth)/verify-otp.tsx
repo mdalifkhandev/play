@@ -51,7 +51,7 @@ export default function VerifyOtp() {
           </View>
           <Text className="text-3xl font-inter-bold text-white mb-2">Enter Verification Code</Text>
           <Text className="text-gray-400 font-inter-regular text-center">
-            We've sent a 6-digit code to j***@gmail.com
+            We've sent a 6-digit code to j***5@gmail.com
           </Text>
         </View>
 
@@ -81,7 +81,7 @@ export default function VerifyOtp() {
           />
         </View>
 
-        <Text className="text-white font-inter-bold text-center mb-8">Paste Code</Text>
+
 
         <CustomButton
           title="Verify"

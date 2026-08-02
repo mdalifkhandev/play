@@ -24,7 +24,7 @@ export const CustomButton = ({
 
   return (
     <Pressable
-      className={`h-14 rounded-xl items-center justify-center active:opacity-80 ${defaultContainerClass} ${containerStyle}`}
+      className={`h-14 rounded-xl items-center justify-center active:opacity-80 ${defaultContainerClass} ${containerStyle} ${props.disabled ? 'opacity-50' : ''}`}
       {...props}
     >
       <Text className={`font-inter-bold text-lg ${defaultTextClass} ${textStyle}`}>
