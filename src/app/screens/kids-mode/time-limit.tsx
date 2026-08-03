@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Header } from '../../../../src/components/ui/Header';
 import { CustomButton } from '../../../../src/components/ui/CustomButton';
+import { useAppStore } from '../../../../src/store';
 
 const TimeCounter = ({ 
   label, 
@@ -88,6 +89,13 @@ export default function TimeLimitScreen() {
             title="Activate Kids Mode"
             variant="primary"
             onPress={() => {
+              const totalMs = (hours * 60 * 60 * 1000) + (minutes * 60 * 1000);
+              const expireTimestamp = Date.now() + totalMs;
+              
+              const store = useAppStore.getState();
+              store.setKidsModeExpireTime(expireTimestamp);
+              store.setKidsModeDuration(totalMs);
+              
               // Action to activate Kids Mode and go to success screen
               router.push('/screens/kids-mode/success');
             }}

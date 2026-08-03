@@ -27,7 +27,10 @@ export default function ConfirmPinScreen() {
             setKidsModeActive(false);
             router.push('/home');
           } else {
-            router.push('/home'); // "Continue" (grant time, we just go back to home)
+            // "Continue" action
+            const durationMs = useAppStore.getState().kidsModeDurationMs || (60 * 60 * 1000); // fallback 1h
+            useAppStore.getState().setKidsModeExpireTime(Date.now() + durationMs);
+            router.push('/home');
           }
         } else {
           toast.error('Incorrect PIN. Please try again.');

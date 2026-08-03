@@ -10,10 +10,14 @@ interface AppState {
   
   // Kids Mode state
   isKidsModeActive: boolean;
+  kidsModeExpireTimestamp: number | null;
+  kidsModeDurationMs: number | null;
   
   // Actions
   setAuth: (token: string, user: any) => void;
   setKidsModeActive: (active: boolean) => void;
+  setKidsModeExpireTime: (timestamp: number | null) => void;
+  setKidsModeDuration: (durationMs: number | null) => void;
   logout: () => void;
 }
 
@@ -24,10 +28,26 @@ export const useAppStore = create<AppState>()(
       token: null,
       user: null,
       isKidsModeActive: false,
+      kidsModeExpireTimestamp: null,
+      kidsModeDurationMs: null,
 
       setAuth: (token, user) => set({ isAuthenticated: true, token, user }),
-      setKidsModeActive: (active: boolean) => set({ isKidsModeActive: active }),
-      logout: () => set({ isAuthenticated: false, token: null, user: null, isKidsModeActive: false }),
+      setKidsModeActive: (active: boolean) => set((state) => {
+        if (active) {
+          return { isKidsModeActive: true };
+        }
+        return { isKidsModeActive: false, kidsModeExpireTimestamp: null, kidsModeDurationMs: null };
+      }),
+      setKidsModeExpireTime: (timestamp: number | null) => set({ kidsModeExpireTimestamp: timestamp }),
+      setKidsModeDuration: (durationMs: number | null) => set({ kidsModeDurationMs: durationMs }),
+      logout: () => set({ 
+        isAuthenticated: false, 
+        token: null, 
+        user: null, 
+        isKidsModeActive: false,
+        kidsModeExpireTimestamp: null,
+        kidsModeDurationMs: null
+      }),
     }),
     {
       name: 'app-storage',
