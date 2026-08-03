@@ -143,6 +143,8 @@ export default function EditMediaScreen() {
   // Options state
   const [exposure, setExposure] = useState(50);
   const [contrast, setContrast] = useState(50);
+  const [activeFilter, setActiveFilter] = useState('Normal');
+  const [activeEffect, setActiveEffect] = useState<string | null>(null);
   
   // Side panel states
   const [activePanel, setActivePanel] = useState<'options' | 'filters' | 'effects' | null>(null);
@@ -210,15 +212,59 @@ export default function EditMediaScreen() {
               source={{ uri: mockImage }} 
               className="w-full h-full absolute inset-0"
               resizeMode="cover"
+              style={{
+                transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }]
+              }}
             />
+            
+            {/* Simulate Glitch Effect (Chromatic Aberration) */}
+            {activeEffect === 'Glitch' && (
+              <>
+                <View className="absolute inset-0 bg-red-500/20" style={{ transform: [{ translateX: -4 }] }} pointerEvents="none" />
+                <View className="absolute inset-0 bg-blue-500/20" style={{ transform: [{ translateX: 4 }] }} pointerEvents="none" />
+              </>
+            )}
+
+            {/* Simulate Flash Effect */}
+            {activeEffect === 'Flash' && (
+              <View className="absolute inset-0 bg-white/40" pointerEvents="none" />
+            )}
+
+            {/* Simulate VHS Effect */}
+            {activeEffect === 'VHS' && (
+              <View className="absolute inset-0 bg-green-500/10 border-t-2 border-black/20" pointerEvents="none" style={{ top: 0, bottom: 0 }} />
+            )}
+
+            {/* Simulate Sparkle Effect */}
+            {activeEffect === 'Sparkle' && (
+              <View className="absolute inset-0" pointerEvents="none">
+                 <View className="absolute top-1/4 left-1/4"><Ionicons name="sparkles" size={24} color="white" /></View>
+                 <View className="absolute top-1/2 right-1/4"><Ionicons name="sparkles" size={32} color="white" /></View>
+                 <View className="absolute bottom-1/4 left-1/3"><Ionicons name="sparkles" size={16} color="white" /></View>
+              </View>
+            )}
             
             {/* Simulate Exposure Effect Overlay */}
             {exposure !== 50 && (
               <View 
-                className="absolute inset-0" 
+                className="absolute inset-0 pointer-events-none" 
                 style={{ 
                   backgroundColor: exposure > 50 ? 'white' : 'black',
                   opacity: Math.abs(exposure - 50) / 100
+                }} 
+              />
+            )}
+
+            {/* Simulate Filter Effect Overlay */}
+            {activeFilter !== 'Normal' && (
+              <View 
+                className="absolute inset-0 pointer-events-none" 
+                style={{ 
+                  backgroundColor: 
+                    activeFilter === 'Vivid' ? 'rgba(255, 50, 50, 0.15)' :
+                    activeFilter === 'Mono' ? 'rgba(0, 0, 0, 0.7)' :
+                    activeFilter === 'Vintage' ? 'rgba(112, 66, 20, 0.3)' :
+                    activeFilter === 'Warm' ? 'rgba(255, 165, 0, 0.2)' : 'transparent',
                 }} 
               />
             )}
@@ -338,27 +384,30 @@ export default function EditMediaScreen() {
 
             {activePanel === 'filters' && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-4">
-                {['Normal', 'Vivid', 'Mono', 'Vintage', 'Warm'].map((filter, i) => (
-                  <View key={i} className="items-center mr-4">
-                    <View className={`w-16 h-16 rounded-full border-2 ${i === 1 ? 'border-[#98FF2F]' : 'border-transparent'} mb-2 overflow-hidden bg-black`}>
+                {['Normal', 'Vivid', 'Mono', 'Vintage', 'Warm'].map((filter) => (
+                  <Pressable key={filter} onPress={() => setActiveFilter(filter)} className="items-center mr-4">
+                    <View className={`w-16 h-16 rounded-full border-2 ${activeFilter === filter ? 'border-[#98FF2F]' : 'border-transparent'} mb-2 overflow-hidden bg-black`}>
                        <Image source={{ uri: mockImage }} className="w-full h-full opacity-80" />
                     </View>
-                    <Text className={`font-inter-medium text-sm ${i === 1 ? 'text-[#98FF2F]' : 'text-white'}`}>{filter}</Text>
-                  </View>
+                    <Text className={`font-inter-medium text-sm ${activeFilter === filter ? 'text-[#98FF2F]' : 'text-white'}`}>{filter}</Text>
+                  </Pressable>
                 ))}
               </ScrollView>
             )}
 
             {activePanel === 'effects' && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-4">
-                {['Glitch', 'Sparkle', 'Zoom', 'Flash', 'VHS'].map((effect, i) => (
-                  <View key={i} className="items-center mr-4">
-                    <View className="w-16 h-16 rounded-2xl bg-[#333] items-center justify-center mb-2 border border-[#444]">
-                       <Ionicons name="sparkles" size={24} color={i === 0 ? '#98FF2F' : 'white'} />
-                    </View>
-                    <Text className={`font-inter-medium text-sm ${i === 0 ? 'text-[#98FF2F]' : 'text-white'}`}>{effect}</Text>
-                  </View>
-                ))}
+                {['None', 'Glitch', 'Sparkle', 'Zoom', 'Flash', 'VHS'].map((effect) => {
+                  const isActive = activeEffect === effect || (effect === 'None' && !activeEffect);
+                  return (
+                    <Pressable key={effect} onPress={() => setActiveEffect(effect === 'None' ? null : effect)} className="items-center mr-4">
+                      <View className={`w-16 h-16 rounded-2xl bg-[#333] items-center justify-center mb-2 border-2 ${isActive ? 'border-[#98FF2F]' : 'border-[#444]'}`}>
+                         <Ionicons name={effect === 'None' ? 'close' : 'sparkles'} size={24} color={isActive ? '#98FF2F' : 'white'} />
+                      </View>
+                      <Text className={`font-inter-medium text-sm ${isActive ? 'text-[#98FF2F]' : 'text-white'}`}>{effect}</Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
             )}
           </View>
