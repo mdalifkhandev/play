@@ -1,18 +1,24 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../../../src/components/ui/Header';
 import { CustomButton } from '../../../../src/components/ui/CustomButton';
+import { useAppStore } from '../../../../src/store';
 
 export default function CoinsSuccessScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  // Give them 500 coins on success
+  useEffect(() => {
+    useAppStore.getState().addCoins(500);
+  }, []);
+
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
-      <Header title="Confirm" showBackButton={true} />
+      <Header title="Confirm" showBackButton={false} />
       
       <View className="flex-1 px-6 items-center justify-center -mt-20">
         

@@ -8,9 +8,10 @@ type Props = {
   onChangeText?: (text: string) => void;
   onSend?: () => void;
   onHeartPress?: () => void;
+  onGiftPress?: () => void;
 };
 
-export function LiveBottomActions({ inputText, onChangeText, onSend, onHeartPress }: Props) {
+export function LiveBottomActions({ inputText, onChangeText, onSend, onHeartPress, onGiftPress }: Props) {
   const insets = useSafeAreaInsets();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
@@ -28,7 +29,7 @@ export function LiveBottomActions({ inputText, onChangeText, onSend, onHeartPres
   return (
     <View style={{ paddingBottom: bottomPadding }} className="absolute bottom-2 left-0 right-0 px-4 flex-row items-center z-10 pt-2">
       <View className="flex-row flex-1 bg-black/40 rounded-full items-center p-1 pl-3">
-        <Pressable>
+        <Pressable onPress={onGiftPress}>
           <Ionicons name="gift-outline" size={24} color="#FFD700" />
         </Pressable>
         <TextInput

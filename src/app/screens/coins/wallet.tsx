@@ -5,10 +5,12 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../../../src/components/ui/Header';
 import { CustomButton } from '../../../../src/components/ui/CustomButton';
+import { useAppStore } from '../../../../src/store';
 
 export default function CoinWalletScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const coinBalance = useAppStore((state) => state.coinBalance);
 
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
@@ -28,7 +30,7 @@ export default function CoinWalletScreen() {
           </Text>
           
           <Text className="text-white text-4xl font-inter-bold mb-8">
-            000 <Text className="text-[#98D83A] text-xl">Coins</Text>
+            {coinBalance} <Text className="text-[#98D83A] text-xl">Coins</Text>
           </Text>
           
           <CustomButton 
