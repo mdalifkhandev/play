@@ -171,7 +171,20 @@ export default function EditMediaScreen() {
   const navigateToPostDetails = () => {
     router.push({
       pathname: '/screens/create/post-details',
-      params: { uri: mockImage, overlayText: overlayText, soundUrl: soundUrl || '' }
+      params: { 
+        uri: mockImage, 
+        overlayText: overlayText, 
+        soundUrl: soundUrl || '',
+        title: title || '',
+        originalVolume: originalVolume?.toString() || '',
+        addedVolume: addedVolume?.toString() || '',
+        trimLeft: trimLeft?.toString() || '',
+        trimRight: trimRight?.toString() || '',
+        exposure: exposure.toString(),
+        contrast: contrast.toString(),
+        activeFilter: activeFilter,
+        activeEffect: activeEffect || ''
+      }
     } as any);
   };
 
