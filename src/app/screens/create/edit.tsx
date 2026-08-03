@@ -1,12 +1,61 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, Image, Pressable, TextInput, KeyboardAvoidingView, Platform, Keyboard, ScrollView, Animated, PanResponder } from 'react-native';
+import { View, Text, Image, Pressable, TextInput, KeyboardAvoidingView, Platform, Keyboard, ScrollView, Animated, PanResponder, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createAudioPlayer } from 'expo-audio';
 
+const { width } = Dimensions.get('window');
+
+// Custom interactive slider using PanResponder
+const CustomSlider = ({ value, onValueChange, label }: { value: number, onValueChange: (val: number) => void, label: string }) => {
+  const latestValue = useRef(value);
+  latestValue.current = value;
+  const startVal = useRef(value);
+  
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        startVal.current = latestValue.current;
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        const sliderWidth = width - 80; // Approximate width for panel slider
+        const dxPercent = (gestureState.dx / sliderWidth) * 100;
+        let newValue = Math.round(startVal.current + dxPercent);
+        newValue = Math.max(0, Math.min(100, newValue));
+        onValueChange(newValue);
+      }
+    })
+  ).current;
+
+  return (
+    <View className="mb-2 w-full">
+      <View className="flex-row justify-between mb-2">
+        <Text className="text-white font-inter-medium text-[15px]">{label}</Text>
+      </View>
+      <View 
+        {...panResponder.panHandlers}
+        className="w-full h-10 justify-center relative" // Larger touch target
+      >
+        <View className="w-full h-1 bg-white/20 rounded-full flex-row items-center relative">
+          <View className="h-full bg-[#98FF2F] rounded-full" style={{ width: `${value}%` }} />
+          <View className="w-5 h-5 rounded-full bg-[#98FF2F] absolute" style={{ left: `${value}%`, marginLeft: -10 }} />
+        </View>
+      </View>
+    </View>
+  );
+};
+
 export default function EditMediaScreen() {
-  const { uri, soundUrl, title } = useLocalSearchParams<{ uri: string; soundUrl: string; title: string }>();
+  const { 
+    uri, soundUrl, title,
+    originalVolume, addedVolume, trimLeft, trimRight
+  } = useLocalSearchParams<{ 
+    uri: string; soundUrl: string; title: string;
+    originalVolume?: string; addedVolume?: string; trimLeft?: string; trimRight?: string;
+  }>();
+  
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -38,6 +87,14 @@ export default function EditMediaScreen() {
     })
   ).current;
 
+  // Format time helper for display (e.g. 15 -> "00:15")
+  const formatTime = (percentStr?: string) => {
+    if (!percentStr) return '00:00';
+    const percent = Number(percentStr);
+    const secs = Math.floor((percent / 100) * 30); // 30 sec mock
+    return `00:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
   useFocusEffect(
     useCallback(() => {
       let player: any = null;
@@ -56,16 +113,36 @@ export default function EditMediaScreen() {
       return () => {
         if (player) {
           player.pause();
-          player.remove();
+          try { player.remove(); } catch(e) {}
         }
+        setSound(null);
       };
     }, [soundUrl])
   );
+
+  // Apply edits (volume, trim) to the existing player without recreating it
+  useEffect(() => {
+    if (sound) {
+      if (addedVolume !== undefined) {
+        sound.volume = Number(addedVolume) / 100;
+      }
+      if (trimLeft !== undefined) {
+        const startMs = Math.floor((Number(trimLeft) / 100) * 30 * 1000);
+        if (typeof sound.seekTo === 'function') {
+          try { sound.seekTo(startMs); } catch(e) {}
+        }
+      }
+    }
+  }, [sound, addedVolume, trimLeft]);
 
   // Text overlay state
   const [isTextMode, setIsTextMode] = useState(false);
   const [overlayText, setOverlayText] = useState('');
   const inputRef = useRef<TextInput>(null);
+
+  // Options state
+  const [exposure, setExposure] = useState(50);
+  const [contrast, setContrast] = useState(50);
   
   // Side panel states
   const [activePanel, setActivePanel] = useState<'options' | 'filters' | 'effects' | null>(null);
@@ -126,14 +203,25 @@ export default function EditMediaScreen() {
         )}
 
         {/* Main Content Area */}
-        <View className="flex-1 px-4 pb-2 relative">
-          <View className="flex-1 bg-[#111] rounded-[32px] overflow-hidden relative items-center justify-center">
+        <View className="flex-1 relative">
+          <View className="flex-1 bg-black overflow-hidden relative items-center justify-center">
             
             <Image 
               source={{ uri: mockImage }} 
               className="w-full h-full absolute inset-0"
               resizeMode="cover"
             />
+            
+            {/* Simulate Exposure Effect Overlay */}
+            {exposure !== 50 && (
+              <View 
+                className="absolute inset-0" 
+                style={{ 
+                  backgroundColor: exposure > 50 ? 'white' : 'black',
+                  opacity: Math.abs(exposure - 50) / 100
+                }} 
+              />
+            )}
             
             {/* Dim the background slightly when in text mode */}
             {isTextMode && (
@@ -152,13 +240,20 @@ export default function EditMediaScreen() {
               <Animated.View 
                 {...panResponder.panHandlers}
                 style={{ transform: [{ translateX: pan.x }, { translateY: pan.y }] }}
-                className="absolute top-10 self-center bg-black/60 px-4 py-2 rounded-full flex-row items-center gap-2 z-10"
+                className="absolute top-10 self-center bg-black/60 px-4 py-2 rounded-full flex-col items-center justify-center z-10"
               >
-                <Ionicons name="musical-notes" size={16} color="white" />
-                <Text className="text-white font-inter-medium text-sm">{title}</Text>
-                <Pressable onPress={() => setShowMusicCard(false)} className="ml-2">
-                  <Ionicons name="close-circle" size={18} color="#aaa" />
-                </Pressable>
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="musical-notes" size={16} color="white" />
+                  <Text className="text-white font-inter-medium text-sm">{title}</Text>
+                  <Pressable onPress={() => setShowMusicCard(false)} className="ml-2">
+                    <Ionicons name="close-circle" size={18} color="#aaa" />
+                  </Pressable>
+                </View>
+                {trimLeft !== undefined && trimRight !== undefined && (
+                  <Text className="text-[#98FF2F] font-inter-medium text-[10px] mt-0.5">
+                    {formatTime(trimLeft)} - {formatTime(trimRight)}
+                  </Text>
+                )}
               </Animated.View>
             )}
 
@@ -210,65 +305,64 @@ export default function EditMediaScreen() {
               </View>
             )}
 
-            {/* Bottom Panel Display for Tools */}
-            {activePanel && (
-              <View className="absolute bottom-0 left-0 right-0 bg-[#222]/90 rounded-t-3xl p-6 min-h-[200px] z-30">
-                <View className="flex-row items-center justify-between mb-6">
-                  <Text className="text-white font-inter-semibold text-lg capitalize">{activePanel}</Text>
-                  <Pressable onPress={() => setActivePanel(null)} className="bg-[#98FF2F] px-4 py-1.5 rounded-lg">
-                    <Text className="text-black font-inter-semibold">Done</Text>
-                  </Pressable>
-                </View>
+          </View>
+        </View>
 
-                {activePanel === 'options' && (
-                  <View className="gap-6">
-                    <View>
-                      <Text className="text-white font-inter-medium mb-2">Exposure</Text>
-                      <View className="w-full h-1 bg-white/20 rounded-full flex-row items-center">
-                        <View className="h-full bg-[#98FF2F] rounded-full w-1/2" />
-                        <View className="w-4 h-4 rounded-full bg-[#98FF2F] absolute left-1/2 -ml-2" />
-                      </View>
-                    </View>
-                    <View>
-                      <Text className="text-white font-inter-medium mb-2">Contrast</Text>
-                      <View className="w-full h-1 bg-white/20 rounded-full flex-row items-center">
-                        <View className="h-full bg-[#98FF2F] rounded-full w-3/4" />
-                        <View className="w-4 h-4 rounded-full bg-[#98FF2F] absolute left-3/4 -ml-2" />
-                      </View>
-                    </View>
-                  </View>
-                )}
+        {/* Bottom Panel Display for Tools */}
+        {activePanel && (
+          <View 
+            className="absolute bottom-0 left-0 right-0 bg-[#222]/90 rounded-t-3xl p-6 z-30 shadow-lg"
+            style={{ paddingBottom: Math.max(insets.bottom + 24, 24) }}
+          >
+            <View className="flex-row items-center justify-between mb-6">
+              <Text className="text-white font-inter-semibold text-lg capitalize">{activePanel}</Text>
+              <Pressable onPress={() => setActivePanel(null)} className="bg-[#98FF2F] px-4 py-1.5 rounded-lg">
+                <Text className="text-black font-inter-semibold">Done</Text>
+              </Pressable>
+            </View>
 
-                {activePanel === 'filters' && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-4">
-                    {['Normal', 'Vivid', 'Mono', 'Vintage', 'Warm'].map((filter, i) => (
-                      <View key={i} className="items-center mr-4">
-                        <View className={`w-16 h-16 rounded-full border-2 ${i === 1 ? 'border-[#98FF2F]' : 'border-transparent'} mb-2 overflow-hidden bg-black`}>
-                           <Image source={{ uri: mockImage }} className="w-full h-full opacity-80" />
-                        </View>
-                        <Text className={`font-inter-medium text-sm ${i === 1 ? 'text-[#98FF2F]' : 'text-white'}`}>{filter}</Text>
-                      </View>
-                    ))}
-                  </ScrollView>
-                )}
-
-                {activePanel === 'effects' && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-4">
-                    {['Glitch', 'Sparkle', 'Zoom', 'Flash', 'VHS'].map((effect, i) => (
-                      <View key={i} className="items-center mr-4">
-                        <View className="w-16 h-16 rounded-2xl bg-[#333] items-center justify-center mb-2 border border-[#444]">
-                           <Ionicons name="sparkles" size={24} color={i === 0 ? '#98FF2F' : 'white'} />
-                        </View>
-                        <Text className={`font-inter-medium text-sm ${i === 0 ? 'text-[#98FF2F]' : 'text-white'}`}>{effect}</Text>
-                      </View>
-                    ))}
-                  </ScrollView>
-                )}
+            {activePanel === 'options' && (
+              <View className="gap-2">
+                <CustomSlider 
+                  label="Exposure" 
+                  value={exposure} 
+                  onValueChange={setExposure} 
+                />
+                <CustomSlider 
+                  label="Contrast" 
+                  value={contrast} 
+                  onValueChange={setContrast} 
+                />
               </View>
             )}
 
+            {activePanel === 'filters' && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-4">
+                {['Normal', 'Vivid', 'Mono', 'Vintage', 'Warm'].map((filter, i) => (
+                  <View key={i} className="items-center mr-4">
+                    <View className={`w-16 h-16 rounded-full border-2 ${i === 1 ? 'border-[#98FF2F]' : 'border-transparent'} mb-2 overflow-hidden bg-black`}>
+                       <Image source={{ uri: mockImage }} className="w-full h-full opacity-80" />
+                    </View>
+                    <Text className={`font-inter-medium text-sm ${i === 1 ? 'text-[#98FF2F]' : 'text-white'}`}>{filter}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            {activePanel === 'effects' && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-4">
+                {['Glitch', 'Sparkle', 'Zoom', 'Flash', 'VHS'].map((effect, i) => (
+                  <View key={i} className="items-center mr-4">
+                    <View className="w-16 h-16 rounded-2xl bg-[#333] items-center justify-center mb-2 border border-[#444]">
+                       <Ionicons name="sparkles" size={24} color={i === 0 ? '#98FF2F' : 'white'} />
+                    </View>
+                    <Text className={`font-inter-medium text-sm ${i === 0 ? 'text-[#98FF2F]' : 'text-white'}`}>{effect}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
           </View>
-        </View>
+        )}
 
         {/* Bottom Bar or Keyboard Input */}
         {isTextMode ? (
