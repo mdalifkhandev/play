@@ -8,23 +8,24 @@ import { CustomButton } from '../../../components/ui/CustomButton';
 export default function SupportScreen() {
   const insets = useSafeAreaInsets();
   const [problemText, setProblemText] = useState('');
-  
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-[#0A0A0A]"
     >
-      <ScrollView 
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 24 }} 
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 24 }}
         className="px-6 pt-16"
       >
         <Header showBackButton={true} title="Support Requests" containerStyle="mt-0 px-0 mb-12" />
-        
-        <View className="items-center mb-8">
-          <Image 
-            source={require('../../../../assets/images/logo.png')} 
-            style={{ width: 180, height: 60, resizeMode: 'contain' }}
+
+        <View className="flex-row justify-center items-center mb-8">
+          <Image
+            source={require('../../../../assets/images/icon.png')}
+            style={{ width: 60, height: 60, resizeMode: 'contain' }}
           />
+          <Text className='text-[#DFFD53] text-4xl font-inter-bold ml-3'>Play</Text>
         </View>
 
         <Text className="text-white text-center text-lg font-inter-medium mb-8 px-4">

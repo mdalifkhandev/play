@@ -21,6 +21,7 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const logoutAction = useAppStore((state) => state.logout);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [isKidsMode, setIsKidsMode] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -132,7 +133,14 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
                 <Switch 
                   trackColor={{ false: "#333", true: "#83D616" }}
                   thumbColor="#FFF"
-                  value={true} 
+                  value={isKidsMode} 
+                  onValueChange={(val) => {
+                    if (val) {
+                      navigateTo('/screens/kids-mode/intro');
+                    } else {
+                      setIsKidsMode(false);
+                    }
+                  }}
                 />
               </View>
 
