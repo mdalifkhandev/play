@@ -8,8 +8,12 @@ interface AppState {
   token: string | null;
   user: any | null;
   
+  // Kids Mode state
+  isKidsModeActive: boolean;
+  
   // Actions
   setAuth: (token: string, user: any) => void;
+  setKidsModeActive: (active: boolean) => void;
   logout: () => void;
 }
 
@@ -19,9 +23,11 @@ export const useAppStore = create<AppState>()(
       isAuthenticated: false,
       token: null,
       user: null,
+      isKidsModeActive: false,
 
       setAuth: (token, user) => set({ isAuthenticated: true, token, user }),
-      logout: () => set({ isAuthenticated: false, token: null, user: null }),
+      setKidsModeActive: (active: boolean) => set({ isKidsModeActive: active }),
+      logout: () => set({ isAuthenticated: false, token: null, user: null, isKidsModeActive: false }),
     }),
     {
       name: 'app-storage',

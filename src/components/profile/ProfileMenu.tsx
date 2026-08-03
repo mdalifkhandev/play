@@ -21,7 +21,7 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const logoutAction = useAppStore((state) => state.logout);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [isKidsMode, setIsKidsMode] = useState(false);
+  const isKidsMode = useAppStore((state) => state.isKidsModeActive);
 
   const handleLogout = async () => {
     try {
@@ -138,7 +138,7 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
                     if (val) {
                       navigateTo('/screens/kids-mode/intro');
                     } else {
-                      setIsKidsMode(false);
+                      navigateTo('/screens/kids-mode/confirm-pin?action=exit');
                     }
                   }}
                 />

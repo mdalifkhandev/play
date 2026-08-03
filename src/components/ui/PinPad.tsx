@@ -6,9 +6,10 @@ interface PinPadProps {
   value: string;
   onValueChange: (value: string) => void;
   maxLength?: number;
+  children?: React.ReactNode;
 }
 
-export const PinPad = ({ value, onValueChange, maxLength = 6 }: PinPadProps) => {
+export const PinPad = ({ value, onValueChange, maxLength = 6, children }: PinPadProps) => {
   const handlePress = (num: string) => {
     if (value.length < maxLength) {
       onValueChange(value + num);
@@ -42,7 +43,7 @@ export const PinPad = ({ value, onValueChange, maxLength = 6 }: PinPadProps) => 
         </View>
       );
     }
-    return <View className="flex-row justify-between w-full mb-12">{dots}</View>;
+    return <View className="flex-row justify-between w-full mb-6">{dots}</View>;
   };
 
   const NumberButton = ({ num, empty }: { num?: string, empty?: boolean }) => {
@@ -74,6 +75,8 @@ export const PinPad = ({ value, onValueChange, maxLength = 6 }: PinPadProps) => 
   return (
     <View className="w-full items-center">
       {renderDots()}
+      
+      {children}
 
       <View className="flex-row flex-wrap justify-between w-full gap-y-4 px-4">
         <NumberButton num="1" />

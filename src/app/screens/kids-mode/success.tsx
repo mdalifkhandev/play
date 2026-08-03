@@ -5,9 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { CustomButton } from '../../../../src/components/ui/CustomButton';
 
+import { useAppStore } from '../../../../src/store';
+
 export default function KidsModeSuccessScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const setKidsModeActive = useAppStore((state) => state.setKidsModeActive);
 
   return (
     <KeyboardAvoidingView
@@ -36,7 +39,7 @@ export default function KidsModeSuccessScreen() {
             title="Done"
             variant="primary"
             onPress={() => {
-              // Action to finalize and go home
+              setKidsModeActive(true);
               router.push('/home');
             }}
           />

@@ -1,33 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, Platform, KeyboardAvoidingView, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, Link } from 'expo-router';
 import { toast } from 'sonner-native';
 import { Header } from '../../../../src/components/ui/Header';
 import { PinPad } from '../../../../src/components/ui/PinPad';
+import { useAppStore } from '../../../../src/store';
 
 export default function ConfirmPinScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
   const [pin, setPin] = useState('');
-  
+  const setKidsModeActive = useAppStore((state) => state.setKidsModeActive);
+
   const originalPin = params.pin as string;
+  const action = params.action as string; // 'continue' or 'exit'
 
   useEffect(() => {
     if (pin.length === 6) {
-      if (pin === originalPin) {
-        // PIN matches
-        setTimeout(() => {
-          router.push('/screens/kids-mode/setup-profile');
-        }, 200);
+      if (action) {
+        // We are verifying an existing PIN (mocking correct PIN as '123456')
+        if (pin === '123456' || pin === originalPin) {
+          if (action === 'exit') {
+            setKidsModeActive(false);
+            router.push('/home');
+          } else {
+            router.push('/home'); // "Continue" (grant time, we just go back to home)
+          }
+        } else {
+          toast.error('Incorrect PIN. Please try again.');
+          setPin('');
+        }
       } else {
-        toast.error('PIN does not match. Please try again.');
-        setPin(''); // Reset to try again
+        // Setup flow
+        if (pin === originalPin || !originalPin) { // fallback if no originalPin is passed for some reason
+          setTimeout(() => {
+            router.push('/screens/kids-mode/setup-profile');
+          }, 200);
+        } else {
+          toast.error('PIN does not match. Please try again.');
+          setPin('');
+        }
       }
     }
-  }, [pin, originalPin, router]);
+  }, [pin, originalPin, action, router]);
 
   return (
     <KeyboardAvoidingView
@@ -35,26 +53,38 @@ export default function ConfirmPinScreen() {
       className="flex-1 bg-[#121212]"
     >
       <View style={{ paddingTop: 64, paddingBottom: insets.bottom + 24 }} className="px-6 flex-1">
-        <Header showBackButton={true} title="Confirm PIN" containerStyle="mt-0 px-0 mb-12" />
-        
-        <View className="items-center mb-8">
+        <Header showBackButton={true} title={action ? "Use Password" : "Confirm PIN"} containerStyle="mt-0 px-0 mb-12" />
+
+        <View className="items-center mb-4">
           <View className="w-20 h-20 rounded-3xl bg-[#2A301E] items-center justify-center mb-6">
             <Ionicons name="key-outline" size={32} color="#98D83A" />
           </View>
           <Text className="text-white text-2xl font-inter-bold text-center mb-2">
-            Confirm Your PIN
+            {action ? "Use Password" : "Confirm Your PIN"}
           </Text>
           <Text className="text-gray-400 text-sm font-inter-regular text-center">
-            Re-enter your PIN to confirm
+            {action
+              ? "You'll need this PIN to turn off Kids Mode or change settings"
+              : "Re-enter your PIN to confirm"}
           </Text>
         </View>
 
-        <View className="flex-1 items-center justify-start mt-6">
+        <View className="flex-1 items-center justify-start mt-4 w-full">
           <PinPad 
             value={pin} 
             onValueChange={setPin} 
             maxLength={6} 
-          />
+          >
+            {action && (
+              <View className="w-full flex-row justify-end px-4 mb-6">
+                <Link href="/screens/kids-mode/forgot-pin" asChild>
+                  <Pressable>
+                    <Text className="text-[#EF4444] font-inter-medium">Forgot password?</Text>
+                  </Pressable>
+                </Link>
+              </View>
+            )}
+          </PinPad>
         </View>
 
       </View>
