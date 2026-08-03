@@ -174,7 +174,7 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
             <View className="px-5 py-2">
               <Text className="text-[#888] text-xs font-semibold mb-4">Business & Tools</Text>
               
-              <Pressable className="flex-row items-center justify-between py-3 mb-2">
+              <Pressable onPress={() => navigateTo('/screens/coins/wallet')} className="flex-row items-center justify-between py-3 mb-2">
                 <View className="flex-row items-center">
                   <Ionicons name="logo-euro" size={22} color="white" />
                   <Text className="text-white text-base ml-4 font-medium">Coin System</Text>
