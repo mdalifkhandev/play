@@ -40,6 +40,17 @@
       "expo-audio",
       "expo-asset",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          },
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Allow play to access your camera.",
