@@ -23,6 +23,10 @@ export default function CreateScreen() {
 
   const router = useRouter();
 
+  const isRecordingRef = useRef(false);
+  const canStopRef = useRef(false);
+  const maxDurationRef = useRef(15);
+
   const startTimer = () => {
     setRecordingTime(0);
     timerIntervalRef.current = setInterval(() => {
