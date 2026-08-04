@@ -10,12 +10,13 @@ export default function PostDetailsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { 
-    uri, overlayText, soundUrl, title,
-    originalVolume, addedVolume, trimLeft, trimRight,
+    uri, mediaType, overlayText, soundUrl, title,
+    originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight,
     exposure: expParam, contrast: contParam, activeFilter, activeEffect
   } = useLocalSearchParams<{ 
-    uri: string; overlayText: string; soundUrl: string; title: string;
+    uri: string; mediaType?: 'photo' | 'video'; overlayText: string; soundUrl: string; title: string;
     originalVolume: string; addedVolume: string; trimLeft: string; trimRight: string;
+    videoTrimLeft?: string; videoTrimRight?: string;
     exposure: string; contrast: string; activeFilter: string; activeEffect: string;
   }>();
 
@@ -84,8 +85,11 @@ export default function PostDetailsScreen() {
       pathname: '/screens/create/post-success',
       params: { 
         uri: mockImage,
+        mediaType: mediaType || 'photo',
         overlayText, soundUrl, title,
         originalVolume, addedVolume, trimLeft, trimRight,
+        videoTrimLeft: videoTrimLeft || '',
+        videoTrimRight: videoTrimRight || '',
         exposure: expParam, contrast: contParam, activeFilter, activeEffect
       }
     } as any);
@@ -126,7 +130,7 @@ export default function PostDetailsScreen() {
       if (trimLeft !== undefined) {
         const startMs = Math.floor((Number(trimLeft) / 100) * 30 * 1000);
         if (typeof sound.seekTo === 'function') {
-          try { sound.seekTo(startMs); } catch(e) {}
+          try { sound.seekTo(startMs / 1000); } catch(e) {}
         }
       }
     }
@@ -215,6 +219,23 @@ export default function PostDetailsScreen() {
               <Ionicons name="musical-notes" size={12} color="white" />
               <Text className="text-white font-inter-medium text-xs ml-1" numberOfLines={1}>{title}</Text>
             </View>
+          )}
+        </View>
+
+        <View className="bg-[#1C1C1E] rounded-xl p-4 mb-6 border border-[#333]">
+          <Text className="text-white font-inter-semibold text-base mb-3">Audio Mix</Text>
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-[#BBB] font-inter-regular">Original sound</Text>
+            <Text className="text-[#98FF2F] font-inter-semibold">{originalVolume || '100'}%</Text>
+          </View>
+          <View className="flex-row items-center justify-between">
+            <Text className="text-[#BBB] font-inter-regular">Added music</Text>
+            <Text className="text-[#98FF2F] font-inter-semibold">{soundUrl ? `${addedVolume || '100'}%` : 'Off'}</Text>
+          </View>
+          {mediaType === 'video' && (
+            <Text className="text-[#888] font-inter-regular text-xs mt-3">
+              Final video keeps your original sound and added music together using these volumes.
+            </Text>
           )}
         </View>
 

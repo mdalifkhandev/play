@@ -19,7 +19,27 @@ const DUMMY_TRACKS = [
 export default function SoundScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { returnTo, uri } = useLocalSearchParams<{ returnTo?: string; uri?: string }>();
+  const {
+    returnTo,
+    uri,
+    mediaType,
+    originalVolume,
+    addedVolume,
+    trimLeft,
+    trimRight,
+    videoTrimLeft,
+    videoTrimRight
+  } = useLocalSearchParams<{
+    returnTo?: string;
+    uri?: string;
+    mediaType?: 'photo' | 'video';
+    originalVolume?: string;
+    addedVolume?: string;
+    trimLeft?: string;
+    trimRight?: string;
+    videoTrimLeft?: string;
+    videoTrimRight?: string;
+  }>();
 
   const [activeTab, setActiveTab] = useState('Trending');
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,7 +125,14 @@ export default function SoundScreen() {
       params: {
         soundUrl: track.url,
         title: track.title,
-        ...(uri ? { uri } : {})
+        ...(uri ? { uri } : {}),
+        ...(mediaType ? { mediaType } : {}),
+        ...(originalVolume ? { originalVolume } : {}),
+        ...(addedVolume ? { addedVolume } : {}),
+        ...(trimLeft ? { trimLeft } : {}),
+        ...(trimRight ? { trimRight } : {}),
+        ...(videoTrimLeft ? { videoTrimLeft } : {}),
+        ...(videoTrimRight ? { videoTrimRight } : {})
       }
     });
   };

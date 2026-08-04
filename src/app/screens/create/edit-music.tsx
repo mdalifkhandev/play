@@ -73,6 +73,7 @@ export default function EditMusicScreen() {
   const [isMusicPlaying, setIsMusicPlaying] = useState(true);
   const [isOriginalMuted, setIsOriginalMuted] = useState(false);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
+  const [videoDurationSec, setVideoDurationSec] = useState(15);
   const [sound, setSound] = useState<any>(null);
   const isVideo = mediaType === 'video';
   const [trimTarget, setTrimTarget] = useState<'music' | 'video'>(isVideo ? 'video' : 'music');
@@ -86,9 +87,20 @@ export default function EditMusicScreen() {
 
   const mockImage = uri || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
   const MAX_DURATION_SEC = 30; // Mock 30 seconds total audio
+  const selectedVideoDurationSec = Math.max(1, ((videoTrimRight - videoTrimLeft) / 100) * videoDurationSec);
+  const maxMusicTrimPercentSpan = isVideo ? Math.max(1, (selectedVideoDurationSec / MAX_DURATION_SEC) * 100) : 100;
+  const musicWindowSpan = Math.min(100, maxMusicTrimPercentSpan);
+  const isVideoRef = useRef(isVideo);
+  isVideoRef.current = isVideo;
+  const musicWindowSpanRef = useRef(musicWindowSpan);
+  musicWindowSpanRef.current = musicWindowSpan;
+  const maxMusicTrimPercentSpanRef = useRef(maxMusicTrimPercentSpan);
+  maxMusicTrimPercentSpanRef.current = maxMusicTrimPercentSpan;
   const activeTrimLeft = trimTarget === 'video' ? videoTrimLeft : trimLeft;
   const activeTrimRight = trimTarget === 'video' ? videoTrimRight : trimRight;
-  const activeMaxDurationSec = trimTarget === 'video' ? 15 : MAX_DURATION_SEC;
+  const activeMaxDurationSec = trimTarget === 'video' ? videoDurationSec : MAX_DURATION_SEC;
+  const musicTrimStartSec = (trimLeft / 100) * MAX_DURATION_SEC;
+  const musicTrimEndSec = (trimRight / 100) * MAX_DURATION_SEC;
   const videoPlayer = useVideoPlayer(isVideo ? { uri: mockImage, contentType: 'progressive' } : null, player => {
     player.loop = true;
     player.muted = false;
@@ -99,6 +111,20 @@ export default function EditMusicScreen() {
   // Use refs to track latest values for PanResponder closures
   const latestAddedVolume = useRef(addedVolume);
   latestAddedVolume.current = addedVolume;
+  const latestMusicTrimStartSec = useRef(musicTrimStartSec);
+  latestMusicTrimStartSec.current = musicTrimStartSec;
+  const latestMusicTrimEndSec = useRef(musicTrimEndSec);
+  latestMusicTrimEndSec.current = musicTrimEndSec;
+
+  const seekMusicToSelectedStart = (player: any) => {
+    if (!player) return;
+
+    if (typeof player.seekTo === 'function') {
+      try { player.seekTo(latestMusicTrimStartSec.current); } catch (e) {}
+    } else {
+      try { player.currentTime = latestMusicTrimStartSec.current; } catch (e) {}
+    }
+  };
 
   useEffect(() => {
     let player: any = null;
@@ -108,6 +134,7 @@ export default function EditMusicScreen() {
         player = createAudioPlayer(source);
         // Set volume explicitly BEFORE playing to prevent audio leaks
         player.volume = latestAddedVolume.current / 100;
+        seekMusicToSelectedStart(player);
         player.play();
         player.loop = true;
         setSound(player);
@@ -127,11 +154,35 @@ export default function EditMusicScreen() {
   useEffect(() => {
     if (sound) {
       if (isMusicPlaying) {
+        seekMusicToSelectedStart(sound);
         sound.play();
       } else {
         sound.pause();
       }
     }
+  }, [isMusicPlaying, sound]);
+
+  useEffect(() => {
+    if (!sound) return;
+
+    seekMusicToSelectedStart(sound);
+    if (isMusicPlaying) {
+      try { sound.play(); } catch (e) {}
+    }
+  }, [isMusicPlaying, musicTrimEndSec, musicTrimStartSec, sound]);
+
+  useEffect(() => {
+    if (!sound || !isMusicPlaying) return;
+
+    const trimWatcher = setInterval(() => {
+      const currentTime = Number(sound.currentTime ?? 0);
+      if (currentTime >= latestMusicTrimEndSec.current) {
+        seekMusicToSelectedStart(sound);
+        try { sound.play(); } catch (e) {}
+      }
+    }, 200);
+
+    return () => clearInterval(trimWatcher);
   }, [isMusicPlaying, sound]);
 
   useEffect(() => {
@@ -142,6 +193,9 @@ export default function EditMusicScreen() {
       videoPlayer.currentTime = 0;
       videoPlayer.muted = isOriginalMuted;
       videoPlayer.volume = isOriginalMuted ? 0 : originalVolume / 100;
+      if (Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
+        setVideoDurationSec(Math.round(videoPlayer.duration));
+      }
 
       if (isVideoPlaying) {
         videoPlayer.play();
@@ -152,6 +206,47 @@ export default function EditMusicScreen() {
       console.error('Video trim preview load error:', error);
     });
   }, [isVideo, mockImage, videoPlayer]);
+
+  useEffect(() => {
+    if (!isVideo) return;
+
+    const durationChecker = setInterval(() => {
+      if (Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
+        setVideoDurationSec(Math.round(videoPlayer.duration));
+        clearInterval(durationChecker);
+      }
+    }, 250);
+
+    return () => clearInterval(durationChecker);
+  }, [isVideo, videoPlayer]);
+
+  useEffect(() => {
+    if (!isVideo) return;
+
+    if (trimRight - trimLeft > maxMusicTrimPercentSpan) {
+      setTrimRight(Math.min(100, trimLeft + maxMusicTrimPercentSpan));
+    }
+  }, [isVideo, maxMusicTrimPercentSpan, trimLeft, trimRight]);
+
+  useEffect(() => {
+    if (!isVideo || trimTarget !== 'music') return;
+
+    if (Math.abs((trimRight - trimLeft) - musicWindowSpan) > 0.5) {
+      setMusicWindowStart(trimLeft);
+    }
+  }, [isVideo, musicWindowSpan, trimLeft, trimRight, trimTarget]);
+
+  useEffect(() => {
+    if (!isVideo) return;
+
+    const clampedLeft = Math.min(trimLeft, 100 - musicWindowSpan);
+    const expectedRight = clampedLeft + musicWindowSpan;
+
+    if (Math.abs(trimLeft - clampedLeft) > 0.5 || Math.abs(trimRight - expectedRight) > 0.5) {
+      setTrimLeft(clampedLeft);
+      setTrimRight(expectedRight);
+    }
+  }, [isVideo, musicWindowSpan, trimLeft, trimRight, videoDurationSec]);
 
   useEffect(() => {
     if (!isVideo || hasVideoFrame) return;
@@ -176,6 +271,14 @@ export default function EditMusicScreen() {
     }
   }, [isVideo, isOriginalMuted, isVideoPlaying, originalVolume, videoPlayer]);
 
+  useEffect(() => {
+    return () => {
+      try {
+        videoPlayer.pause();
+      } catch (e) {}
+    };
+  }, [videoPlayer]);
+
   // Sync volume state dynamically when slider changes
   useEffect(() => {
     if (sound) {
@@ -184,17 +287,13 @@ export default function EditMusicScreen() {
       
       if (vol === 0) {
         sound.pause();
-      } else {
+      } else if (isMusicPlaying) {
         // If it was paused purely due to volume=0, resume it if isPlaying is true
         // But avoid repeatedly calling play() while dragging
-        if (isMusicPlaying) {
-          try {
-            // Only call play if it's not currently playing (if the API supports checking)
-            // It's safer to just let the main isPlaying useEffect handle the play/pause state for standard toggles.
-            // We just call play() once if it was paused.
-            sound.play();
-          } catch(e) {}
-        }
+        try {
+          seekMusicToSelectedStart(sound);
+          sound.play();
+        } catch(e) {}
       }
     }
   }, [addedVolume, isMusicPlaying, sound]);
@@ -209,7 +308,11 @@ export default function EditMusicScreen() {
     if (trimTargetRef.current === 'video') {
       setVideoTrimLeft(value);
     } else {
-      setTrimLeft(value);
+      const clampedLeft = Math.min(value, trimRight - 10);
+      setTrimLeft(clampedLeft);
+      if (isVideo && trimRight - clampedLeft > maxMusicTrimPercentSpan) {
+        setTrimRight(Math.min(100, clampedLeft + maxMusicTrimPercentSpan));
+      }
     }
   };
 
@@ -217,8 +320,16 @@ export default function EditMusicScreen() {
     if (trimTargetRef.current === 'video') {
       setVideoTrimRight(value);
     } else {
-      setTrimRight(value);
+      const maxRight = isVideo ? Math.min(100, trimLeft + maxMusicTrimPercentSpan) : 100;
+      setTrimRight(Math.min(value, maxRight));
     }
+  };
+
+  const setMusicWindowStart = (left: number) => {
+    const span = musicWindowSpanRef.current;
+    const clampedLeft = Math.max(0, Math.min(100 - span, left));
+    setTrimLeft(clampedLeft);
+    setTrimRight(clampedLeft + span);
   };
 
   // Trim Left Handle
@@ -229,7 +340,8 @@ export default function EditMusicScreen() {
     onPanResponderMove: (evt, gestureState) => {
       const w = width - 32;
       let newLeft = leftStart.current + (gestureState.dx / w) * 100;
-      newLeft = Math.max(0, Math.min(latestTrimRight.current - 10, newLeft)); // Keep it at least 10% apart from right
+      const minGap = trimTargetRef.current === 'music' && isVideoRef.current ? Math.min(10, maxMusicTrimPercentSpanRef.current) : 10;
+      newLeft = Math.max(0, Math.min(latestTrimRight.current - minGap, newLeft)); // Keep it apart from right
       setActiveTrimLeft(newLeft);
     }
   })).current;
@@ -242,8 +354,24 @@ export default function EditMusicScreen() {
     onPanResponderMove: (evt, gestureState) => {
       const w = width - 32;
       let newRight = rightStart.current + (gestureState.dx / w) * 100;
-      newRight = Math.max(latestTrimLeft.current + 10, Math.min(100, newRight));
+      const minGap = trimTargetRef.current === 'music' && isVideoRef.current ? Math.min(10, maxMusicTrimPercentSpanRef.current) : 10;
+      const maxRight = trimTargetRef.current === 'music' && isVideoRef.current
+        ? Math.min(100, latestTrimLeft.current + maxMusicTrimPercentSpanRef.current)
+        : 100;
+      newRight = Math.max(latestTrimLeft.current + minGap, Math.min(maxRight, newRight));
       setActiveTrimRight(newRight);
+    }
+  })).current;
+
+  const musicWindowStart = useRef(trimLeft);
+  const musicWindowPan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => trimTargetRef.current === 'music' && isVideoRef.current,
+    onMoveShouldSetPanResponder: () => trimTargetRef.current === 'music' && isVideoRef.current,
+    onPanResponderGrant: () => { musicWindowStart.current = latestTrimLeft.current; },
+    onPanResponderMove: (evt, gestureState) => {
+      const w = width - 32;
+      const newLeft = musicWindowStart.current + (gestureState.dx / w) * 100;
+      setMusicWindowStart(newLeft);
     }
   })).current;
 
@@ -253,11 +381,26 @@ export default function EditMusicScreen() {
     return `00:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const pausePreviewPlayers = () => {
+    try {
+      videoPlayer.pause();
+    } catch (e) {}
+
+    if (sound) {
+      try {
+        sound.pause();
+      } catch (e) {}
+    }
+  };
+
   return (
     <View className="flex-1 bg-[#121212]" style={{ paddingTop: insets.top }}>
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-[#222]">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
+        <Pressable onPress={() => {
+          pausePreviewPlayers();
+          router.back();
+        }} className="p-2 -ml-2">
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>
         <Text className="text-white font-inter-semibold text-[17px]">
@@ -265,8 +408,9 @@ export default function EditMusicScreen() {
         </Text>
         <Pressable 
           onPress={() => {
+            pausePreviewPlayers();
             // Save state by passing back to edit.tsx
-            router.navigate({
+            router.replace({
               pathname: '/screens/create/edit' as any,
               params: {
                 uri,
@@ -396,6 +540,12 @@ export default function EditMusicScreen() {
             <Text className="text-white font-inter-medium">{formatTime(activeTrimLeft)} / {formatTime(activeTrimRight)}</Text>
             <Text className="text-white font-inter-medium">{trimTarget === 'video' ? 'VIDEO TRIM' : 'MUSIC TRIM'}</Text>
           </View>
+
+          {isVideo && trimTarget === 'music' && (
+            <Text className="text-[#888] font-inter-regular text-sm mb-3">
+              Drag the green window to choose the part of the song that plays for {formatTime(100, selectedVideoDurationSec)}.
+            </Text>
+          )}
           
           {/* Mock Trim Timeline (Interactive) */}
           <View className="h-16 w-full flex-row rounded-lg overflow-hidden relative bg-[#222]">
@@ -405,24 +555,41 @@ export default function EditMusicScreen() {
               resizeMode="cover"
             />
             <View 
-              className="absolute inset-y-0 border-y-4 border-[#98FF2F] bg-black/10 flex-row justify-between"
+              className="absolute inset-y-0 border-4 border-[#98FF2F] bg-black/10 flex-row justify-between rounded-lg overflow-hidden"
               style={{ left: `${activeTrimLeft}%`, right: `${100 - activeTrimRight}%` }}
+              {...(isVideo && trimTarget === 'music' ? musicWindowPan.panHandlers : {})}
             >
               {/* Left Handle */}
-              <View 
-                {...leftPan.panHandlers}
-                className="w-6 h-full bg-[#98FF2F] items-center justify-center -ml-1 absolute left-0 z-10"
-              >
-                <View className="w-0.5 h-4 bg-black rounded-full" />
-              </View>
+              {!(isVideo && trimTarget === 'music') && (
+                <View 
+                  {...leftPan.panHandlers}
+                  className="w-7 h-full bg-[#98FF2F] items-center justify-center absolute left-[-1px] z-10 rounded-l-lg"
+                >
+                  <View className="w-0.5 h-4 bg-black rounded-full" />
+                </View>
+              )}
               
               {/* Right Handle */}
-              <View 
-                {...rightPan.panHandlers}
-                className="w-6 h-full bg-[#98FF2F] items-center justify-center -mr-1 absolute right-0 z-10"
-              >
-                <View className="w-0.5 h-4 bg-black rounded-full" />
-              </View>
+              {isVideo && trimTarget === 'music' ? (
+                <>
+                  <View className="w-7 h-full bg-[#98FF2F] items-center justify-center absolute left-[-1px] z-10 rounded-l-lg">
+                    <View className="w-0.5 h-4 bg-black rounded-full" />
+                  </View>
+                  <View className="w-7 h-full bg-[#98FF2F] items-center justify-center absolute right-[-1px] z-10 rounded-r-lg">
+                    <View className="w-0.5 h-4 bg-black rounded-full" />
+                  </View>
+                  <View className="absolute inset-0 items-center justify-center pointer-events-none">
+                    <Ionicons name="move" size={18} color="black" />
+                  </View>
+                </>
+              ) : (
+                <View 
+                  {...rightPan.panHandlers}
+                  className="w-7 h-full bg-[#98FF2F] items-center justify-center absolute right-[-1px] z-10 rounded-r-lg"
+                >
+                  <View className="w-0.5 h-4 bg-black rounded-full" />
+                </View>
+              )}
             </View>
           </View>
         </View>

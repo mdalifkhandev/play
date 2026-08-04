@@ -25,6 +25,18 @@ function MediaVideoPreview({ uri, compact = false }: { uri: string; compact?: bo
     });
   }, [player, uri]);
 
+  useFocusEffect(
+    useCallback(() => {
+      player.play();
+
+      return () => {
+        try {
+          player.pause();
+        } catch (e) {}
+      };
+    }, [player])
+  );
+
   return (
     <View className="absolute inset-0 bg-black">
       <VideoView
@@ -170,7 +182,7 @@ export default function EditMediaScreen() {
       if (trimLeft !== undefined) {
         const startMs = Math.floor((Number(trimLeft) / 100) * 30 * 1000);
         if (typeof sound.seekTo === 'function') {
-          try { sound.seekTo(startMs); } catch(e) {}
+          try { sound.seekTo(startMs / 1000); } catch(e) {}
         }
       }
     }
@@ -394,7 +406,23 @@ export default function EditMediaScreen() {
             {/* Right Floating Actions */}
             {!isTextMode && !activePanel && (
               <View className="absolute right-4 top-10 gap-4 z-20">
-                <Pressable onPress={() => router.push({ pathname: '/screens/create/sound', params: { returnTo: '/screens/create/edit', uri: uri, mediaType: mediaType || 'photo' } } as any)} className="items-center relative">
+                <Pressable
+                  onPress={() => router.push({
+                    pathname: '/screens/create/sound',
+                    params: {
+                      returnTo: '/screens/create/edit',
+                      uri,
+                      mediaType: mediaType || 'photo',
+                      originalVolume: originalVolume?.toString() || '',
+                      addedVolume: addedVolume?.toString() || '',
+                      trimLeft: trimLeft?.toString() || '',
+                      trimRight: trimRight?.toString() || '',
+                      videoTrimLeft: videoTrimLeft?.toString() || '',
+                      videoTrimRight: videoTrimRight?.toString() || ''
+                    }
+                  } as any)}
+                  className="items-center relative"
+                >
                   <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
                   <Ionicons name="musical-notes-outline" size={20} color="#98D83A" />
                   </View>
@@ -451,8 +479,7 @@ export default function EditMediaScreen() {
                 <View className="w-16 h-16 rounded-lg overflow-hidden relative border-2 border-[#98D83A]">
                   {isVideo ? (
                     <>
-                      <MediaVideoPreview uri={mockImage} compact />
-                      <View className="absolute inset-0 items-center justify-center bg-black/20">
+                      <View className="absolute inset-0 bg-[#222] items-center justify-center">
                         <Ionicons name="play" size={18} color="white" />
                       </View>
                     </>
