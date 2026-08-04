@@ -4,8 +4,47 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createAudioPlayer } from 'expo-audio';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width } = Dimensions.get('window');
+
+function MediaVideoPreview({ uri, compact = false }: { uri: string; compact?: boolean }) {
+  const [hasFirstFrame, setHasFirstFrame] = useState(false);
+  const player = useVideoPlayer({ uri, contentType: 'progressive' }, player => {
+    player.loop = true;
+    player.muted = true;
+    player.play();
+  });
+
+  useEffect(() => {
+    player.replaceAsync({ uri, contentType: 'progressive' }).then(() => {
+      player.currentTime = 0;
+      player.play();
+    }).catch(error => {
+      console.error('Video preview load error:', error);
+    });
+  }, [player, uri]);
+
+  return (
+    <View className="absolute inset-0 bg-black">
+      <VideoView
+        player={player}
+        className="absolute inset-0"
+        style={{ width: '100%', height: '100%' }}
+        nativeControls={false}
+        contentFit="cover"
+        surfaceType="textureView"
+        onFirstFrameRender={() => setHasFirstFrame(true)}
+      />
+      {!hasFirstFrame && (
+        <View className="absolute inset-0 items-center justify-center bg-black">
+          <Ionicons name="play-circle" size={compact ? 24 : 56} color="#98FF2F" />
+          {!compact && <Text className="text-white font-inter-medium mt-3">Loading video preview...</Text>}
+        </View>
+      )}
+    </View>
+  );
+}
 
 // Custom interactive slider using PanResponder
 const CustomSlider = ({ value, onValueChange, label }: { value: number, onValueChange: (val: number) => void, label: string }) => {
@@ -49,17 +88,19 @@ const CustomSlider = ({ value, onValueChange, label }: { value: number, onValueC
 
 export default function EditMediaScreen() {
   const { 
-    uri, soundUrl, title,
-    originalVolume, addedVolume, trimLeft, trimRight
+    uri, mediaType, soundUrl, title,
+    originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight
   } = useLocalSearchParams<{ 
-    uri: string; soundUrl: string; title: string;
+    uri: string; mediaType?: 'photo' | 'video'; soundUrl: string; title: string;
     originalVolume?: string; addedVolume?: string; trimLeft?: string; trimRight?: string;
+    videoTrimLeft?: string; videoTrimRight?: string;
   }>();
   
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const mockImage = uri || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
+  const isVideo = mediaType === 'video';
 
   // Audio Player for Preview
   const [sound, setSound] = useState<any>(null);
@@ -164,7 +205,18 @@ export default function EditMediaScreen() {
   const navigateToEditMusic = () => {
     router.push({
       pathname: '/screens/create/edit-music',
-      params: { uri: mockImage, soundUrl: soundUrl || '', title: title || '' }
+      params: {
+        uri: mockImage,
+        mediaType: mediaType || 'photo',
+        soundUrl: soundUrl || '',
+        title: title || '',
+        originalVolume: originalVolume?.toString() || '',
+        addedVolume: addedVolume?.toString() || '',
+        trimLeft: trimLeft?.toString() || '',
+        trimRight: trimRight?.toString() || '',
+        videoTrimLeft: videoTrimLeft?.toString() || '',
+        videoTrimRight: videoTrimRight?.toString() || ''
+      }
     } as any);
   };
 
@@ -173,6 +225,7 @@ export default function EditMediaScreen() {
       pathname: '/screens/create/post-details',
       params: { 
         uri: mockImage, 
+        mediaType: mediaType || 'photo',
         overlayText: overlayText, 
         soundUrl: soundUrl || '',
         title: title || '',
@@ -180,6 +233,8 @@ export default function EditMediaScreen() {
         addedVolume: addedVolume?.toString() || '',
         trimLeft: trimLeft?.toString() || '',
         trimRight: trimRight?.toString() || '',
+        videoTrimLeft: videoTrimLeft?.toString() || '',
+        videoTrimRight: videoTrimRight?.toString() || '',
         exposure: exposure.toString(),
         contrast: contrast.toString(),
         activeFilter: activeFilter,
@@ -221,14 +276,25 @@ export default function EditMediaScreen() {
         <View className="flex-1 relative">
           <View className="flex-1 bg-black overflow-hidden relative items-center justify-center">
             
-            <Image 
-              source={{ uri: mockImage }} 
-              className="w-full h-full absolute inset-0"
-              resizeMode="cover"
-              style={{
-                transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }]
-              }}
-            />
+            {isVideo ? (
+              <View
+                className="w-full h-full absolute inset-0"
+                style={{
+                  transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }]
+                }}
+              >
+                <MediaVideoPreview uri={mockImage} />
+              </View>
+            ) : (
+              <Image 
+                source={{ uri: mockImage }} 
+                className="w-full h-full absolute inset-0"
+                resizeMode="cover"
+                style={{
+                  transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }]
+                }}
+              />
+            )}
             
             {/* Simulate Glitch Effect (Chromatic Aberration) */}
             {activeEffect === 'Glitch' && (
@@ -288,6 +354,15 @@ export default function EditMediaScreen() {
             )}
 
             {/* Display Overlay Text */}
+            {!isTextMode && !activePanel && (
+              <View className="absolute left-4 top-10 bg-black/60 px-3 py-1.5 rounded-full flex-row items-center z-20">
+                <Ionicons name={isVideo ? 'videocam' : 'image'} size={14} color="#98FF2F" />
+                <Text className="text-white font-inter-semibold text-xs ml-1.5">
+                  {isVideo ? 'Video' : 'Photo'}
+                </Text>
+              </View>
+            )}
+
             {overlayText.length > 0 && (
               <Text className="text-white font-inter-bold text-3xl text-center px-4 z-10" style={{ textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 10 }}>
                 {overlayText}
@@ -319,8 +394,11 @@ export default function EditMediaScreen() {
             {/* Right Floating Actions */}
             {!isTextMode && !activePanel && (
               <View className="absolute right-4 top-10 gap-4 z-20">
-                <Pressable onPress={() => router.push({ pathname: '/screens/create/sound', params: { returnTo: '/screens/create/edit', uri: uri } } as any)} className="w-12 h-12 bg-black rounded-full items-center justify-center relative">
+                <Pressable onPress={() => router.push({ pathname: '/screens/create/sound', params: { returnTo: '/screens/create/edit', uri: uri, mediaType: mediaType || 'photo' } } as any)} className="items-center relative">
+                  <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
                   <Ionicons name="musical-notes-outline" size={20} color="#98D83A" />
+                  </View>
+                  <Text className="text-white text-[10px] mt-1 font-inter-medium">Sound</Text>
                   {soundUrl && (
                     <View className="absolute -top-1 -right-1 w-4 h-4 bg-[#98FF2F] rounded-full border border-black items-center justify-center">
                       <Ionicons name="checkmark" size={10} color="black" />
@@ -329,25 +407,40 @@ export default function EditMediaScreen() {
                 </Pressable>
                 
                 {/* Scissors - Route to Edit Music if sound is added, otherwise maybe just trim video */}
-                <Pressable onPress={navigateToEditMusic} className="w-12 h-12 bg-black rounded-full items-center justify-center">
+                <Pressable onPress={navigateToEditMusic} className="items-center">
+                  <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
                   <Ionicons name="cut-outline" size={20} color="#98D83A" />
+                  </View>
+                  <Text className="text-white text-[10px] mt-1 font-inter-medium">Trim</Text>
                 </Pressable>
                 
-                <Pressable onPress={() => setActivePanel('options')} className="w-12 h-12 bg-black rounded-full items-center justify-center">
+                <Pressable onPress={() => setActivePanel('options')} className="items-center">
+                  <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
                   <Ionicons name="options-outline" size={20} color="#98D83A" />
+                  </View>
+                  <Text className="text-white text-[10px] mt-1 font-inter-medium">Adjust</Text>
                 </Pressable>
                 
                 {/* Text Tool */}
-                <Pressable onPress={() => setIsTextMode(true)} className="w-12 h-12 bg-black rounded-full items-center justify-center">
+                <Pressable onPress={() => setIsTextMode(true)} className="items-center">
+                  <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
                   <Text className="text-[#98D83A] font-serif text-lg font-bold">Tt</Text>
+                  </View>
+                  <Text className="text-white text-[10px] mt-1 font-inter-medium">Text</Text>
                 </Pressable>
                 
-                <Pressable onPress={() => setActivePanel('filters')} className="w-12 h-12 bg-black rounded-full items-center justify-center">
+                <Pressable onPress={() => setActivePanel('filters')} className="items-center">
+                  <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
                   <Ionicons name="color-filter-outline" size={20} color="#98D83A" />
+                  </View>
+                  <Text className="text-white text-[10px] mt-1 font-inter-medium">Filter</Text>
                 </Pressable>
                 
-                <Pressable onPress={() => setActivePanel('effects')} className="w-12 h-12 bg-black rounded-full items-center justify-center">
+                <Pressable onPress={() => setActivePanel('effects')} className="items-center">
+                  <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
                   <Ionicons name="tablet-landscape-outline" size={20} color="#98D83A" style={{ transform: [{ rotate: '-45deg' }] }} />
+                  </View>
+                  <Text className="text-white text-[10px] mt-1 font-inter-medium">Effect</Text>
                 </Pressable>
               </View>
             )}
@@ -356,7 +449,16 @@ export default function EditMediaScreen() {
             {!isTextMode && !activePanel && (
               <View className="absolute bottom-4 left-4 right-4 bg-black/60 rounded-2xl p-4 min-h-[100px] z-20">
                 <View className="w-16 h-16 rounded-lg overflow-hidden relative border-2 border-[#98D83A]">
-                  <Image source={{ uri: mockImage }} className="w-full h-full" />
+                  {isVideo ? (
+                    <>
+                      <MediaVideoPreview uri={mockImage} compact />
+                      <View className="absolute inset-0 items-center justify-center bg-black/20">
+                        <Ionicons name="play" size={18} color="white" />
+                      </View>
+                    </>
+                  ) : (
+                    <Image source={{ uri: mockImage }} className="w-full h-full" />
+                  )}
                   <View className="absolute top-1 right-1 bg-[#98D83A] rounded-full">
                     <Ionicons name="checkmark-circle" size={16} color="black" />
                   </View>
