@@ -14,17 +14,31 @@ export default function CreateScreen() {
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
-  
-  const [recordingMode, setRecordingMode] = useState<'10m' | '60s' | '15s' | 'Photo'>('Photo');
+
+  const [mainMode, setMainMode] = useState<'Photo' | 'Video' | 'Live'>('Video');
+  const [recordingMode, setRecordingMode] = useState<'1m' | '30s' | '15s'>('15s');
   const [isRecording, setIsRecording] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const router = useRouter();
 
+  const startTimer = () => {
+    setRecordingTime(0);
+    timerIntervalRef.current = setInterval(() => {
+      setRecordingTime(prev => prev + 1);
+    }, 1000);
+  };
+
+  const stopTimer = () => {
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    setRecordingTime(0);
+  };
+
   const handleRecordAction = async () => {
     if (!cameraRef.current) return;
-    
-    if (recordingMode === 'Photo') {
+
+    if (mainMode === 'Photo') {
       try {
         const photo = await cameraRef.current.takePictureAsync();
         if (photo?.uri) {
@@ -35,24 +49,34 @@ export default function CreateScreen() {
       }
     } else {
       if (isRecording) {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         cameraRef.current.stopRecording();
         setIsRecording(false);
+        stopTimer();
       } else {
         try {
           setIsRecording(true);
-          const maxDuration = recordingMode === '15s' ? 15 : recordingMode === '60s' ? 60 : 600;
+          startTimer();
 
-          // Pass maxDuration directly to recordAsync as suggested by user
+          let maxDuration = 15;
+          if (mainMode === 'Video') {
+            maxDuration = recordingMode === '15s' ? 15 : recordingMode === '30s' ? 30 : 60;
+          } else {
+            maxDuration = 3600; // Live mock
+          }
+
           const video = await cameraRef.current.recordAsync({ maxDuration });
           setIsRecording(false);
-          
-          if (video?.uri) {
+          stopTimer();
+
+          if (video?.uri && mainMode !== 'Live') {
             router.push({ pathname: '/screens/create/edit', params: { uri: video.uri } });
+          } else if (mainMode === 'Live') {
+            alert('Live ended');
           }
         } catch (error) {
-          console.error('Failed to record video:', error);
+          console.error('Failed to record video/live:', error);
           setIsRecording(false);
+          stopTimer();
         }
       }
     }
@@ -101,38 +125,55 @@ export default function CreateScreen() {
   return (
     <View className="flex-1 bg-black">
       <View className="flex-1 overflow-hidden rounded-b-xl">
-        <CameraView 
-          ref={cameraRef} 
-          style={StyleSheet.absoluteFill} 
-          facing={facing} 
-          mode={recordingMode === 'Photo' ? 'picture' : 'video'}
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing={facing}
+          mode={mainMode === 'Photo' ? 'picture' : 'video'}
         />
 
-        {/* Top Centered Pill */}
+        {/* Top Centered Pill / Timer */}
         <View
-          className="absolute top-0 left-0 right-0 items-center z-10"
+          className="absolute top-0 left-0 right-0 items-center z-10 flex-row justify-center"
           style={{ paddingTop: insets.top + 10 }}
         >
-          <Pressable 
-            onPress={() => router.push({ pathname: '/screens/create/sound', params: { returnTo: '/(tab)/create' } } as any)}
-            className="bg-black/70 px-5 py-2 rounded-full flex-row items-center"
-          >
-            <Ionicons name="musical-note" size={16} color="white" className="mr-2" />
-            <Text className="text-white font-inter-semibold text-sm">
-              {title || 'Add sound'}
-            </Text>
-          </Pressable>
+          {isRecording && (mainMode === 'Video' || mainMode === 'Live') && (
+            <View className="absolute left-4 bg-black/50 px-3 py-1.5 rounded-full flex-row items-center" style={{ top: insets.top + 10 }}>
+              <View className="w-2 h-2 rounded-full bg-red-500 mr-2" />
+              <Text className="text-white font-inter-semibold text-sm">
+                {Math.floor(recordingTime / 60).toString().padStart(2, '0')}:{(recordingTime % 60).toString().padStart(2, '0')}
+              </Text>
+            </View>
+          )}
+
+          {!isRecording && (
+            <Pressable
+              onPress={() => router.push({ pathname: '/screens/create/sound', params: { returnTo: '/(tab)/create' } } as any)}
+              className="bg-black/70 px-5 py-2 rounded-full flex-row items-center"
+            >
+              <Ionicons name="musical-note" size={16} color="white" className="mr-2" />
+              <Text className="text-white font-inter-semibold text-sm">
+                {title || 'Add sound'}
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Floating Controls Over Camera */}
         <View className="absolute bottom-6 left-0 right-0 z-10">
 
           {/* Mode Selector Row */}
-          <View className="flex-row justify-center items-center mb-6 gap-6">
-            {['10m', '60s', '15s', 'Photo'].map((mode) => (
+          <View className="flex-row justify-center items-center mb-6 gap-6 h-8">
+            {mainMode === 'Photo' && (
+              <View className="bg-white px-4  rounded-full">
+                <Text className="text-black font-inter-bold text-[15px]">Photo </Text>
+              </View>
+            )}
+
+            {mainMode === 'Video' && ['1m', '30s', '15s'].map((mode) => (
               <Pressable key={mode} onPress={() => setRecordingMode(mode as any)}>
                 {recordingMode === mode ? (
-                  <View className="bg-white px-4 py-1.5 rounded-full">
+                  <View className="bg-white px-4  rounded-full">
                     <Text className="text-black font-inter-bold text-[15px]">{mode}</Text>
                   </View>
                 ) : (
@@ -140,6 +181,12 @@ export default function CreateScreen() {
                 )}
               </Pressable>
             ))}
+
+            {mainMode === 'Live' && (
+              <View className="bg-white px-4 rounded-full">
+                <Text className="text-black font-inter-bold text-[15px]">Live</Text>
+              </View>
+            )}
           </View>
 
           {/* Record Button & Effects */}
@@ -167,10 +214,14 @@ export default function CreateScreen() {
           <Text className="text-white font-inter-semibold text-xs">UPLOAD</Text>
         </Pressable>
 
-        <View className="flex-row items-center gap-6 absolute left-32 right-0 justify-center pointer-events-none">
-          <Text className="text-white font-inter-semibold text-[15px]">Post</Text>
-          <Text className="text-white font-inter-bold text-[15px]">Video</Text>
-          <Text className="text-gray-400 font-inter-semibold text-[15px]">Live</Text>
+        <View className="flex-row items-center gap-6 absolute left-32 right-0 justify-center">
+          {['Photo', 'Video', 'Live'].map((m) => (
+            <Pressable key={m} onPress={() => setMainMode(m as any)}>
+              <Text className={mainMode === m ? "text-white font-inter-bold text-[15px]" : "text-gray-400 font-inter-semibold text-[15px]"}>
+                {m}
+              </Text>
+            </Pressable>
+          ))}
         </View>
 
         {/* Placeholder for symmetry */}
