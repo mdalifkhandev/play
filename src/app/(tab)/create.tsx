@@ -16,7 +16,7 @@ export default function CreateScreen() {
   const cameraRef = useRef<CameraView>(null);
 
   const [mainMode, setMainMode] = useState<'Photo' | 'Video' | 'Live'>('Video');
-  const [recordingMode, setRecordingMode] = useState<'1m' | '30s' | '15s'>('15s');
+  const [recordingMode, setRecordingMode] = useState<'1m' | '30s' | '15s' | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -59,7 +59,7 @@ export default function CreateScreen() {
 
           let maxDuration = 15;
           if (mainMode === 'Video') {
-            maxDuration = recordingMode === '15s' ? 15 : recordingMode === '30s' ? 30 : 60;
+            maxDuration = recordingMode === '15s' ? 15 : recordingMode === '30s' ? 30 : recordingMode === '1m' ? 60 : 600;
           } else {
             maxDuration = 3600; // Live mock
           }
@@ -171,7 +171,10 @@ export default function CreateScreen() {
             )}
 
             {mainMode === 'Video' && ['1m', '30s', '15s'].map((mode) => (
-              <Pressable key={mode} onPress={() => setRecordingMode(mode as any)}>
+              <Pressable
+                key={mode}
+                onPress={() => setRecordingMode(prev => prev === mode ? null : (mode as any))}
+              >
                 {recordingMode === mode ? (
                   <View className="bg-white px-4  rounded-full">
                     <Text className="text-black font-inter-bold text-[15px]">{mode}</Text>
@@ -195,7 +198,7 @@ export default function CreateScreen() {
               onPress={handleRecordAction}
               className={`w-[72px] h-[72px] rounded-full border-[3px] items-center justify-center ${isRecording ? 'border-red-500' : 'border-white'}`}
             >
-              <View className={`${isRecording ? 'w-8 h-8 rounded-lg bg-red-500' : 'w-[60px] h-[60px] bg-white rounded-full'}`} />
+              <View className={`${isRecording ? 'w-8 h-8 rounded-lg bg-red-500' : 'w-[60px] h-[60px] bg-red-500 rounded-full'}`} />
             </Pressable>
           </View>
 
