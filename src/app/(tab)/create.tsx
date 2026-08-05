@@ -8,7 +8,14 @@ import { CustomButton } from '../../components/ui/CustomButton';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function CreateScreen() {
-  const { soundUrl, title } = useLocalSearchParams<{ soundUrl?: string; title?: string }>();
+  const { soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl } = useLocalSearchParams<{
+    soundUrl?: string;
+    title?: string;
+    soundDuration?: string;
+    musicId?: string;
+    musicArtist?: string;
+    musicCoverUrl?: string;
+  }>();
   const [facing, setFacing] = useState<CameraType>('back');
   const [camPermission, requestCamPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -26,7 +33,14 @@ export default function CreateScreen() {
 
   const router = useRouter();
 
-  const selectedSoundParams = soundUrl || title ? { soundUrl: soundUrl || '', title: title || '' } : {};
+  const selectedSoundParams = soundUrl || title ? {
+    soundUrl: soundUrl || '',
+    title: title || '',
+    soundDuration: soundDuration || '',
+    musicId: musicId || '',
+    musicArtist: musicArtist || '',
+    musicCoverUrl: musicCoverUrl || '',
+  } : {};
   const cameraMode = mainMode === 'Photo' ? 'picture' : 'video';
 
   const isCameraReadyRef = useRef(false);

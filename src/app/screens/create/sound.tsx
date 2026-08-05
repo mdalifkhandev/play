@@ -1,22 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer } from 'expo-audio';
-import { CustomInput } from '../../../components/inputs/CustomInput';
 import { SearchIcon } from '../../../components/icons/SearchIcon';
 import { useLocalSearchParams } from 'expo-router';
+import { searchMusicTracks } from '../../../api/music/music.api';
+import type { MusicTrack } from '../../../api/music/music.types';
 
-// Using the downloaded local assets from assets/sound
-const DUMMY_TRACKS = [
-  { id: '1', title: 'Rainy Window Lo-Fi', artist: 'Kaazoom', duration: '00:15', url: require('../../../../assets/sound/kaazoom-rainy-window-study-lofi-15-sec-stinger-526099.mp3') },
-  { id: '2', title: 'Amazon Nature Waterfall', artist: 'MeditativeTiger', duration: '00:15', url: require('../../../../assets/sound/meditativetiger-15-second-amazon-nature-waterfall-395552.mp3') },
-  { id: '3', title: 'Bamboo Waterfall Loop', artist: 'MeditativeTiger', duration: '00:15', url: require('../../../../assets/sound/meditativetiger-bamboo-waterfall-15-second-loop-395563.mp3') },
-  { id: '4', title: 'Catchy Jazzy Stinger', artist: 'Sonican', duration: '00:15', url: require('../../../../assets/sound/sonican-catchy-jazzy-15-sec-stinger-343720.mp3') },
-  { id: '5', title: 'Cartoon Accent Pop', artist: 'OpenMindAudio', duration: '00:15', url: require('../../../../assets/sound/openmindaudio-cartoon-accent-stinger-highlight-pop-529306.mp3') },
-  { id: '6', title: 'Cinematic Sound Effect', artist: 'Diamond Tunes', duration: '00:12', url: require('../../../../assets/sound/diamond_tunes-cinematic-sound-effect-327618.mp3') },
-];
+const formatDuration = (seconds: number) => {
+  const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.round(seconds)) : 0;
+  const mins = Math.floor(safeSeconds / 60);
+  const secs = safeSeconds % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
 
 export default function SoundScreen() {
   const insets = useSafeAreaInsets();
@@ -49,12 +47,12 @@ export default function SoundScreen() {
 
   const [activeTab, setActiveTab] = useState('Trending');
   const [searchQuery, setSearchQuery] = useState('');
-  const filteredTracks = DUMMY_TRACKS.filter((track) => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return true;
-
-    return `${track.title} ${track.artist}`.toLowerCase().includes(query);
-  });
+  const [tracks, setTracks] = useState<MusicTrack[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [isLoadingTracks, setIsLoadingTracks] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   // Audio state
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -74,9 +72,45 @@ export default function SoundScreen() {
     };
   }, []);
 
-  const handleTogglePlay = (track: typeof DUMMY_TRACKS[0]) => {
+  const loadTracks = useCallback(async (nextPage = 1, query = searchQuery) => {
+    const isFirstPage = nextPage === 1;
+    setLoadError('');
+    isFirstPage ? setIsLoadingTracks(true) : setIsLoadingMore(true);
+
+    try {
+      const result = await searchMusicTracks({
+        search: query,
+        page: nextPage,
+        limit: 20,
+        order: activeTab === 'Trending' ? 'popularity_total' : activeTab === 'Mood' ? 'popularity_week' : 'releasedate',
+      });
+      const playableTracks = result.tracks.filter(track => track.downloadAllowed);
+      setTracks(prev => isFirstPage ? playableTracks : [...prev, ...playableTracks]);
+      setPage(result.pagination.page);
+      setHasNextPage(result.pagination.hasNextPage);
+    } catch (error: any) {
+      console.log('Music search error:', error);
+      setLoadError(error?.response?.data?.error?.message || error?.message || 'Could not load music.');
+      if (isFirstPage) {
+        setTracks([]);
+      }
+    } finally {
+      setIsLoadingTracks(false);
+      setIsLoadingMore(false);
+    }
+  }, [activeTab, searchQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadTracks(1, searchQuery);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [loadTracks, searchQuery]);
+
+  const handleTogglePlay = (track: MusicTrack) => {
     // If clicking the currently playing/loading track, stop it
-    if (playingId === track.id || loadingId === track.id) {
+    if (playingId === track.providerTrackId || loadingId === track.providerTrackId) {
       if (activePlayerRef.current) {
         activePlayerRef.current.pause();
         activePlayerRef.current.remove();
@@ -94,11 +128,11 @@ export default function SoundScreen() {
       activePlayerRef.current = null;
     }
 
-    setLoadingId(track.id);
+    setLoadingId(track.providerTrackId);
     setPlayingId(null);
 
     try {
-      const newSound = createAudioPlayer(track.url);
+      const newSound = createAudioPlayer(track.audioPreviewUrl);
       newSound.play();
       activePlayerRef.current = newSound;
 
@@ -110,7 +144,7 @@ export default function SoundScreen() {
         }
         if (status.isLoaded && status.playing) {
           setLoadingId(null);
-          setPlayingId(track.id);
+          setPlayingId(track.providerTrackId);
         }
         if (status.didJustFinish) {
           setPlayingId(null);
@@ -123,7 +157,7 @@ export default function SoundScreen() {
     }
   };
 
-  const handleUse = (track: typeof DUMMY_TRACKS[0]) => {
+  const handleUse = (track: MusicTrack) => {
     if (activePlayerRef.current) {
       activePlayerRef.current.pause();
       activePlayerRef.current.remove();
@@ -135,9 +169,12 @@ export default function SoundScreen() {
     router.push({
       pathname: targetPath as any,
       params: {
-        soundUrl: track.url,
+        soundUrl: track.audioPreviewUrl,
+        musicId: track.providerTrackId,
         title: track.title,
-        soundDuration: track.duration,
+        musicArtist: track.artistName,
+        musicCoverUrl: track.coverImageUrl || '',
+        soundDuration: String(track.durationSeconds),
         ...(uri ? { uri } : {}),
         ...(mediaType ? { mediaType } : {}),
         ...(originalVolume ? { originalVolume } : {}),
@@ -202,15 +239,43 @@ export default function SoundScreen() {
 
       {/* List */}
       <ScrollView className="flex-1 px-4">
-        {filteredTracks.map(track => {
-          const isThisPlaying = playingId === track.id;
-          const isThisLoading = loadingId === track.id;
+        {isLoadingTracks && (
+          <View className="items-center justify-center py-10">
+            <ActivityIndicator size="large" color="#98FF2F" />
+            <Text className="text-[#888] font-inter-medium mt-3">Loading music...</Text>
+          </View>
+        )}
+
+        {!isLoadingTracks && loadError ? (
+          <View className="items-center justify-center py-10 px-4">
+            <Ionicons name="warning-outline" size={34} color="#98FF2F" />
+            <Text className="text-white font-inter-semibold text-base mt-3 text-center">{loadError}</Text>
+            <Pressable onPress={() => loadTracks(1)} className="border border-[#98D83A] rounded-lg px-5 py-2 mt-4">
+              <Text className="text-[#98D83A] font-inter-semibold">Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {!isLoadingTracks && !loadError && tracks.length === 0 ? (
+          <View className="items-center justify-center py-10 px-4">
+            <Ionicons name="musical-notes-outline" size={34} color="#98FF2F" />
+            <Text className="text-white font-inter-semibold text-base mt-3 text-center">No downloadable music found</Text>
+          </View>
+        ) : null}
+
+        {!isLoadingTracks && tracks.map(track => {
+          const isThisPlaying = playingId === track.providerTrackId;
+          const isThisLoading = loadingId === track.providerTrackId;
 
           return (
-            <View key={track.id} className="flex-row items-center bg-[#1A1A1A] rounded-xl p-2.5 mb-3 border border-[#333]">
+            <View key={track.providerTrackId} className="flex-row items-center bg-[#1A1A1A] rounded-xl p-2.5 mb-3 border border-[#333]">
               <Pressable onPress={() => handleTogglePlay(track)} className="relative">
                 <View className="w-[60px] h-[60px] rounded-lg bg-[#333] items-center justify-center relative overflow-hidden">
-                  <Ionicons name="musical-notes" size={28} color="#98FF2F" />
+                  {track.coverImageUrl ? (
+                    <Image source={{ uri: track.coverImageUrl }} className="absolute inset-0 w-full h-full" resizeMode="cover" />
+                  ) : (
+                    <Ionicons name="musical-notes" size={28} color="#98FF2F" />
+                  )}
 
                   {isThisLoading ? (
                     <View className="absolute inset-0 bg-black/60 items-center justify-center">
@@ -227,7 +292,7 @@ export default function SoundScreen() {
               <View className="flex-1 ml-3">
                 <Text className="text-white font-inter-medium text-[16px] mb-0.5">{track.title}</Text>
                 <Text className="text-[#888] font-inter-regular text-[13px]">
-                  {track.artist} • {track.duration}
+                  {track.artistName} • {formatDuration(track.durationSeconds)}
                 </Text>
               </View>
 
@@ -241,6 +306,19 @@ export default function SoundScreen() {
             </View>
           );
         })}
+        {!isLoadingTracks && hasNextPage && (
+          <Pressable
+            onPress={() => loadTracks(page + 1)}
+            disabled={isLoadingMore}
+            className="border border-[#98D83A] rounded-lg py-3 items-center mb-3"
+          >
+            {isLoadingMore ? (
+              <ActivityIndicator size="small" color="#98FF2F" />
+            ) : (
+              <Text className="text-[#98D83A] font-inter-semibold">Load more</Text>
+            )}
+          </Pressable>
+        )}
         <View className="h-10" />
       </ScrollView>
     </View>

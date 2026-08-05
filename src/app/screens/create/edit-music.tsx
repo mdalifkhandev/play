@@ -79,7 +79,7 @@ export default function EditMusicScreen() {
   const insets = useSafeAreaInsets();
   
   const { 
-    uri, mediaType, soundUrl, title, soundDuration,
+    uri, mediaType, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
     originalVolume: initOrigVol, 
     addedVolume: initAddedVol, 
     trimLeft: initTrimLeft, 
@@ -91,6 +91,7 @@ export default function EditMusicScreen() {
     videoDuration: initVideoDuration
   } = useLocalSearchParams<{ 
     uri: string; mediaType?: 'photo' | 'video'; soundUrl: string; title: string; soundDuration?: string;
+    musicId?: string; musicArtist?: string; musicCoverUrl?: string;
     originalVolume?: string; addedVolume?: string; trimLeft?: string; trimRight?: string;
     videoTrimLeft?: string; videoTrimRight?: string;
     videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
@@ -468,6 +469,9 @@ export default function EditMusicScreen() {
                 soundUrl,
                 title,
                 soundDuration: soundDuration || '',
+                musicId: musicId || '',
+                musicArtist: musicArtist || '',
+                musicCoverUrl: musicCoverUrl || '',
                 originalVolume: originalVolume.toString(),
                 addedVolume: addedVolume.toString(),
                 trimLeft: trimLeft.toString(),

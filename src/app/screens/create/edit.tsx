@@ -108,11 +108,12 @@ const CustomSlider = ({ value, onValueChange, label }: { value: number, onValueC
 
 export default function EditMediaScreen() {
   const { 
-    uri, mediaType, soundUrl, title, soundDuration,
+    uri, mediaType, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
     originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight,
     videoTrimStart, videoTrimEnd, videoDuration
   } = useLocalSearchParams<{ 
     uri: string; mediaType?: 'photo' | 'video'; soundUrl: string; title: string; soundDuration?: string;
+    musicId?: string; musicArtist?: string; musicCoverUrl?: string;
     originalVolume?: string; addedVolume?: string; trimLeft?: string; trimRight?: string;
     videoTrimLeft?: string; videoTrimRight?: string;
     videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
@@ -442,6 +443,9 @@ export default function EditMediaScreen() {
         soundUrl: soundUrl || '',
         title: title || '',
         soundDuration: soundDuration || '',
+        musicId: musicId || '',
+        musicArtist: musicArtist || '',
+        musicCoverUrl: musicCoverUrl || '',
         originalVolume: originalVolume?.toString() || '',
         addedVolume: addedVolume?.toString() || '',
         trimLeft: trimLeft?.toString() || '',
@@ -490,6 +494,9 @@ export default function EditMediaScreen() {
         soundUrl: soundUrl || '',
         title: title || '',
         soundDuration: soundDuration || '',
+        musicId: musicId || '',
+        musicArtist: musicArtist || '',
+        musicCoverUrl: musicCoverUrl || '',
         originalVolume: originalVolume?.toString() || '',
         addedVolume: addedVolume?.toString() || '',
         trimLeft: trimLeft?.toString() || '',
@@ -516,6 +523,9 @@ export default function EditMediaScreen() {
           soundUrl: soundUrl || '',
           title: title || '',
           soundDuration: soundDuration || '',
+          musicId: musicId || '',
+          musicArtist: musicArtist || '',
+          musicCoverUrl: musicCoverUrl || '',
           originalVolume: originalVolume?.toString() || '',
           addedVolume: addedVolume?.toString() || '',
           trimLeft: trimLeft?.toString() || '',
@@ -748,6 +758,9 @@ export default function EditMediaScreen() {
                       trimLeft: trimLeft?.toString() || '',
                       trimRight: trimRight?.toString() || '',
                       soundDuration: soundDuration || '',
+                      musicId: musicId || '',
+                      musicArtist: musicArtist || '',
+                      musicCoverUrl: musicCoverUrl || '',
                       videoTrimLeft: videoTrimLeft?.toString() || '',
                       videoTrimRight: videoTrimRight?.toString() || '',
                       videoTrimStart: videoTrimStart || '',

@@ -34,12 +34,13 @@ export default function PostSuccessScreen() {
   const insets = useSafeAreaInsets();
 
   const {
-    uri, mediaType, overlayText, soundUrl, title, soundDuration,
+    uri, mediaType, overlayText, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
     originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight,
     videoTrimStart, videoTrimEnd, videoDuration,
     exposure: expParam, contrast: contParam, activeFilter, activeEffect
   } = useLocalSearchParams<{
     uri: string; mediaType?: 'photo' | 'video'; overlayText: string; soundUrl: string; title: string; soundDuration?: string;
+    musicId?: string; musicArtist?: string; musicCoverUrl?: string;
     originalVolume: string; addedVolume: string; trimLeft: string; trimRight: string;
     videoTrimLeft?: string; videoTrimRight?: string;
     videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
