@@ -7,6 +7,31 @@ import { createAudioPlayer } from 'expo-audio';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width } = Dimensions.get('window');
+const DEFAULT_MUSIC_DURATION_SEC = 15;
+const LOCAL_SOUND_DURATIONS: Record<string, number> = {
+  'Cinematic Sound Effect': 12,
+};
+
+const parseDurationSeconds = (duration?: string, title?: string) => {
+  if (title && LOCAL_SOUND_DURATIONS[title]) {
+    return LOCAL_SOUND_DURATIONS[title];
+  }
+
+  if (!duration) return DEFAULT_MUSIC_DURATION_SEC;
+
+  if (/^\d+(\.\d+)?$/.test(duration)) {
+    const seconds = Number(duration);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : DEFAULT_MUSIC_DURATION_SEC;
+  }
+
+  const parts = duration.split(':').map(Number);
+  if (parts.length === 2 && parts.every(Number.isFinite)) {
+    const seconds = parts[0] * 60 + parts[1];
+    return seconds > 0 ? seconds : DEFAULT_MUSIC_DURATION_SEC;
+  }
+
+  return DEFAULT_MUSIC_DURATION_SEC;
+};
 
 // Custom interactive slider using PanResponder
 const CustomSlider = ({ value, onValueChange, label }: { value: number, onValueChange: (val: number) => void, label: string }) => {
@@ -54,17 +79,21 @@ export default function EditMusicScreen() {
   const insets = useSafeAreaInsets();
   
   const { 
-    uri, mediaType, soundUrl, title, 
+    uri, mediaType, soundUrl, title, soundDuration,
     originalVolume: initOrigVol, 
     addedVolume: initAddedVol, 
     trimLeft: initTrimLeft, 
     trimRight: initTrimRight,
     videoTrimLeft: initVideoTrimLeft,
-    videoTrimRight: initVideoTrimRight
+    videoTrimRight: initVideoTrimRight,
+    videoTrimStart: initVideoTrimStart,
+    videoTrimEnd: initVideoTrimEnd,
+    videoDuration: initVideoDuration
   } = useLocalSearchParams<{ 
-    uri: string; mediaType?: 'photo' | 'video'; soundUrl: string; title: string;
+    uri: string; mediaType?: 'photo' | 'video'; soundUrl: string; title: string; soundDuration?: string;
     originalVolume?: string; addedVolume?: string; trimLeft?: string; trimRight?: string;
     videoTrimLeft?: string; videoTrimRight?: string;
+    videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
   }>();
 
   const [originalVolume, setOriginalVolume] = useState(initOrigVol ? parseInt(initOrigVol, 10) : 100);
@@ -73,7 +102,8 @@ export default function EditMusicScreen() {
   const [isMusicPlaying, setIsMusicPlaying] = useState(true);
   const [isOriginalMuted, setIsOriginalMuted] = useState(false);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
-  const [videoDurationSec, setVideoDurationSec] = useState(15);
+  const [videoDurationSec, setVideoDurationSec] = useState(initVideoDuration ? Number(initVideoDuration) : 0);
+  const [musicDurationSec, setMusicDurationSec] = useState(() => parseDurationSeconds(soundDuration, title));
   const [sound, setSound] = useState<any>(null);
   const isVideo = mediaType === 'video';
   const [trimTarget, setTrimTarget] = useState<'music' | 'video'>(isVideo ? 'video' : 'music');
@@ -86,9 +116,8 @@ export default function EditMusicScreen() {
   const [videoTrimRight, setVideoTrimRight] = useState(initVideoTrimRight ? parseInt(initVideoTrimRight, 10) : 100);
 
   const mockImage = uri || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
-  const MAX_DURATION_SEC = 30; // Mock 30 seconds total audio
   const selectedVideoDurationSec = Math.max(1, ((videoTrimRight - videoTrimLeft) / 100) * videoDurationSec);
-  const maxMusicTrimPercentSpan = isVideo ? Math.max(1, (selectedVideoDurationSec / MAX_DURATION_SEC) * 100) : 100;
+  const maxMusicTrimPercentSpan = isVideo ? Math.max(1, (selectedVideoDurationSec / musicDurationSec) * 100) : 100;
   const musicWindowSpan = Math.min(100, maxMusicTrimPercentSpan);
   const isVideoRef = useRef(isVideo);
   isVideoRef.current = isVideo;
@@ -98,9 +127,9 @@ export default function EditMusicScreen() {
   maxMusicTrimPercentSpanRef.current = maxMusicTrimPercentSpan;
   const activeTrimLeft = trimTarget === 'video' ? videoTrimLeft : trimLeft;
   const activeTrimRight = trimTarget === 'video' ? videoTrimRight : trimRight;
-  const activeMaxDurationSec = trimTarget === 'video' ? videoDurationSec : MAX_DURATION_SEC;
-  const musicTrimStartSec = (trimLeft / 100) * MAX_DURATION_SEC;
-  const musicTrimEndSec = (trimRight / 100) * MAX_DURATION_SEC;
+  const activeMaxDurationSec = trimTarget === 'video' ? videoDurationSec : musicDurationSec;
+  const musicTrimStartSec = (trimLeft / 100) * musicDurationSec;
+  const musicTrimEndSec = (trimRight / 100) * musicDurationSec;
   const videoPlayer = useVideoPlayer(isVideo ? { uri: mockImage, contentType: 'progressive' } : null, player => {
     player.loop = true;
     player.muted = false;
@@ -121,9 +150,9 @@ export default function EditMusicScreen() {
 
     if (typeof player.seekTo === 'function') {
       try { player.seekTo(latestMusicTrimStartSec.current); } catch (e) {}
-    } else {
-      try { player.currentTime = latestMusicTrimStartSec.current; } catch (e) {}
     }
+
+    try { player.currentTime = latestMusicTrimStartSec.current; } catch (e) {}
   };
 
   useEffect(() => {
@@ -136,6 +165,13 @@ export default function EditMusicScreen() {
         player.volume = latestAddedVolume.current / 100;
         seekMusicToSelectedStart(player);
         player.play();
+        setTimeout(() => seekMusicToSelectedStart(player), 100);
+        setTimeout(() => {
+          const loadedDuration = Number(player.duration);
+          if (!soundDuration && Number.isFinite(loadedDuration) && loadedDuration > 0) {
+            setMusicDurationSec(Math.floor(loadedDuration));
+          }
+        }, 300);
         player.loop = true;
         setSound(player);
       } catch (e) {
@@ -149,6 +185,10 @@ export default function EditMusicScreen() {
       }
     };
   }, [soundUrl]);
+
+  useEffect(() => {
+    setMusicDurationSec(parseDurationSeconds(soundDuration, title));
+  }, [soundDuration, title]);
 
   // Sync play/pause state
   useEffect(() => {
@@ -176,7 +216,7 @@ export default function EditMusicScreen() {
 
     const trimWatcher = setInterval(() => {
       const currentTime = Number(sound.currentTime ?? 0);
-      if (currentTime >= latestMusicTrimEndSec.current) {
+      if (currentTime >= latestMusicTrimEndSec.current || currentTime < latestMusicTrimStartSec.current - 0.25) {
         seekMusicToSelectedStart(sound);
         try { sound.play(); } catch (e) {}
       }
@@ -377,8 +417,13 @@ export default function EditMusicScreen() {
 
   // Format time helper (e.g. 15 -> "00:15")
   const formatTime = (percent: number, duration = activeMaxDurationSec) => {
-    const secs = Math.floor((percent / 100) * duration);
-    return `00:${secs < 10 ? '0' : ''}${secs}`;
+    const clampedPercent = Math.max(0, Math.min(100, percent));
+    const maxSeconds = Math.max(0, Math.floor(duration));
+    const secs = Math.min(maxSeconds, Math.floor((clampedPercent / 100) * duration));
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+
+    return `${mins < 10 ? '0' : ''}${mins}:${remainingSecs < 10 ? '0' : ''}${remainingSecs}`;
   };
 
   const pausePreviewPlayers = () => {
@@ -409,6 +454,12 @@ export default function EditMusicScreen() {
         <Pressable 
           onPress={() => {
             pausePreviewPlayers();
+            const videoTrimStartSec = videoDurationSec > 0
+              ? (videoTrimLeft / 100) * videoDurationSec
+              : Number(initVideoTrimStart || 0);
+            const videoTrimEndSec = videoDurationSec > 0
+              ? (videoTrimRight / 100) * videoDurationSec
+              : Number(initVideoTrimEnd || 0);
             // Save state by passing back to edit.tsx
             router.replace({
               pathname: '/screens/create/edit' as any,
@@ -416,12 +467,16 @@ export default function EditMusicScreen() {
                 uri,
                 soundUrl,
                 title,
+                soundDuration: soundDuration || '',
                 originalVolume: originalVolume.toString(),
                 addedVolume: addedVolume.toString(),
                 trimLeft: trimLeft.toString(),
                 trimRight: trimRight.toString(),
                 videoTrimLeft: videoTrimLeft.toString(),
                 videoTrimRight: videoTrimRight.toString(),
+                videoTrimStart: videoTrimStartSec.toString(),
+                videoTrimEnd: videoTrimEndSec.toString(),
+                videoDuration: videoDurationSec.toString(),
                 mediaType: mediaType || 'photo'
               }
             });

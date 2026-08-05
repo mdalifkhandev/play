@@ -318,13 +318,13 @@ export default function CreateScreen() {
           ))}
         </View>
 
-        <Pressable
+        {/* <Pressable
           onPress={() => router.push('/screens/create/banuba-editor' as any)}
           className="w-[84px] h-10 mt-5 bg-[#98FF2F] rounded-lg items-center justify-center"
         >
           <Ionicons name="sparkles" size={15} color="black" />
           <Text className="text-black font-inter-bold text-[10px]">ADVANCED</Text>
-        </Pressable>
+        </Pressable>    */}
       </View>
     </View>
   );

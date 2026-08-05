@@ -5,18 +5,44 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer } from 'expo-audio';
 
+const DEFAULT_AUDIO_DURATION_SEC = 30;
+const LOCAL_SOUND_DURATIONS: Record<string, number> = {
+  'Cinematic Sound Effect': 12,
+};
+
+const parseDurationSeconds = (duration?: string, title?: string) => {
+  if (title && LOCAL_SOUND_DURATIONS[title]) {
+    return LOCAL_SOUND_DURATIONS[title];
+  }
+
+  if (!duration) return DEFAULT_AUDIO_DURATION_SEC;
+
+  if (/^\d+(\.\d+)?$/.test(duration)) {
+    return Number(duration);
+  }
+
+  const parts = duration.split(':').map(Number);
+  if (parts.length === 2 && parts.every(Number.isFinite)) {
+    return parts[0] * 60 + parts[1];
+  }
+
+  return DEFAULT_AUDIO_DURATION_SEC;
+};
+
 export default function PostSuccessScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const {
-    uri, mediaType, overlayText, soundUrl, title,
+    uri, mediaType, overlayText, soundUrl, title, soundDuration,
     originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight,
+    videoTrimStart, videoTrimEnd, videoDuration,
     exposure: expParam, contrast: contParam, activeFilter, activeEffect
   } = useLocalSearchParams<{
-    uri: string; mediaType?: 'photo' | 'video'; overlayText: string; soundUrl: string; title: string;
+    uri: string; mediaType?: 'photo' | 'video'; overlayText: string; soundUrl: string; title: string; soundDuration?: string;
     originalVolume: string; addedVolume: string; trimLeft: string; trimRight: string;
     videoTrimLeft?: string; videoTrimRight?: string;
+    videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
     exposure: string; contrast: string; activeFilter: string; activeEffect: string;
   }>();
 
@@ -26,6 +52,22 @@ export default function PostSuccessScreen() {
 
   // Audio Player for final preview
   const [sound, setSound] = useState<any>(null);
+  const audioDurationSec = parseDurationSeconds(soundDuration, title);
+
+  const getTrimTime = (percentStr?: string, fallbackPercent = 0) => {
+    const percent = percentStr !== undefined && percentStr !== '' ? Number(percentStr) : fallbackPercent;
+    return Math.floor((percent / 100) * audioDurationSec * 1000) / 1000;
+  };
+
+  const seekSound = (player: any, seconds: number) => {
+    if (!player || !Number.isFinite(seconds)) return;
+
+    if (typeof player.seekTo === 'function') {
+      try { player.seekTo(seconds); } catch(e) {}
+    }
+
+    try { player.currentTime = seconds; } catch(e) {}
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -34,7 +76,9 @@ export default function PostSuccessScreen() {
         try {
           const source = /^\d+$/.test(soundUrl) ? parseInt(soundUrl, 10) : soundUrl;
           player = createAudioPlayer(source);
+          seekSound(player, getTrimTime(trimLeft));
           player.play();
+          setTimeout(() => seekSound(player, getTrimTime(trimLeft)), 100);
           player.loop = true;
           setSound(player);
         } catch (error) {
@@ -56,14 +100,26 @@ export default function PostSuccessScreen() {
       if (addedVolume !== undefined) {
         sound.volume = Number(addedVolume) / 100;
       }
-      if (trimLeft !== undefined) {
-        const startMs = Math.floor((Number(trimLeft) / 100) * 30 * 1000);
-        if (typeof sound.seekTo === 'function') {
-          try { sound.seekTo(startMs / 1000); } catch (e) { }
-        }
-      }
+      seekSound(sound, getTrimTime(trimLeft));
     }
   }, [sound, addedVolume, trimLeft]);
+
+  useEffect(() => {
+    if (!sound) return;
+
+    const watcher = setInterval(() => {
+      const currentTime = Number(sound.currentTime ?? 0);
+      const trimStartSec = getTrimTime(trimLeft);
+      const trimEndSec = getTrimTime(trimRight, 100);
+
+      if (currentTime >= trimEndSec || currentTime < trimStartSec - 0.25) {
+        seekSound(sound, trimStartSec);
+        try { sound.play(); } catch (e) { }
+      }
+    }, 200);
+
+    return () => clearInterval(watcher);
+  }, [audioDurationSec, sound, trimLeft, trimRight]);
 
   const handleDone = () => {
     // Reset back to home or camera
@@ -182,7 +238,7 @@ export default function PostSuccessScreen() {
           </View>
           {mediaType === 'video' && (
             <Text className="text-[#888] font-inter-regular text-xs mt-3">
-              Video trim: {videoTrimLeft || '0'}% - {videoTrimRight || '100'}%
+              Video trim: {videoTrimStart && videoTrimEnd ? `${videoTrimStart}s - ${videoTrimEnd}s` : `${videoTrimLeft || '0'}% - ${videoTrimRight || '100'}%`}
             </Text>
           )}
         </View>

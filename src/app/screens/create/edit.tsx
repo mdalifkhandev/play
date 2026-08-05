@@ -7,36 +7,43 @@ import { createAudioPlayer } from 'expo-audio';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width } = Dimensions.get('window');
+const DEFAULT_AUDIO_DURATION_SEC = 30;
+const LOCAL_SOUND_DURATIONS: Record<string, number> = {
+  'Cinematic Sound Effect': 12,
+};
 
-function MediaVideoPreview({ uri, compact = false }: { uri: string; compact?: boolean }) {
-  const [hasFirstFrame, setHasFirstFrame] = useState(false);
-  const player = useVideoPlayer({ uri, contentType: 'progressive' }, player => {
-    player.loop = true;
-    player.muted = true;
-    player.play();
-  });
+const parseDurationSeconds = (duration?: string, title?: string) => {
+  if (title && LOCAL_SOUND_DURATIONS[title]) {
+    return LOCAL_SOUND_DURATIONS[title];
+  }
 
-  useEffect(() => {
-    player.replaceAsync({ uri, contentType: 'progressive' }).then(() => {
-      player.currentTime = 0;
-      player.play();
-    }).catch(error => {
-      console.error('Video preview load error:', error);
-    });
-  }, [player, uri]);
+  if (!duration) return DEFAULT_AUDIO_DURATION_SEC;
 
-  useFocusEffect(
-    useCallback(() => {
-      player.play();
+  if (/^\d+(\.\d+)?$/.test(duration)) {
+    const seconds = Number(duration);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : DEFAULT_AUDIO_DURATION_SEC;
+  }
 
-      return () => {
-        try {
-          player.pause();
-        } catch (e) {}
-      };
-    }, [player])
-  );
+  const parts = duration.split(':').map(Number);
+  if (parts.length === 2 && parts.every(Number.isFinite)) {
+    const seconds = parts[0] * 60 + parts[1];
+    return seconds > 0 ? seconds : DEFAULT_AUDIO_DURATION_SEC;
+  }
 
+  return DEFAULT_AUDIO_DURATION_SEC;
+};
+
+function MediaVideoPreview({
+  player,
+  hasFirstFrame,
+  onFirstFrameRender,
+  compact = false
+}: {
+  player: any;
+  hasFirstFrame: boolean;
+  onFirstFrameRender: () => void;
+  compact?: boolean;
+}) {
   return (
     <View className="absolute inset-0 bg-black">
       <VideoView
@@ -46,7 +53,7 @@ function MediaVideoPreview({ uri, compact = false }: { uri: string; compact?: bo
         nativeControls={false}
         contentFit="cover"
         surfaceType="textureView"
-        onFirstFrameRender={() => setHasFirstFrame(true)}
+        onFirstFrameRender={onFirstFrameRender}
       />
       {!hasFirstFrame && (
         <View className="absolute inset-0 items-center justify-center bg-black">
@@ -100,12 +107,14 @@ const CustomSlider = ({ value, onValueChange, label }: { value: number, onValueC
 
 export default function EditMediaScreen() {
   const { 
-    uri, mediaType, soundUrl, title,
-    originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight
+    uri, mediaType, soundUrl, title, soundDuration,
+    originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight,
+    videoTrimStart, videoTrimEnd, videoDuration
   } = useLocalSearchParams<{ 
-    uri: string; mediaType?: 'photo' | 'video'; soundUrl: string; title: string;
+    uri: string; mediaType?: 'photo' | 'video'; soundUrl: string; title: string; soundDuration?: string;
     originalVolume?: string; addedVolume?: string; trimLeft?: string; trimRight?: string;
     videoTrimLeft?: string; videoTrimRight?: string;
+    videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
   }>();
   
   const router = useRouter();
@@ -113,10 +122,22 @@ export default function EditMediaScreen() {
 
   const mockImage = uri || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
   const isVideo = mediaType === 'video';
+  const audioDurationSec = parseDurationSeconds(soundDuration, title);
+  const videoPlayer = useVideoPlayer(isVideo ? { uri: mockImage, contentType: 'progressive' } : null, player => {
+    player.loop = true;
+    player.muted = true;
+    player.play();
+  });
 
   // Audio Player for Preview
   const [sound, setSound] = useState<any>(null);
   const [showMusicCard, setShowMusicCard] = useState(true);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(true);
+  const [hasVideoFrame, setHasVideoFrame] = useState(false);
+  const [videoDurationSec, setVideoDurationSec] = useState(videoDuration ? Number(videoDuration) : 0);
+  const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
+  const isPreviewPlayingRef = useRef(isPreviewPlaying);
+  isPreviewPlayingRef.current = isPreviewPlaying;
 
   // Drag logic for Music Card
   const pan = useRef(new Animated.ValueXY()).current;
@@ -144,8 +165,54 @@ export default function EditMediaScreen() {
   const formatTime = (percentStr?: string) => {
     if (!percentStr) return '00:00';
     const percent = Number(percentStr);
-    const secs = Math.floor((percent / 100) * 30); // 30 sec mock
-    return `00:${secs < 10 ? '0' : ''}${secs}`;
+    const secs = Math.min(Math.floor(audioDurationSec), Math.floor((Math.max(0, Math.min(100, percent)) / 100) * audioDurationSec));
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+    return `${mins < 10 ? '0' : ''}${mins}:${remainingSecs < 10 ? '0' : ''}${remainingSecs}`;
+  };
+
+  const getTrimTime = (percentStr?: string, fallbackPercent = 0) => {
+    const percent = percentStr !== undefined && percentStr !== '' ? Number(percentStr) : fallbackPercent;
+    return Math.floor((percent / 100) * audioDurationSec * 1000) / 1000;
+  };
+
+  const getVideoTrimPercent = (percentStr: string | undefined, fallbackPercent: number) => {
+    const percent = percentStr !== undefined && percentStr !== '' ? Number(percentStr) : fallbackPercent;
+    return Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : fallbackPercent;
+  };
+
+  const videoTrimStartPercent = getVideoTrimPercent(videoTrimLeft, 0);
+  const videoTrimEndPercent = getVideoTrimPercent(videoTrimRight, 100);
+  const savedVideoTrimStartSec = videoTrimStart !== undefined && videoTrimStart !== '' ? Number(videoTrimStart) : null;
+  const savedVideoTrimEndSec = videoTrimEnd !== undefined && videoTrimEnd !== '' ? Number(videoTrimEnd) : null;
+  const videoTrimStartSec = savedVideoTrimStartSec !== null && Number.isFinite(savedVideoTrimStartSec)
+    ? savedVideoTrimStartSec
+    : videoDurationSec > 0 ? (videoTrimStartPercent / 100) * videoDurationSec : 0;
+  const videoTrimEndSec = savedVideoTrimEndSec !== null && Number.isFinite(savedVideoTrimEndSec)
+    ? savedVideoTrimEndSec
+    : videoDurationSec > 0 ? (videoTrimEndPercent / 100) * videoDurationSec : 0;
+  const selectedVideoDurationSec = videoDurationSec > 0
+    ? Math.max(1, videoTrimEndSec - videoTrimStartSec)
+    : 1;
+
+  const formatSeconds = (seconds: number) => {
+    const safeSeconds = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
+    const mins = Math.floor(safeSeconds / 60);
+    const remainingSecs = safeSeconds % 60;
+    return `${mins < 10 ? '0' : ''}${mins}:${remainingSecs < 10 ? '0' : ''}${remainingSecs}`;
+  };
+
+  const previewDurationSec = Math.max(1, isVideo ? selectedVideoDurationSec : audioDurationSec);
+  const previewProgressPercent = Math.max(0, Math.min(100, (previewCurrentTime / previewDurationSec) * 100));
+
+  const seekSound = (player: any, seconds: number) => {
+    if (!player || !Number.isFinite(seconds)) return;
+
+    if (typeof player.seekTo === 'function') {
+      try { player.seekTo(seconds); } catch(e) {}
+    }
+
+    try { player.currentTime = seconds; } catch(e) {}
   };
 
   useFocusEffect(
@@ -156,7 +223,11 @@ export default function EditMediaScreen() {
           // Handle asset IDs passed as strings (e.g. from require())
           const source = /^\d+$/.test(soundUrl) ? parseInt(soundUrl, 10) : soundUrl;
           player = createAudioPlayer(source);
-          player.play();
+          seekSound(player, getTrimTime(trimLeft));
+          if (isPreviewPlayingRef.current) {
+            player.play();
+          }
+          setTimeout(() => seekSound(player, getTrimTime(trimLeft)), 100);
           player.loop = true; // Loop the preview music
           setSound(player);
         } catch (error) {
@@ -173,20 +244,141 @@ export default function EditMediaScreen() {
     }, [soundUrl])
   );
 
+  useEffect(() => {
+    if (!isVideo) return;
+
+    setHasVideoFrame(false);
+    videoPlayer.replaceAsync({ uri: mockImage, contentType: 'progressive' }).then(() => {
+      videoPlayer.muted = true;
+      if (Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
+        setVideoDurationSec(Math.floor(videoPlayer.duration));
+      }
+      const loadedDuration = Number(videoPlayer.duration);
+      const startSec = Number.isFinite(loadedDuration) && loadedDuration > 0
+        ? (videoTrimStartPercent / 100) * loadedDuration
+        : 0;
+      videoPlayer.currentTime = startSec;
+
+      if (isPreviewPlaying) {
+        videoPlayer.play();
+      } else {
+        videoPlayer.pause();
+      }
+    }).catch(error => {
+      console.error('Video preview load error:', error);
+    });
+  }, [isVideo, mockImage, videoPlayer, videoTrimStartPercent]);
+
+  useEffect(() => {
+    if (!isVideo) return;
+
+    const durationChecker = setInterval(() => {
+      if (Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
+        setVideoDurationSec(Math.floor(videoPlayer.duration));
+        clearInterval(durationChecker);
+      }
+    }, 250);
+
+    return () => clearInterval(durationChecker);
+  }, [isVideo, videoPlayer]);
+
+  useEffect(() => {
+    if (isPreviewPlaying) {
+      if (isVideo) {
+        if (videoDurationSec > 0 && (videoPlayer.currentTime < videoTrimStartSec || videoPlayer.currentTime >= videoTrimEndSec)) {
+          try { videoPlayer.currentTime = videoTrimStartSec; } catch(e) {}
+        }
+        try { videoPlayer.play(); } catch(e) {}
+      }
+      if (sound) {
+        try { sound.play(); } catch(e) {}
+      }
+    } else {
+      if (isVideo) {
+        try { videoPlayer.pause(); } catch(e) {}
+      }
+      if (sound) {
+        try { sound.pause(); } catch(e) {}
+      }
+    }
+  }, [isPreviewPlaying, isVideo, sound, videoDurationSec, videoPlayer, videoTrimEndSec, videoTrimStartSec]);
+
   // Apply edits (volume, trim) to the existing player without recreating it
   useEffect(() => {
     if (sound) {
       if (addedVolume !== undefined) {
         sound.volume = Number(addedVolume) / 100;
       }
-      if (trimLeft !== undefined) {
-        const startMs = Math.floor((Number(trimLeft) / 100) * 30 * 1000);
-        if (typeof sound.seekTo === 'function') {
-          try { sound.seekTo(startMs / 1000); } catch(e) {}
-        }
-      }
+      seekSound(sound, getTrimTime(trimLeft));
     }
   }, [sound, addedVolume, trimLeft]);
+
+  useEffect(() => {
+    if (!sound || !isPreviewPlaying) return;
+
+    const watcher = setInterval(() => {
+      const currentTime = Number(sound.currentTime ?? 0);
+      const trimStartSec = getTrimTime(trimLeft);
+      const trimEndSec = getTrimTime(trimRight, 100);
+
+      if (currentTime >= trimEndSec || currentTime < trimStartSec - 0.25) {
+        seekSound(sound, trimStartSec);
+        if (isPreviewPlaying) {
+          try { sound.play(); } catch(e) {}
+        }
+      }
+    }, 200);
+
+    return () => clearInterval(watcher);
+  }, [audioDurationSec, isPreviewPlaying, sound, trimLeft, trimRight]);
+
+  useEffect(() => {
+    const progressTimer = setInterval(() => {
+      const videoCurrentTime = Number(videoPlayer.currentTime ?? 0);
+      const nextTime = isVideo ? videoCurrentTime - videoTrimStartSec : Number(sound?.currentTime ?? 0) - getTrimTime(trimLeft);
+      const safeTime = Math.max(0, nextTime);
+      const duration = previewDurationSec;
+
+      if (isPreviewPlaying && isVideo && videoDurationSec > 0 && (videoCurrentTime >= videoTrimEndSec || videoCurrentTime < videoTrimStartSec - 0.1)) {
+        try { videoPlayer.currentTime = videoTrimStartSec; } catch(e) {}
+        if (sound) {
+          seekSound(sound, getTrimTime(trimLeft));
+        }
+        setPreviewCurrentTime(0);
+        return;
+      }
+
+      if (isPreviewPlaying && safeTime >= duration - 0.1) {
+        if (isVideo) {
+          try { videoPlayer.currentTime = videoTrimStartSec; } catch(e) {}
+        }
+        if (sound) {
+          seekSound(sound, getTrimTime(trimLeft));
+        }
+        setPreviewCurrentTime(0);
+        return;
+      }
+
+      setPreviewCurrentTime(Math.min(duration, safeTime));
+    }, 200);
+
+    return () => clearInterval(progressTimer);
+  }, [isPreviewPlaying, isVideo, previewDurationSec, sound, trimLeft, videoPlayer, videoTrimEndSec, videoTrimStartSec]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsPreviewPlaying(true);
+
+      return () => {
+        try { videoPlayer.pause(); } catch(e) {}
+        try { sound?.pause(); } catch(e) {}
+      };
+    }, [sound, videoPlayer])
+  );
+
+  const togglePreviewPlayback = () => {
+    setIsPreviewPlaying(prev => !prev);
+  };
 
   // Text overlay state
   const [isTextMode, setIsTextMode] = useState(false);
@@ -222,12 +414,16 @@ export default function EditMediaScreen() {
         mediaType: mediaType || 'photo',
         soundUrl: soundUrl || '',
         title: title || '',
+        soundDuration: soundDuration || '',
         originalVolume: originalVolume?.toString() || '',
         addedVolume: addedVolume?.toString() || '',
         trimLeft: trimLeft?.toString() || '',
         trimRight: trimRight?.toString() || '',
         videoTrimLeft: videoTrimLeft?.toString() || '',
-        videoTrimRight: videoTrimRight?.toString() || ''
+        videoTrimRight: videoTrimRight?.toString() || '',
+        videoTrimStart: videoTrimStart || '',
+        videoTrimEnd: videoTrimEnd || '',
+        videoDuration: videoDurationSec.toString()
       }
     } as any);
   };
@@ -241,12 +437,16 @@ export default function EditMediaScreen() {
         overlayText: overlayText, 
         soundUrl: soundUrl || '',
         title: title || '',
+        soundDuration: soundDuration || '',
         originalVolume: originalVolume?.toString() || '',
         addedVolume: addedVolume?.toString() || '',
         trimLeft: trimLeft?.toString() || '',
         trimRight: trimRight?.toString() || '',
         videoTrimLeft: videoTrimLeft?.toString() || '',
         videoTrimRight: videoTrimRight?.toString() || '',
+        videoTrimStart: videoTrimStart || '',
+        videoTrimEnd: videoTrimEnd || '',
+        videoDuration: videoDurationSec.toString(),
         exposure: exposure.toString(),
         contrast: contrast.toString(),
         activeFilter: activeFilter,
@@ -295,7 +495,11 @@ export default function EditMediaScreen() {
                   transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }]
                 }}
               >
-                <MediaVideoPreview uri={mockImage} />
+                <MediaVideoPreview
+                  player={videoPlayer}
+                  hasFirstFrame={hasVideoFrame}
+                  onFirstFrameRender={() => setHasVideoFrame(true)}
+                />
               </View>
             ) : (
               <Image 
@@ -403,6 +607,41 @@ export default function EditMediaScreen() {
               </Animated.View>
             )}
 
+            {!isTextMode && !activePanel && (
+              <View className="absolute left-4 right-4 bottom-36 bg-black/70 rounded-2xl px-4 py-3 z-20">
+                <View className="flex-row items-center gap-3">
+                  <Pressable
+                    onPress={togglePreviewPlayback}
+                    className="w-11 h-11 rounded-full bg-[#98FF2F] items-center justify-center"
+                  >
+                    <Ionicons
+                      name={isPreviewPlaying ? 'pause' : 'play'}
+                      size={22}
+                      color="black"
+                      style={{ marginLeft: isPreviewPlaying ? 0 : 2 }}
+                    />
+                  </Pressable>
+
+                  <View className="flex-1">
+                    <View className="flex-row items-center justify-between mb-2">
+                      <Text className="text-white font-inter-semibold text-xs">
+                        {formatSeconds(previewCurrentTime)}
+                      </Text>
+                      <Text className="text-white font-inter-semibold text-xs">
+                        {formatSeconds(previewDurationSec)}
+                      </Text>
+                    </View>
+                    <View className="h-1.5 bg-white/25 rounded-full overflow-hidden">
+                      <View
+                        className="h-full bg-[#98FF2F] rounded-full"
+                        style={{ width: `${previewProgressPercent}%` }}
+                      />
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )}
+
             {/* Right Floating Actions */}
             {!isTextMode && !activePanel && (
               <View className="absolute right-4 top-10 gap-4 z-20">
@@ -417,8 +656,12 @@ export default function EditMediaScreen() {
                       addedVolume: addedVolume?.toString() || '',
                       trimLeft: trimLeft?.toString() || '',
                       trimRight: trimRight?.toString() || '',
+                      soundDuration: soundDuration || '',
                       videoTrimLeft: videoTrimLeft?.toString() || '',
-                      videoTrimRight: videoTrimRight?.toString() || ''
+                      videoTrimRight: videoTrimRight?.toString() || '',
+                      videoTrimStart: videoTrimStart || '',
+                      videoTrimEnd: videoTrimEnd || '',
+                      videoDuration: videoDurationSec.toString()
                     }
                   } as any)}
                   className="items-center relative"
@@ -442,12 +685,12 @@ export default function EditMediaScreen() {
                   <Text className="text-white text-[10px] mt-1 font-inter-medium">Trim</Text>
                 </Pressable>
                 
-                <Pressable onPress={() => setActivePanel('options')} className="items-center">
+                {/* <Pressable onPress={() => setActivePanel('options')} className="items-center">
                   <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
                   <Ionicons name="options-outline" size={20} color="#98D83A" />
                   </View>
                   <Text className="text-white text-[10px] mt-1 font-inter-medium">Adjust</Text>
-                </Pressable>
+                </Pressable> */}
                 
                 {/* Text Tool */}
                 <Pressable onPress={() => setIsTextMode(true)} className="items-center">

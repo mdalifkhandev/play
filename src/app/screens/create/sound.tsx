@@ -14,6 +14,8 @@ const DUMMY_TRACKS = [
   { id: '2', title: 'Amazon Nature Waterfall', artist: 'MeditativeTiger', duration: '00:15', url: require('../../../../assets/sound/meditativetiger-15-second-amazon-nature-waterfall-395552.mp3') },
   { id: '3', title: 'Bamboo Waterfall Loop', artist: 'MeditativeTiger', duration: '00:15', url: require('../../../../assets/sound/meditativetiger-bamboo-waterfall-15-second-loop-395563.mp3') },
   { id: '4', title: 'Catchy Jazzy Stinger', artist: 'Sonican', duration: '00:15', url: require('../../../../assets/sound/sonican-catchy-jazzy-15-sec-stinger-343720.mp3') },
+  { id: '5', title: 'Cartoon Accent Pop', artist: 'OpenMindAudio', duration: '00:15', url: require('../../../../assets/sound/openmindaudio-cartoon-accent-stinger-highlight-pop-529306.mp3') },
+  { id: '6', title: 'Cinematic Sound Effect', artist: 'Diamond Tunes', duration: '00:12', url: require('../../../../assets/sound/diamond_tunes-cinematic-sound-effect-327618.mp3') },
 ];
 
 export default function SoundScreen() {
@@ -28,7 +30,10 @@ export default function SoundScreen() {
     trimLeft,
     trimRight,
     videoTrimLeft,
-    videoTrimRight
+    videoTrimRight,
+    videoTrimStart,
+    videoTrimEnd,
+    videoDuration
   } = useLocalSearchParams<{
     returnTo?: string;
     uri?: string;
@@ -39,10 +44,17 @@ export default function SoundScreen() {
     trimRight?: string;
     videoTrimLeft?: string;
     videoTrimRight?: string;
+    videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
   }>();
 
   const [activeTab, setActiveTab] = useState('Trending');
   const [searchQuery, setSearchQuery] = useState('');
+  const filteredTracks = DUMMY_TRACKS.filter((track) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+
+    return `${track.title} ${track.artist}`.toLowerCase().includes(query);
+  });
 
   // Audio state
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -125,14 +137,18 @@ export default function SoundScreen() {
       params: {
         soundUrl: track.url,
         title: track.title,
+        soundDuration: track.duration,
         ...(uri ? { uri } : {}),
         ...(mediaType ? { mediaType } : {}),
         ...(originalVolume ? { originalVolume } : {}),
         ...(addedVolume ? { addedVolume } : {}),
-        ...(trimLeft ? { trimLeft } : {}),
-        ...(trimRight ? { trimRight } : {}),
+        trimLeft: '0',
+        trimRight: '100',
         ...(videoTrimLeft ? { videoTrimLeft } : {}),
-        ...(videoTrimRight ? { videoTrimRight } : {})
+        ...(videoTrimRight ? { videoTrimRight } : {}),
+        ...(videoTrimStart ? { videoTrimStart } : {}),
+        ...(videoTrimEnd ? { videoTrimEnd } : {}),
+        ...(videoDuration ? { videoDuration } : {})
       }
     });
   };
@@ -186,7 +202,7 @@ export default function SoundScreen() {
 
       {/* List */}
       <ScrollView className="flex-1 px-4">
-        {DUMMY_TRACKS.map(track => {
+        {filteredTracks.map(track => {
           const isThisPlaying = playingId === track.id;
           const isThisLoading = loadingId === track.id;
 
