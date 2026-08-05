@@ -1,11 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, Animated, Dimensions, Switch, ScrollView } from 'react-native';
+import { View, Text, Modal, Pressable, Animated, Dimensions, Switch, ScrollView, InteractionManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiClient } from '../../api/client';
 import { useAppStore } from '../../store';
-import { toast } from 'sonner-native';
 
 const { width } = Dimensions.get('window');
 
@@ -21,19 +19,21 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const logoutAction = useAppStore((state) => state.logout);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isKidsMode = useAppStore((state) => state.isKidsModeActive);
 
   const handleLogout = async () => {
-    try {
-      await apiClient.post('/auth/logout');
-    } catch (e) {
-      // Ignore errors during logout on backend
-    }
-    logoutAction();
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+
     setLogoutModalVisible(false);
-    toast.success('Logged out successfully');
     onClose();
-    router.replace('/(auth)/login');
+
+    InteractionManager.runAfterInteractions(() => {
+      logoutAction();
+      setIsLoggingOut(false);
+      router.replace('/(auth)/login');
+    });
   };
 
   useEffect(() => {
@@ -249,9 +249,11 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
               
               <Pressable 
                 onPress={handleLogout}
+                disabled={isLoggingOut}
                 className="flex-1 py-4 rounded-xl bg-[#EF4444] items-center"
+                style={{ opacity: isLoggingOut ? 0.7 : 1 }}
               >
-                <Text className="text-white font-semibold">Yes, Logout</Text>
+                <Text className="text-white font-semibold">{isLoggingOut ? 'Logging out...' : 'Yes, Logout'}</Text>
               </Pressable>
             </View>
           </View>

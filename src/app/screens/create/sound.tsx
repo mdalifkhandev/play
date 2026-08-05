@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer } from 'expo-audio';
 import { SearchIcon } from '../../../components/icons/SearchIcon';
 import { useLocalSearchParams } from 'expo-router';
+import { handleApiError } from '../../../api/client';
 import { searchMusicTracks } from '../../../api/music/music.api';
 import type { MusicTrack } from '../../../api/music/music.types';
 
@@ -53,6 +54,7 @@ export default function SoundScreen() {
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const lastRequestKeyRef = useRef('');
 
   // Audio state
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -73,6 +75,12 @@ export default function SoundScreen() {
   }, []);
 
   const loadTracks = useCallback(async (nextPage = 1, query = searchQuery) => {
+    const requestKey = `${activeTab}:${query.trim().toLowerCase()}:${nextPage}`;
+    if (nextPage === 1 && lastRequestKeyRef.current === requestKey && (isLoadingTracks || loadError)) {
+      return;
+    }
+    lastRequestKeyRef.current = requestKey;
+
     const isFirstPage = nextPage === 1;
     setLoadError('');
     isFirstPage ? setIsLoadingTracks(true) : setIsLoadingMore(true);
@@ -89,8 +97,12 @@ export default function SoundScreen() {
       setPage(result.pagination.page);
       setHasNextPage(result.pagination.hasNextPage);
     } catch (error: any) {
-      console.log('Music search error:', error);
-      setLoadError(error?.response?.data?.error?.message || error?.message || 'Could not load music.');
+      const message = handleApiError(error, 'Could not load music.');
+      setLoadError(
+        error?.response?.status === 502
+          ? 'Music provider is unavailable. Check backend JAMENDO_CLIENT_ID or try again later.'
+          : message,
+      );
       if (isFirstPage) {
         setTracks([]);
       }
@@ -98,7 +110,7 @@ export default function SoundScreen() {
       setIsLoadingTracks(false);
       setIsLoadingMore(false);
     }
-  }, [activeTab, searchQuery]);
+  }, [activeTab, isLoadingTracks, loadError, searchQuery]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -106,7 +118,7 @@ export default function SoundScreen() {
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [loadTracks, searchQuery]);
+  }, [activeTab, searchQuery]);
 
   const handleTogglePlay = (track: MusicTrack) => {
     // If clicking the currently playing/loading track, stop it

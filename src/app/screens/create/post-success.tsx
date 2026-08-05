@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, Image, ScrollView } from 'react-native';
+import { View, Text, Pressable, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer } from 'expo-audio';
+import { getReelStatus } from '../../../api/reels/reels.api';
+import type { ReelStatusResult } from '../../../api/reels/reels.types';
 
 const DEFAULT_AUDIO_DURATION_SEC = 30;
 const LOCAL_SOUND_DURATIONS: Record<string, number> = {
@@ -37,7 +39,8 @@ export default function PostSuccessScreen() {
     uri, mediaType, overlayText, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
     originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight,
     videoTrimStart, videoTrimEnd, videoDuration,
-    exposure: expParam, contrast: contParam, activeFilter, activeEffect
+    exposure: expParam, contrast: contParam, activeFilter, activeEffect,
+    reelId, reelStatus, reelProgress
   } = useLocalSearchParams<{
     uri: string; mediaType?: 'photo' | 'video'; overlayText: string; soundUrl: string; title: string; soundDuration?: string;
     musicId?: string; musicArtist?: string; musicCoverUrl?: string;
@@ -45,11 +48,23 @@ export default function PostSuccessScreen() {
     videoTrimLeft?: string; videoTrimRight?: string;
     videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
     exposure: string; contrast: string; activeFilter: string; activeEffect: string;
+    reelId?: string; reelStatus?: string; reelProgress?: string;
   }>();
 
   const exposure = expParam ? parseInt(expParam) : 50;
 
   const mockImage = uri || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
+  const [reel, setReel] = useState<ReelStatusResult | null>(
+    reelId
+      ? {
+          id: reelId,
+          status: (reelStatus as ReelStatusResult['status']) || 'queued',
+          progress: reelProgress ? Number(reelProgress) : 0,
+        }
+      : null,
+  );
+  const [statusError, setStatusError] = useState('');
+  const isReelProcessing = reel?.status === 'queued' || reel?.status === 'processing';
 
   // Audio Player for final preview
   const [sound, setSound] = useState<any>(null);
@@ -122,6 +137,36 @@ export default function PostSuccessScreen() {
     return () => clearInterval(watcher);
   }, [audioDurationSec, sound, trimLeft, trimRight]);
 
+  useEffect(() => {
+    if (!reelId) return;
+    let isMounted = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const poll = async () => {
+      try {
+        const latest = await getReelStatus(reelId);
+        if (!isMounted) return;
+        setReel(latest);
+        setStatusError('');
+
+        if (latest.status === 'queued' || latest.status === 'processing') {
+          timer = setTimeout(poll, 3000);
+        }
+      } catch (error: any) {
+        if (!isMounted) return;
+        setStatusError(error?.response?.data?.error?.message || error?.message || 'Could not check reel status.');
+        timer = setTimeout(poll, 5000);
+      }
+    };
+
+    poll();
+
+    return () => {
+      isMounted = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [reelId]);
+
   const handleDone = () => {
     // Reset back to home or camera
     router.dismissAll();
@@ -145,16 +190,45 @@ export default function PostSuccessScreen() {
 
         {/* Success Icon */}
         <View className="w-24 h-24 bg-[#98FF2F] rounded-full items-center justify-center mb-6">
-          <Ionicons name="checkmark-sharp" size={64} color="black" />
+          {isReelProcessing ? (
+            <ActivityIndicator size="large" color="black" />
+          ) : reel?.status === 'failed' ? (
+            <Ionicons name="alert" size={56} color="black" />
+          ) : (
+            <Ionicons name="checkmark-sharp" size={64} color="black" />
+          )}
         </View>
 
         <Text className="text-white font-inter-bold text-2xl mb-2 text-center">
-          Your Post is now live!
+          {isReelProcessing
+            ? 'Your reel is processing'
+            : reel?.status === 'failed'
+              ? 'Reel processing failed'
+              : 'Your Post is now live!'}
         </Text>
 
         <Text className="text-[#888] font-inter-regular text-center mb-8 px-4">
-          Shared with your community and the explore feed.
+          {isReelProcessing
+            ? 'Backend is creating the final video with your music and edits.'
+            : reel?.status === 'failed'
+              ? reel.error?.message || 'Please try posting again.'
+              : 'Shared with your community and the explore feed.'}
         </Text>
+
+        {reelId && (
+          <View className="w-full bg-[#171717] rounded-2xl p-4 mb-6 border border-[#2A2A2A]">
+            <View className="flex-row items-center justify-between mb-3">
+              <Text className="text-white font-inter-semibold text-base">Reel status</Text>
+              <Text className="text-[#98FF2F] font-inter-semibold capitalize">{reel?.status || 'queued'}</Text>
+            </View>
+            <View className="h-2 bg-white/20 rounded-full overflow-hidden mb-2">
+              <View className="h-full bg-[#98FF2F]" style={{ width: `${Math.max(0, Math.min(100, reel?.progress ?? 0))}%` }} />
+            </View>
+            <Text className="text-[#888] font-inter-regular text-xs">
+              {statusError || `${Math.max(0, Math.min(100, reel?.progress ?? 0))}% complete`}
+            </Text>
+          </View>
+        )}
 
         {/* Thumbnail Preview */}
         <View className="w-full aspect-[3/4] max-h-[400px] rounded-[32px] overflow-hidden mb-8 bg-[#111] relative">

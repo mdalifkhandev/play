@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, Image, TextInput, ScrollView, Switch } from 'react-native';
+import { View, Text, Pressable, Image, TextInput, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer } from 'expo-audio';
 import * as Location from 'expo-location';
+import { handleApiError } from '../../../api/client';
+import { publishReel } from '../../../api/reels/reels.api';
+import type { ReelAudioInput, ReelVideoEditInput } from '../../../api/reels/reels.types';
 
 const DEFAULT_AUDIO_DURATION_SEC = 30;
 const LOCAL_SOUND_DURATIONS: Record<string, number> = {
@@ -28,6 +31,24 @@ const parseDurationSeconds = (duration?: string, title?: string) => {
   }
 
   return DEFAULT_AUDIO_DURATION_SEC;
+};
+
+const toMs = (seconds: number) => Math.max(0, Math.round(seconds * 1000));
+
+const clampPercent = (value?: string, fallback = 0) => {
+  const parsed = value !== undefined && value !== '' ? Number(value) : fallback;
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.min(100, parsed));
+};
+
+const mapFilter = (value?: string): ReelVideoEditInput['filter'] => {
+  const normalized = (value || '').trim().toLowerCase();
+  if (normalized === 'vivid') return 'vivid';
+  if (normalized === 'warm' || normalized === 'vintage') return 'warm';
+  if (normalized === 'cool') return 'cool';
+  if (normalized === 'mono' || normalized === 'grayscale') return 'grayscale';
+  if (normalized === 'sepia') return 'sepia';
+  return 'none';
 };
 
 export default function PostDetailsScreen() {
@@ -56,6 +77,7 @@ export default function PostDetailsScreen() {
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [locationInput, setLocationInput] = useState('');
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
 
   // Ref for caption input to auto-focus
   const captionInputRef = React.useRef<TextInput>(null);
@@ -107,13 +129,108 @@ export default function PostDetailsScreen() {
     }
   };
 
-  const handlePost = () => {
+  const buildVideoEditPayload = (): ReelVideoEditInput => {
+    const parsedVideoDuration = videoDuration ? Number(videoDuration) : 0;
+    const fallbackEndSeconds = parsedVideoDuration > 0 ? parsedVideoDuration : 1;
+    const startSeconds = videoTrimStart !== undefined && videoTrimStart !== ''
+      ? Number(videoTrimStart)
+      : (clampPercent(videoTrimLeft, 0) / 100) * fallbackEndSeconds;
+    const endSeconds = videoTrimEnd !== undefined && videoTrimEnd !== ''
+      ? Number(videoTrimEnd)
+      : (clampPercent(videoTrimRight, 100) / 100) * fallbackEndSeconds;
+    const startMs = toMs(Number.isFinite(startSeconds) ? startSeconds : 0);
+    const endMs = Math.max(startMs + 1000, toMs(Number.isFinite(endSeconds) ? endSeconds : fallbackEndSeconds));
+
+    return {
+      trim: { startMs, endMs },
+      filter: mapFilter(activeFilter),
+      effect: 'none',
+      exposure: exposure,
+      contrast: contParam ? parseInt(contParam, 10) : 50,
+      ...(overlayText?.trim()
+        ? {
+            overlayText: {
+              text: overlayText.trim(),
+              x: 0.5,
+              y: 0.5,
+              fontSize: 42,
+            },
+          }
+        : {}),
+    };
+  };
+
+  const buildAudioPayload = (videoEdit: ReelVideoEditInput): ReelAudioInput => {
+    const original = originalVolume ? parseInt(originalVolume, 10) : 100;
+    const added = addedVolume ? parseInt(addedVolume, 10) : 100;
+
+    if (!musicId) {
+      return {
+        originalVolume: original,
+        musicVolume: 0,
+      };
+    }
+
+    const audioDurationMs = toMs(audioDurationSec);
+    const trimStartMs = toMs(getTrimTime(trimLeft));
+    const selectedVideoMs = videoEdit.trim.endMs - videoEdit.trim.startMs;
+    const percentEndMs = toMs(getTrimTime(trimRight, 100));
+    const trimEndMs = Math.min(audioDurationMs, Math.max(percentEndMs, trimStartMs + selectedVideoMs));
+
+    return {
+      originalVolume: original,
+      musicVolume: added,
+      musicId,
+      musicTrim: {
+        startMs: trimStartMs,
+        endMs: trimEndMs,
+      },
+    };
+  };
+
+  const handlePost = async () => {
+    if (isPosting) return;
+
+    if (mediaType !== 'video') {
+      router.push({
+        pathname: '/screens/create/post-success',
+        params: { 
+          uri: mockImage,
+          mediaType: mediaType || 'photo',
+          overlayText, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
+          originalVolume, addedVolume, trimLeft, trimRight,
+          videoTrimLeft: videoTrimLeft || '',
+          videoTrimRight: videoTrimRight || '',
+          videoTrimStart: videoTrimStart || '',
+          videoTrimEnd: videoTrimEnd || '',
+          videoDuration: videoDuration || '',
+          exposure: expParam, contrast: contParam, activeFilter, activeEffect
+        }
+      } as any);
+      return;
+    }
+
+    setIsPosting(true);
+
+    try {
+      const videoEdit = buildVideoEditPayload();
+      const reel = await publishReel({
+        videoUri: mockImage,
+        caption: caption.trim() || undefined,
+        forKids,
+        audio: buildAudioPayload(videoEdit),
+        videoEdit,
+      });
+
     router.push({
       pathname: '/screens/create/post-success',
       params: { 
         uri: mockImage,
         mediaType: mediaType || 'photo',
         overlayText, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
+        reelId: reel.reelId,
+        reelStatus: reel.status,
+        reelProgress: String(reel.progress),
         originalVolume, addedVolume, trimLeft, trimRight,
         videoTrimLeft: videoTrimLeft || '',
         videoTrimRight: videoTrimRight || '',
@@ -123,6 +240,13 @@ export default function PostDetailsScreen() {
         exposure: expParam, contrast: contParam, activeFilter, activeEffect
       }
     } as any);
+    } catch (error: any) {
+      console.log('Publish reel error:', error);
+      const message = handleApiError(error, 'Could not upload this reel.');
+      alert(message.toLowerCase().includes('access token') ? 'Please login again, then upload your reel.' : message);
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   // Audio Player for final preview
@@ -420,9 +544,18 @@ export default function PostDetailsScreen() {
         </Pressable>
         <Pressable 
           onPress={handlePost}
+          disabled={isPosting}
           className="flex-1 py-3 rounded-xl bg-[#98FF2F] items-center"
+          style={{ opacity: isPosting ? 0.7 : 1 }}
         >
-          <Text className="text-black font-inter-semibold text-base">Post</Text>
+          {isPosting ? (
+            <View className="flex-row items-center gap-2">
+              <ActivityIndicator size="small" color="black" />
+              <Text className="text-black font-inter-semibold text-base">Uploading</Text>
+            </View>
+          ) : (
+            <Text className="text-black font-inter-semibold text-base">Post</Text>
+          )}
         </Pressable>
       </View>
 
