@@ -384,6 +384,31 @@ export default function EditMediaScreen() {
   const [isTextMode, setIsTextMode] = useState(false);
   const [overlayText, setOverlayText] = useState('');
   const inputRef = useRef<TextInput>(null);
+  const latestOverlayText = useRef(overlayText);
+  latestOverlayText.current = overlayText;
+  const latestIsTextMode = useRef(isTextMode);
+  latestIsTextMode.current = isTextMode;
+  const textPan = useRef(new Animated.ValueXY()).current;
+  const textPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: () => latestOverlayText.current.trim().length > 0 && !latestIsTextMode.current,
+      onStartShouldSetPanResponder: () => latestOverlayText.current.trim().length > 0 && !latestIsTextMode.current,
+      onPanResponderGrant: () => {
+        textPan.setOffset({
+          x: (textPan.x as any)._value,
+          y: (textPan.y as any)._value
+        });
+        textPan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dx: textPan.x, dy: textPan.y }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: () => {
+        textPan.flattenOffset();
+      }
+    })
+  ).current;
 
   // Options state
   const [exposure, setExposure] = useState(50);
@@ -579,10 +604,19 @@ export default function EditMediaScreen() {
               </View>
             )}
 
-            {overlayText.length > 0 && (
-              <Text className="text-white font-inter-bold text-3xl text-center px-4 z-10" style={{ textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 10 }}>
-                {overlayText}
-              </Text>
+            {overlayText.trim().length > 0 && (
+              <Animated.View
+                {...(!isTextMode && !activePanel ? textPanResponder.panHandlers : {})}
+                className="absolute left-6 right-6 top-1/2 z-10 items-center"
+                style={{ transform: [{ translateX: textPan.x }, { translateY: textPan.y }] }}
+              >
+                <Text
+                  className="text-white font-inter-bold text-3xl text-center px-4"
+                  style={{ textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 10 }}
+                >
+                  {overlayText}
+                </Text>
+              </Animated.View>
             )}
             
             {/* Display Music Card (Draggable) */}
