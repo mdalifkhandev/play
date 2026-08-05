@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, Image, Pressable, TextInput, KeyboardAvoidingView, Platform, Keyboard, ScrollView, Animated, PanResponder, Dimensions } from 'react-native';
+import { View, Text, Image, Pressable, TextInput, KeyboardAvoidingView, Platform, Keyboard, ScrollView, Animated, PanResponder, Dimensions, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createAudioPlayer } from 'expo-audio';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { exportEditedMedia } from '../../../utils/exportEditedMedia';
 
 const { width } = Dimensions.get('window');
 const DEFAULT_AUDIO_DURATION_SEC = 30;
@@ -136,6 +137,7 @@ export default function EditMediaScreen() {
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
   const [videoDurationSec, setVideoDurationSec] = useState(videoDuration ? Number(videoDuration) : 0);
   const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
   const isPreviewPlayingRef = useRef(isPreviewPlaying);
   isPreviewPlayingRef.current = isPreviewPlaying;
 
@@ -453,11 +455,36 @@ export default function EditMediaScreen() {
     } as any);
   };
 
-  const navigateToPostDetails = () => {
+  const navigateToPostDetails = async () => {
+    if (isExporting) return;
+
+    setIsExporting(true);
+    try {
+      try { videoPlayer.pause(); } catch(e) {}
+      try { sound?.pause(); } catch(e) {}
+
+      const exportedUri = await exportEditedMedia({
+        uri: mockImage,
+        mediaType,
+        soundUrl,
+        overlayText,
+        originalVolume,
+        addedVolume,
+        trimLeft,
+        trimRight,
+        audioDurationSec,
+        videoTrimStartSec,
+        videoTrimEndSec,
+        activeFilter: activeFilter || undefined,
+        activeEffect: activeEffect || undefined,
+        textOffsetX: (textPan.x as any)._value,
+        textOffsetY: (textPan.y as any)._value,
+      });
+
     router.push({
       pathname: '/screens/create/post-details',
       params: { 
-        uri: mockImage, 
+        uri: exportedUri, 
         mediaType: mediaType || 'photo',
         overlayText: overlayText, 
         soundUrl: soundUrl || '',
@@ -478,6 +505,36 @@ export default function EditMediaScreen() {
         activeEffect: activeEffect || ''
       }
     } as any);
+    } catch (error) {
+      console.log('Export edited video error:', error);
+      router.push({
+        pathname: '/screens/create/post-details',
+        params: { 
+          uri: mockImage, 
+          mediaType: mediaType || 'photo',
+          overlayText: overlayText, 
+          soundUrl: soundUrl || '',
+          title: title || '',
+          soundDuration: soundDuration || '',
+          originalVolume: originalVolume?.toString() || '',
+          addedVolume: addedVolume?.toString() || '',
+          trimLeft: trimLeft?.toString() || '',
+          trimRight: trimRight?.toString() || '',
+          videoTrimLeft: videoTrimLeft?.toString() || '',
+          videoTrimRight: videoTrimRight?.toString() || '',
+          videoTrimStart: videoTrimStart || '',
+          videoTrimEnd: videoTrimEnd || '',
+          videoDuration: videoDurationSec.toString(),
+          exposure: exposure.toString(),
+          contrast: contrast.toString(),
+          activeFilter: activeFilter,
+          activeEffect: activeEffect || '',
+          exportPending: 'true'
+        }
+      } as any);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -861,9 +918,17 @@ export default function EditMediaScreen() {
             </Pressable>
             <Pressable 
               onPress={navigateToPostDetails}
-              className="px-8 py-3 rounded-xl bg-[#98D83A]"
+              disabled={isExporting}
+              className={`px-8 py-3 rounded-xl bg-[#98D83A] ${isExporting ? 'opacity-60' : ''}`}
             >
-              <Text className="text-black font-inter-semibold">Next(1)</Text>
+              {isExporting ? (
+                <View className="flex-row items-center gap-2">
+                  <ActivityIndicator size="small" color="black" />
+                  <Text className="text-black font-inter-semibold">Exporting</Text>
+                </View>
+              ) : (
+                <Text className="text-black font-inter-semibold">Next(1)</Text>
+              )}
             </Pressable>
           </View>
         ) : null}
