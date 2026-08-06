@@ -1,7 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { apiClient } from '../client';
-import type { PublishReelInput, ReelPublishResult, ReelStatusResult } from './reels.types';
+import type { PublishReelInput, ReelPublishResult, ReelStatusResult, ReelFeedResponse } from './reels.types';
 
 type UploadUrlResponse = {
   uploadId: string;
@@ -22,11 +22,12 @@ const VIDEO_MIME_TYPE = 'video/mp4';
 export async function publishReel(input: PublishReelInput): Promise<ReelPublishResult> {
   const file = await createUploadFile(input.videoUri);
 
-  const uploadUrlResponse = await apiClient.post<{ data: UploadUrlResponse }>('/media/upload-url', {
+  const uploadUrlResponse = await apiClient.post<{ data: UploadUrlResponse }>('/uploads/prepare', {
     fileName: file.name,
-    contentType: file.type,
-    fileSize: file.size,
     mediaType: 'video',
+    mimeType: file.type,
+    fileSizeBytes: file.size,
+    purpose: 'reel',
   });
   const uploadData = uploadUrlResponse.data.data;
 
@@ -42,7 +43,7 @@ export async function publishReel(input: PublishReelInput): Promise<ReelPublishR
   formData.append('public_id', uploadData.publicId);
   formData.append('overwrite', 'false');
 
-  await uploadToCloudinary(uploadData.uploadUrl, formData);
+  await uploadToCloudinary(uploadData.uploadUrl, formData, input.onProgress);
 
   const completeResponse = await completeUploadWithRetry(uploadData.uploadId);
   const completed = completeResponse.data.data;
@@ -73,7 +74,7 @@ async function completeUploadWithRetry(uploadId: string) {
 
   for (let attempt = 0; attempt <= delays.length; attempt += 1) {
     try {
-      return await apiClient.post<{ data: CompleteUploadResponse }>('/media/complete', {
+      return await apiClient.post<{ data: CompleteUploadResponse }>('/uploads/complete', {
         uploadId,
       });
     } catch (error: any) {
@@ -102,28 +103,57 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function uploadToCloudinary(uploadUrl: string, formData: FormData) {
-  return new Promise<void>((resolve, reject) => {
-    const request = new XMLHttpRequest();
+export async function uploadToCloudinary(uploadUrl: string, formData: FormData, onProgress?: (progress: number) => void) {
+  const delays = [1000, 2000, 4000];
+  let lastError: unknown;
 
-    request.open('POST', uploadUrl);
-    request.onload = () => {
-      if (request.status >= 200 && request.status < 300) {
-        resolve();
-        return;
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const request = new XMLHttpRequest();
+
+        request.open('POST', uploadUrl);
+        if (onProgress) {
+          request.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const progress = Math.round((event.loaded / event.total) * 100);
+              onProgress(progress);
+            }
+          };
+        }
+        
+        request.onload = () => {
+          if (request.status >= 200 && request.status < 300) {
+            resolve();
+            return;
+          }
+          reject(new Error(`Cloudinary upload failed with status ${request.status}.`));
+        };
+        request.onerror = () => reject(new Error('Cloudinary upload failed.'));
+        request.ontimeout = () => reject(new Error('Cloudinary upload timed out.'));
+        request.timeout = 120000;
+        request.send(formData);
+      });
+      return; // Success
+    } catch (error: any) {
+      lastError = error;
+      if (attempt < delays.length) {
+        await sleep(delays[attempt]);
       }
+    }
+  }
 
-      reject(new Error(`Cloudinary upload failed with status ${request.status}.`));
-    };
-    request.onerror = () => reject(new Error('Cloudinary upload failed.'));
-    request.ontimeout = () => reject(new Error('Cloudinary upload timed out.'));
-    request.timeout = 120000;
-    request.send(formData);
-  });
+  throw lastError;
 }
 
 export async function getReelStatus(reelId: string): Promise<ReelStatusResult> {
   const response = await apiClient.get<{ data: ReelStatusResult }>(`/reels/${reelId}`);
+  return response.data.data;
+}
+
+export async function getFeed(cursor?: string): Promise<ReelFeedResponse> {
+  const params = cursor ? { cursor } : {};
+  const response = await apiClient.get<{ data: ReelFeedResponse }>('/reels/feed', { params });
   return response.data.data;
 }
 

@@ -15,9 +15,16 @@ import "../../global.css";
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAppStore } from "../store";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+const defaultErrorHandler = ErrorUtils.getGlobalHandler();
+ErrorUtils.setGlobalHandler((error, isFatal) => {
+  console.error('Unhandled JS Exception:', error);
+  defaultErrorHandler(error, isFatal);
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,12 +88,14 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }} />
-        <Toaster />
-      </QueryClientProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <QueryClientProvider client={queryClient}>
+          <StatusBar style="light" />
+          <Stack screenOptions={{ headerShown: false }} />
+          <Toaster />
+        </QueryClientProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }

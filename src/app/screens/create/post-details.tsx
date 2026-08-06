@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, Image, TextInput, ScrollView, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, TextInput, ScrollView, Switch, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer } from 'expo-audio';
 import * as Location from 'expo-location';
+import * as FileSystem from 'expo-file-system/legacy';
 import { handleApiError } from '../../../api/client';
-import { publishReel } from '../../../api/reels/reels.api';
+import { publishReel, getReelStatus } from '../../../api/reels/reels.api';
 import type { ReelAudioInput, ReelVideoEditInput } from '../../../api/reels/reels.types';
 
 const DEFAULT_AUDIO_DURATION_SEC = 30;
@@ -58,7 +60,7 @@ export default function PostDetailsScreen() {
     uri, mediaType, overlayText, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
     originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight,
     videoTrimStart, videoTrimEnd, videoDuration,
-    exposure: expParam, contrast: contParam, activeFilter, activeEffect
+    exposure: expParam, contrast: contParam, activeFilter, activeEffect, videoEdit
   } = useLocalSearchParams<{ 
     uri: string; mediaType?: 'photo' | 'video'; overlayText: string; soundUrl: string; title: string; soundDuration?: string;
     musicId?: string; musicArtist?: string; musicCoverUrl?: string;
@@ -66,7 +68,17 @@ export default function PostDetailsScreen() {
     videoTrimLeft?: string; videoTrimRight?: string;
     videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
     exposure: string; contrast: string; activeFilter: string; activeEffect: string;
+    videoEdit?: string;
   }>();
+
+  const parsedVideoEdit = React.useMemo(() => {
+    if (!videoEdit) return undefined;
+    try {
+      return JSON.parse(videoEdit);
+    } catch {
+      return undefined;
+    }
+  }, [videoEdit]);
 
   const exposure = expParam ? parseInt(expParam) : 50;
 
@@ -78,6 +90,7 @@ export default function PostDetailsScreen() {
   const [locationInput, setLocationInput] = useState('');
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   // Ref for caption input to auto-focus
   const captionInputRef = React.useRef<TextInput>(null);
@@ -213,14 +226,34 @@ export default function PostDetailsScreen() {
     setIsPosting(true);
 
     try {
-      const videoEdit = buildVideoEditPayload();
-      const reel = await publishReel({
+      let reel = await publishReel({
         videoUri: mockImage,
         caption: caption.trim() || undefined,
         forKids,
-        audio: buildAudioPayload(videoEdit),
-        videoEdit,
+        audio: parsedVideoEdit?.audio || buildAudioPayload({} as any), // Fallback if no edit spec
+        videoEdit: parsedVideoEdit || buildVideoEditPayload(), // Fallback if no edit spec
+        onProgress: (p) => setUploadProgress(p),
       });
+
+      // Poll until backend FFmpeg processing finishes
+      while (reel.status === 'processing' || reel.status === 'queued') {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const status = await getReelStatus(reel.reelId);
+        reel = {
+          ...reel,
+          status: status.status as any,
+          progress: status.progress
+        };
+      }
+
+      if (reel.status === 'failed') {
+        throw new Error('Backend video processing failed');
+      }
+
+      // Cleanup cached file if it's from cache (i.e., ffmpeg output)
+      if (mockImage.startsWith(FileSystem.cacheDirectory!)) {
+        try { await FileSystem.deleteAsync(mockImage); } catch(e) {}
+      }
 
     router.push({
       pathname: '/screens/create/post-success',
@@ -246,6 +279,7 @@ export default function PostDetailsScreen() {
       alert(message.toLowerCase().includes('access token') ? 'Please login again, then upload your reel.' : message);
     } finally {
       setIsPosting(false);
+      setUploadProgress(null);
     }
   };
 
@@ -271,10 +305,16 @@ export default function PostDetailsScreen() {
   useFocusEffect(
     useCallback(() => {
       let player: any = null;
+      let isReady = false;
       if (soundUrl) {
         try {
           const source = /^\d+$/.test(soundUrl) ? parseInt(soundUrl, 10) : soundUrl;
           player = createAudioPlayer(source);
+          
+          player.addListener('playbackStatusUpdate', (status: any) => {
+            if (status.isLoaded) isReady = true;
+          });
+
           seekSound(player, getTrimTime(trimLeft));
           player.play();
           setTimeout(() => seekSound(player, getTrimTime(trimLeft)), 100);
@@ -286,8 +326,19 @@ export default function PostDetailsScreen() {
       }
       return () => {
         if (player) {
-          player.pause();
-          try { player.remove(); } catch(e) {}
+          if (!isReady) {
+            setTimeout(() => {
+              try { player.pause(); } catch (e) {}
+              try { player.remove(); } catch (e) {
+                try { player.release(); } catch (e2) {}
+              }
+            }, 1000);
+          } else {
+            try { player.pause(); } catch (e) {}
+            try { player.remove(); } catch (e) {
+              try { player.release(); } catch (e2) {}
+            }
+          }
         }
         setSound(null);
       };
@@ -337,14 +388,7 @@ export default function PostDetailsScreen() {
         
         {/* Top Thumbnail */}
         <View className="w-full h-40 rounded-2xl overflow-hidden mb-6 relative bg-black items-center justify-center">
-          <Image 
-            source={{ uri: mockImage }} 
-            className="w-full h-full absolute inset-0"
-            resizeMode="cover"
-            style={{
-              transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }]
-            }}
-          />
+          <Image source={{ uri: mockImage }} className="absolute inset-0 w-full h-full" contentFit="cover" style={{ transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }] }} />
 
           {/* Simulate Glitch Effect */}
           {activeEffect === 'Glitch' && (
@@ -551,7 +595,9 @@ export default function PostDetailsScreen() {
           {isPosting ? (
             <View className="flex-row items-center gap-2">
               <ActivityIndicator size="small" color="black" />
-              <Text className="text-black font-inter-semibold text-base">Uploading</Text>
+              <Text className="text-black font-inter-semibold text-base">
+                {uploadProgress !== null ? `Uploading ${uploadProgress}%` : 'Processing...'}
+              </Text>
             </View>
           ) : (
             <Text className="text-black font-inter-semibold text-base">Post</Text>

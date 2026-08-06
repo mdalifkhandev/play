@@ -12,6 +12,7 @@ export interface FeedItemProps {
   id: string;
   type: 'video' | 'image';
   source: string;
+  thumbnailUrl?: string;
   user: {
     username: string;
     profileImage: string;
@@ -25,6 +26,7 @@ export interface FeedItemProps {
     shares: string;
   };
   isActive: boolean;
+  shouldMountVideo?: boolean;
 }
 
 // Extract video to its own component to safely delay its mounting
@@ -69,11 +71,13 @@ function FeedVideo({ source, isActive }: { source: any, isActive: boolean }) {
 export const FeedItem = ({
   type,
   source,
+  thumbnailUrl,
   user,
   description,
   date,
   stats,
-  isActive
+  isActive,
+  shouldMountVideo = true
 }: FeedItemProps) => {
   const insets = useSafeAreaInsets();
 
@@ -121,7 +125,17 @@ export const FeedItem = ({
     <View style={{ height: WINDOW_HEIGHT, width: WINDOW_WIDTH }} className="">
 
       {type === 'video' && isReady ? (
-        <FeedVideo source={source} isActive={isActive} />
+        shouldMountVideo ? (
+          <FeedVideo source={source} isActive={isActive} />
+        ) : (
+          <View className="absolute inset-0">
+            {thumbnailUrl ? (
+              <Image source={{ uri: thumbnailUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
+            ) : (
+              <View className="absolute inset-0 bg-black" />
+            )}
+          </View>
+        )
       ) : type === 'image' ? (
         <Pressable className="absolute inset-0">
           <Image

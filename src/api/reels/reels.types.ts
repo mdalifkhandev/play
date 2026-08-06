@@ -29,8 +29,9 @@ export type PublishReelInput = {
   videoUri: string;
   caption?: string;
   forKids?: boolean;
-  audio: ReelAudioInput;
-  videoEdit: ReelVideoEditInput;
+  audio?: ReelAudioInput;
+  videoEdit?: any;
+  onProgress?: (progress: number) => void;
 };
 
 export type ReelPublishResult = {
@@ -54,4 +55,34 @@ export type ReelStatusResult = {
     message?: string;
     canRetry?: boolean;
   } | null;
+};
+
+export type ReelFeedItem = {
+  id: string;
+  videoUrl: string;
+  thumbnailUrl: string;
+  durationMs: number;
+  caption: string | null;
+  user: {
+    id: string;
+    username: string | null;
+    avatarUrl: string | null;
+  };
+  stats: {
+    likes: number;
+    comments: number;
+    shares: number;
+    views: number;
+  };
+  viewerState: {
+    isLiked: boolean;
+    isSaved: boolean;
+  } | null;
+  createdAt: string;
+  publishedAt: string;
+};
+
+export type ReelFeedResponse = {
+  items: ReelFeedItem[];
+  nextCursor?: string;
 };

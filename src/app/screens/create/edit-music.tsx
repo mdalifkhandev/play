@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Pressable, Image, Dimensions, PanResponder, ScrollView } from 'react-native';
+import { View, Text, Pressable, Dimensions, PanResponder, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -131,7 +132,8 @@ export default function EditMusicScreen() {
   const activeMaxDurationSec = trimTarget === 'video' ? videoDurationSec : musicDurationSec;
   const musicTrimStartSec = (trimLeft / 100) * musicDurationSec;
   const musicTrimEndSec = (trimRight / 100) * musicDurationSec;
-  const videoPlayer = useVideoPlayer(isVideo ? { uri: mockImage, contentType: 'progressive' } : null, player => {
+  const videoSource = React.useMemo(() => isVideo ? { uri: mockImage, contentType: 'progressive' as const } : null, [isVideo, mockImage]);
+  const videoPlayer = useVideoPlayer(videoSource, player => {
     player.loop = true;
     player.muted = false;
     player.volume = originalVolume / 100;
@@ -162,16 +164,20 @@ export default function EditMusicScreen() {
       try {
         const source = /^\d+$/.test(soundUrl) ? parseInt(soundUrl, 10) : soundUrl;
         player = createAudioPlayer(source);
+        
         // Set volume explicitly BEFORE playing to prevent audio leaks
         player.volume = latestAddedVolume.current / 100;
         seekMusicToSelectedStart(player);
         player.play();
         setTimeout(() => seekMusicToSelectedStart(player), 100);
         setTimeout(() => {
-          const loadedDuration = Number(player.duration);
-          if (!soundDuration && Number.isFinite(loadedDuration) && loadedDuration > 0) {
-            setMusicDurationSec(Math.floor(loadedDuration));
-          }
+          if (!player) return;
+          try {
+            const loadedDuration = Number(player.duration);
+            if (!soundDuration && Number.isFinite(loadedDuration) && loadedDuration > 0) {
+              setMusicDurationSec(Math.floor(loadedDuration));
+            }
+          } catch(e) {}
         }, 300);
         player.loop = true;
         setSound(player);
@@ -181,8 +187,8 @@ export default function EditMusicScreen() {
     }
     return () => {
       if (player) {
-        player.pause();
-        player.remove();
+        try { player.pause(); } catch (e) {}
+        try { player.release(); } catch (e) {}
       }
     };
   }, [soundUrl]);
@@ -212,12 +218,17 @@ export default function EditMusicScreen() {
     }
   }, [isMusicPlaying, musicTrimEndSec, musicTrimStartSec, sound]);
 
+  const lastMusicSeekTime = useRef(0);
   useEffect(() => {
     if (!sound || !isMusicPlaying) return;
 
     const trimWatcher = setInterval(() => {
+      const now = Date.now();
+      if (now - lastMusicSeekTime.current < 1000) return;
+
       const currentTime = Number(sound.currentTime ?? 0);
       if (currentTime >= latestMusicTrimEndSec.current || currentTime < latestMusicTrimStartSec.current - 0.25) {
+        lastMusicSeekTime.current = now;
         seekMusicToSelectedStart(sound);
         try { sound.play(); } catch (e) {}
       }
@@ -227,10 +238,10 @@ export default function EditMusicScreen() {
   }, [isMusicPlaying, sound]);
 
   useEffect(() => {
-    if (!isVideo) return;
+    if (!isVideo || !videoPlayer) return;
 
     setHasVideoFrame(false);
-    videoPlayer.replaceAsync({ uri: mockImage, contentType: 'progressive' }).then(() => {
+    try {
       videoPlayer.currentTime = 0;
       videoPlayer.muted = isOriginalMuted;
       videoPlayer.volume = isOriginalMuted ? 0 : originalVolume / 100;
@@ -243,10 +254,10 @@ export default function EditMusicScreen() {
       } else {
         videoPlayer.pause();
       }
-    }).catch(error => {
+    } catch (error) {
       console.error('Video trim preview load error:', error);
-    });
-  }, [isVideo, mockImage, videoPlayer]);
+    }
+  }, [isVideo, videoPlayer, isOriginalMuted, originalVolume, isVideoPlaying]);
 
   useEffect(() => {
     if (!isVideo) return;
@@ -509,7 +520,7 @@ export default function EditMusicScreen() {
               <Image 
                 source={{ uri: mockImage }} 
                 className="w-full h-full"
-                resizeMode="cover"
+                contentFit="cover"
               />
             )}
             <View className="absolute inset-0 bg-black/20" />

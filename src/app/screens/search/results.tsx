@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LiveGridItem, LiveStreamData } from '../../../components/live/LiveGridItem';
@@ -83,42 +83,75 @@ export default function SearchResultsScreen() {
   const [sound, setSound] = useState<AudioPlayer | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  
+  const activePlayerRef = useRef<any>(null);
+  const isPlayerReadyRef = useRef<boolean>(false);
+  const lastTapRef = useRef<number>(0);
 
-  useEffect(() => {
-    return sound
-      ? () => {
-        sound.remove();
-      }
-      : undefined;
-  }, [sound]);
+  const stopActivePlayer = useCallback(() => {
+    const player = activePlayerRef.current;
+    const isReady = isPlayerReadyRef.current;
+    
+    activePlayerRef.current = null;
+    isPlayerReadyRef.current = false;
+    
+    if (!player) return;
 
-  const toggleSound = (item: typeof MOCK_SOUNDS[0]) => {
-    if (playingId === item.id || loadingId === item.id) {
-      if (sound) {
-        sound.pause();
-        sound.remove();
-        setSound(null);
-      }
-      setPlayingId(null);
-      setLoadingId(null);
+    if (!isReady) {
+      setTimeout(() => {
+        try { player.pause(); } catch (e) {}
+        try { player.remove(); } catch (e) {
+          try { player.release(); } catch (e2) {}
+        }
+      }, 1000);
       return;
     }
 
-    if (sound) {
-      sound.pause();
-      sound.remove();
-      setSound(null);
+    try { player.pause(); } catch (e) {}
+    try { player.remove(); } catch (e) {
+      try { player.release(); } catch (e2) {}
     }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopActivePlayer();
+    };
+  }, [stopActivePlayer]);
+
+  const toggleSound = (item: typeof MOCK_SOUNDS[0]) => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 350) return;
+    lastTapRef.current = now;
+
+    if (playingId === item.id || loadingId === item.id) {
+      stopActivePlayer();
+      setPlayingId(null);
+      setLoadingId(null);
+      setSound(null);
+      return;
+    }
+
+    stopActivePlayer();
+    setSound(null);
 
     setLoadingId(item.id);
     setPlayingId(null);
 
     try {
       const newSound = createAudioPlayer(item.url);
+      activePlayerRef.current = newSound;
+      isPlayerReadyRef.current = false;
       newSound.play();
       setSound(newSound);
 
       newSound.addListener('playbackStatusUpdate', (status) => {
+        if (activePlayerRef.current !== newSound) return;
+        
+        if (status.isLoaded) {
+          isPlayerReadyRef.current = true;
+        }
+        
         if (status.isLoaded && status.playing) {
           setLoadingId(null);
           setPlayingId(item.id);

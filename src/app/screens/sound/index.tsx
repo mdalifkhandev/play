@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Pressable, Text, View, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createAudioPlayer, AudioPlayer } from 'expo-audio';
@@ -19,42 +19,75 @@ export default function SoundScreen() {
   const [sound, setSound] = useState<AudioPlayer | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  
+  const activePlayerRef = useRef<any>(null);
+  const isPlayerReadyRef = useRef<boolean>(false);
+  const lastTapRef = useRef<number>(0);
 
-  useEffect(() => {
-    return sound
-      ? () => {
-          sound.remove();
+  const stopActivePlayer = useCallback(() => {
+    const player = activePlayerRef.current;
+    const isReady = isPlayerReadyRef.current;
+    
+    activePlayerRef.current = null;
+    isPlayerReadyRef.current = false;
+    
+    if (!player) return;
+
+    if (!isReady) {
+      setTimeout(() => {
+        try { player.pause(); } catch (e) {}
+        try { player.remove(); } catch (e) {
+          try { player.release(); } catch (e2) {}
         }
-      : undefined;
-  }, [sound]);
-
-  const toggleSound = (item: typeof MOCK_SOUNDS[0]) => {
-    if (playingId === item.id || loadingId === item.id) {
-      if (sound) {
-        sound.pause();
-        sound.remove();
-        setSound(null);
-      }
-      setPlayingId(null);
-      setLoadingId(null);
+      }, 1000);
       return;
     }
 
-    if (sound) {
-      sound.pause();
-      sound.remove();
-      setSound(null);
+    try { player.pause(); } catch (e) {}
+    try { player.remove(); } catch (e) {
+      try { player.release(); } catch (e2) {}
     }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopActivePlayer();
+    };
+  }, [stopActivePlayer]);
+
+  const toggleSound = (item: typeof MOCK_SOUNDS[0]) => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 350) return;
+    lastTapRef.current = now;
+
+    if (playingId === item.id || loadingId === item.id) {
+      stopActivePlayer();
+      setPlayingId(null);
+      setLoadingId(null);
+      setSound(null);
+      return;
+    }
+
+    stopActivePlayer();
+    setSound(null);
 
     setLoadingId(item.id);
     setPlayingId(null);
 
     try {
       const newSound = createAudioPlayer(item.url);
+      activePlayerRef.current = newSound;
+      isPlayerReadyRef.current = false;
       newSound.play();
       setSound(newSound);
       
       newSound.addListener('playbackStatusUpdate', (status) => {
+        if (activePlayerRef.current !== newSound) return;
+        
+        if (status.isLoaded) {
+          isPlayerReadyRef.current = true;
+        }
+        
         if (status.isLoaded && status.playing) {
           setLoadingId(null);
           setPlayingId(item.id);
@@ -70,9 +103,7 @@ export default function SoundScreen() {
   };
 
   const handleSelectSound = (item: typeof MOCK_SOUNDS[0]) => {
-    if (sound) {
-      sound.remove();
-    }
+    stopActivePlayer();
     router.push({ pathname: '/(tab)/create', params: { soundUrl: item.url, title: item.title } });
   };
 

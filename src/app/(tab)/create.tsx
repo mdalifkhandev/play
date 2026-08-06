@@ -6,6 +6,7 @@ import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CustomButton } from '../../components/ui/CustomButton';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export default function CreateScreen() {
   const { soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl } = useLocalSearchParams<{
@@ -46,6 +47,11 @@ export default function CreateScreen() {
   const isCameraReadyRef = useRef(false);
   const isRecordingRef = useRef(false);
   const isStoppingRecordingRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   const startTimer = () => {
     stopTimer();
@@ -105,7 +111,7 @@ export default function CreateScreen() {
           quality: 0.8,
           skipProcessing: false,
         });
-        if (photo?.uri) {
+        if (photo?.uri && isMountedRef.current) {
           router.push({
             pathname: '/screens/create/edit',
             params: { uri: photo.uri, mediaType: 'photo', ...selectedSoundParams },
@@ -139,7 +145,7 @@ export default function CreateScreen() {
           maxDuration,
         });
 
-        if (video?.uri && mainMode !== 'Live') {
+        if (video?.uri && mainMode !== 'Live' && isMountedRef.current) {
           router.push({
             pathname: '/screens/create/edit',
             params: { uri: video.uri, mediaType: 'video', ...selectedSoundParams },
@@ -162,21 +168,33 @@ export default function CreateScreen() {
   const pickFromGallery = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        mediaTypes: ['images', 'videos'],
         allowsEditing: true,
-        quality: 1,
+        quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        router.push({
-          pathname: '/screens/create/edit',
-          params: {
-            uri: asset.uri,
-            mediaType: asset.type === 'video' ? 'video' : 'photo',
-            ...selectedSoundParams,
-          },
-        });
+        
+        if (asset.type === 'video') {
+           const info = await FileSystem.getInfoAsync(asset.uri);
+           // 500 MB limit
+           if (info.exists && typeof info.size === 'number' && info.size > 500 * 1024 * 1024) {
+             Alert.alert('Video too large', 'Please select a video smaller than 500MB.');
+             return;
+           }
+        }
+        
+        if (isMountedRef.current) {
+          router.push({
+            pathname: '/screens/create/edit',
+            params: {
+              uri: asset.uri,
+              mediaType: asset.type === 'video' ? 'video' : 'photo',
+              ...selectedSoundParams,
+            },
+          });
+        }
       }
     } catch (error) {
       console.error('Error selecting media from gallery:', error);

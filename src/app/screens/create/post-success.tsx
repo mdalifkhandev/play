@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, Image, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -88,10 +89,16 @@ export default function PostSuccessScreen() {
   useFocusEffect(
     useCallback(() => {
       let player: any = null;
+      let isReady = false;
       if (soundUrl) {
         try {
           const source = /^\d+$/.test(soundUrl) ? parseInt(soundUrl, 10) : soundUrl;
           player = createAudioPlayer(source);
+          
+          player.addListener('playbackStatusUpdate', (status: any) => {
+            if (status.isLoaded) isReady = true;
+          });
+
           seekSound(player, getTrimTime(trimLeft));
           player.play();
           setTimeout(() => seekSound(player, getTrimTime(trimLeft)), 100);
@@ -103,8 +110,19 @@ export default function PostSuccessScreen() {
       }
       return () => {
         if (player) {
-          player.pause();
-          try { player.remove(); } catch (e) { }
+          if (!isReady) {
+            setTimeout(() => {
+              try { player.pause(); } catch (e) {}
+              try { player.remove(); } catch (e) {
+                try { player.release(); } catch (e2) {}
+              }
+            }, 1000);
+          } else {
+            try { player.pause(); } catch (e) {}
+            try { player.remove(); } catch (e) {
+              try { player.release(); } catch (e2) {}
+            }
+          }
         }
         setSound(null);
       };
@@ -235,7 +253,7 @@ export default function PostSuccessScreen() {
           <Image
             source={{ uri: mockImage }}
             className="w-full h-full absolute inset-0"
-            resizeMode="cover"
+            contentFit="cover"
             style={{
               transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }]
             }}

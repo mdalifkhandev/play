@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, Image, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -62,17 +63,27 @@ export default function SoundScreen() {
   
   // Use a ref to strictly track the active player and prevent overlapping sounds
   const activePlayerRef = useRef<any>(null);
+  const isPlayerReadyRef = useRef<boolean>(false);
+  const lastTapRef = useRef<number>(0);
+
+  const stopActivePlayer = useCallback(() => {
+    const player = activePlayerRef.current;
+    
+    activePlayerRef.current = null;
+    isPlayerReadyRef.current = false;
+    
+    if (!player) return;
+
+    try { player.pause(); } catch (e) {}
+    try { player.release(); } catch (e) {}
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (activePlayerRef.current) {
-        activePlayerRef.current.pause();
-        activePlayerRef.current.remove();
-        activePlayerRef.current = null;
-      }
+      stopActivePlayer();
     };
-  }, []);
+  }, [stopActivePlayer]);
 
   const loadTracks = useCallback(async (nextPage = 1, query = searchQuery) => {
     const requestKey = `${activeTab}:${query.trim().toLowerCase()}:${nextPage}`;
@@ -121,25 +132,20 @@ export default function SoundScreen() {
   }, [activeTab, searchQuery]);
 
   const handleTogglePlay = (track: MusicTrack) => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 350) return; // Debounce rapid taps
+    lastTapRef.current = now;
+
     // If clicking the currently playing/loading track, stop it
     if (playingId === track.providerTrackId || loadingId === track.providerTrackId) {
-      if (activePlayerRef.current) {
-        activePlayerRef.current.pause();
-        activePlayerRef.current.remove();
-        activePlayerRef.current = null;
-      }
+      stopActivePlayer();
       setPlayingId(null);
       setLoadingId(null);
       return;
     }
 
     // Stop current track if switching
-    if (activePlayerRef.current) {
-      activePlayerRef.current.pause();
-      activePlayerRef.current.remove();
-      activePlayerRef.current = null;
-    }
-
+    stopActivePlayer();
     setLoadingId(track.providerTrackId);
     setPlayingId(null);
 
@@ -147,8 +153,14 @@ export default function SoundScreen() {
       const newSound = createAudioPlayer(track.audioPreviewUrl);
       newSound.play();
       activePlayerRef.current = newSound;
+      isPlayerReadyRef.current = false;
 
       newSound.addListener('playbackStatusUpdate', (status: any) => {
+        if (activePlayerRef.current !== newSound) return;
+        
+        if (status.isLoaded) {
+          isPlayerReadyRef.current = true;
+        }
         if (status.error) {
           console.log('Audio playback error:', status.error);
           setLoadingId(null);
@@ -170,11 +182,7 @@ export default function SoundScreen() {
   };
 
   const handleUse = (track: MusicTrack) => {
-    if (activePlayerRef.current) {
-      activePlayerRef.current.pause();
-      activePlayerRef.current.remove();
-      activePlayerRef.current = null;
-    }
+    stopActivePlayer();
 
     const targetPath = returnTo || '/(tab)/create';
 
@@ -207,11 +215,7 @@ export default function SoundScreen() {
       {/* Header */}
       <View className="flex-row items-center px-4 py-3">
         <Pressable onPress={() => {
-          if (activePlayerRef.current) {
-            activePlayerRef.current.pause();
-            activePlayerRef.current.remove();
-            activePlayerRef.current = null;
-          }
+          stopActivePlayer();
           router.back();
         }} className="p-2 -ml-2">
           <Ionicons name="arrow-back" size={24} color="white" />
@@ -284,7 +288,7 @@ export default function SoundScreen() {
               <Pressable onPress={() => handleTogglePlay(track)} className="relative">
                 <View className="w-[60px] h-[60px] rounded-lg bg-[#333] items-center justify-center relative overflow-hidden">
                   {track.coverImageUrl ? (
-                    <Image source={{ uri: track.coverImageUrl }} className="absolute inset-0 w-full h-full" resizeMode="cover" />
+                    <Image source={{ uri: track.coverImageUrl }} className="absolute inset-0 w-full h-full" contentFit="cover" />
                   ) : (
                     <Ionicons name="musical-notes" size={28} color="#98FF2F" />
                   )}
