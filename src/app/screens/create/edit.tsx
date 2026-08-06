@@ -71,7 +71,7 @@ const CustomSlider = ({ value, onValueChange, label }: { value: number, onValueC
   const latestValue = useRef(value);
   latestValue.current = value;
   const startVal = useRef(value);
-  
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -93,7 +93,7 @@ const CustomSlider = ({ value, onValueChange, label }: { value: number, onValueC
       <View className="flex-row justify-between mb-2">
         <Text className="text-white font-inter-medium text-[15px]">{label}</Text>
       </View>
-      <View 
+      <View
         {...panResponder.panHandlers}
         className="w-full h-10 justify-center relative" // Larger touch target
       >
@@ -107,18 +107,18 @@ const CustomSlider = ({ value, onValueChange, label }: { value: number, onValueC
 };
 
 export default function EditMediaScreen() {
-  const { 
+  const {
     uri, mediaType, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
     originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight,
     videoTrimStart, videoTrimEnd, videoDuration
-  } = useLocalSearchParams<{ 
+  } = useLocalSearchParams<{
     uri: string; mediaType?: 'photo' | 'video'; soundUrl: string; title: string; soundDuration?: string;
     musicId?: string; musicArtist?: string; musicCoverUrl?: string;
     originalVolume?: string; addedVolume?: string; trimLeft?: string; trimRight?: string;
     videoTrimLeft?: string; videoTrimRight?: string;
     videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
   }>();
-  
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -212,10 +212,10 @@ export default function EditMediaScreen() {
     if (!player || !Number.isFinite(seconds)) return;
 
     if (typeof player.seekTo === 'function') {
-      try { player.seekTo(seconds); } catch(e) {}
+      try { player.seekTo(seconds); } catch (e) { }
     }
 
-    try { player.currentTime = seconds; } catch(e) {}
+    try { player.currentTime = seconds; } catch (e) { }
   };
 
   useFocusEffect(
@@ -240,7 +240,7 @@ export default function EditMediaScreen() {
       return () => {
         if (player) {
           player.pause();
-          try { player.remove(); } catch(e) {}
+          try { player.remove(); } catch (e) { }
         }
         setSound(null);
       };
@@ -289,19 +289,19 @@ export default function EditMediaScreen() {
     if (isPreviewPlaying) {
       if (isVideo) {
         if (videoDurationSec > 0 && (videoPlayer.currentTime < videoTrimStartSec || videoPlayer.currentTime >= videoTrimEndSec)) {
-          try { videoPlayer.currentTime = videoTrimStartSec; } catch(e) {}
+          try { videoPlayer.currentTime = videoTrimStartSec; } catch (e) { }
         }
-        try { videoPlayer.play(); } catch(e) {}
+        try { videoPlayer.play(); } catch (e) { }
       }
       if (sound) {
-        try { sound.play(); } catch(e) {}
+        try { sound.play(); } catch (e) { }
       }
     } else {
       if (isVideo) {
-        try { videoPlayer.pause(); } catch(e) {}
+        try { videoPlayer.pause(); } catch (e) { }
       }
       if (sound) {
-        try { sound.pause(); } catch(e) {}
+        try { sound.pause(); } catch (e) { }
       }
     }
   }, [isPreviewPlaying, isVideo, sound, videoDurationSec, videoPlayer, videoTrimEndSec, videoTrimStartSec]);
@@ -327,7 +327,7 @@ export default function EditMediaScreen() {
       if (currentTime >= trimEndSec || currentTime < trimStartSec - 0.25) {
         seekSound(sound, trimStartSec);
         if (isPreviewPlaying) {
-          try { sound.play(); } catch(e) {}
+          try { sound.play(); } catch (e) { }
         }
       }
     }, 200);
@@ -343,7 +343,7 @@ export default function EditMediaScreen() {
       const duration = previewDurationSec;
 
       if (isPreviewPlaying && isVideo && videoDurationSec > 0 && (videoCurrentTime >= videoTrimEndSec || videoCurrentTime < videoTrimStartSec - 0.1)) {
-        try { videoPlayer.currentTime = videoTrimStartSec; } catch(e) {}
+        try { videoPlayer.currentTime = videoTrimStartSec; } catch (e) { }
         if (sound) {
           seekSound(sound, getTrimTime(trimLeft));
         }
@@ -353,7 +353,7 @@ export default function EditMediaScreen() {
 
       if (isPreviewPlaying && safeTime >= duration - 0.1) {
         if (isVideo) {
-          try { videoPlayer.currentTime = videoTrimStartSec; } catch(e) {}
+          try { videoPlayer.currentTime = videoTrimStartSec; } catch (e) { }
         }
         if (sound) {
           seekSound(sound, getTrimTime(trimLeft));
@@ -373,8 +373,8 @@ export default function EditMediaScreen() {
       setIsPreviewPlaying(true);
 
       return () => {
-        try { videoPlayer.pause(); } catch(e) {}
-        try { sound?.pause(); } catch(e) {}
+        try { videoPlayer.pause(); } catch (e) { }
+        try { sound?.pause(); } catch (e) { }
       };
     }, [sound, videoPlayer])
   );
@@ -418,7 +418,7 @@ export default function EditMediaScreen() {
   const [contrast, setContrast] = useState(50);
   const [activeFilter, setActiveFilter] = useState('Normal');
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
-  
+
   // Side panel states
   const [activePanel, setActivePanel] = useState<'options' | 'filters' | 'effects' | null>(null);
 
@@ -464,8 +464,8 @@ export default function EditMediaScreen() {
 
     setIsExporting(true);
     try {
-      try { videoPlayer.pause(); } catch(e) {}
-      try { sound?.pause(); } catch(e) {}
+      try { videoPlayer.pause(); } catch (e) { }
+      try { sound?.pause(); } catch (e) { }
 
       const exportedUri = await exportEditedMedia({
         uri: mockImage,
@@ -485,41 +485,41 @@ export default function EditMediaScreen() {
         textOffsetY: (textPan.y as any)._value,
       });
 
-    router.push({
-      pathname: '/screens/create/post-details',
-      params: { 
-        uri: exportedUri, 
-        mediaType: mediaType || 'photo',
-        overlayText: overlayText, 
-        soundUrl: soundUrl || '',
-        title: title || '',
-        soundDuration: soundDuration || '',
-        musicId: musicId || '',
-        musicArtist: musicArtist || '',
-        musicCoverUrl: musicCoverUrl || '',
-        originalVolume: originalVolume?.toString() || '',
-        addedVolume: addedVolume?.toString() || '',
-        trimLeft: trimLeft?.toString() || '',
-        trimRight: trimRight?.toString() || '',
-        videoTrimLeft: videoTrimLeft?.toString() || '',
-        videoTrimRight: videoTrimRight?.toString() || '',
-        videoTrimStart: videoTrimStart || '',
-        videoTrimEnd: videoTrimEnd || '',
-        videoDuration: videoDurationSec.toString(),
-        exposure: exposure.toString(),
-        contrast: contrast.toString(),
-        activeFilter: activeFilter,
-        activeEffect: activeEffect || ''
-      }
-    } as any);
+      router.push({
+        pathname: '/screens/create/post-details',
+        params: {
+          uri: exportedUri,
+          mediaType: mediaType || 'photo',
+          overlayText: overlayText,
+          soundUrl: soundUrl || '',
+          title: title || '',
+          soundDuration: soundDuration || '',
+          musicId: musicId || '',
+          musicArtist: musicArtist || '',
+          musicCoverUrl: musicCoverUrl || '',
+          originalVolume: originalVolume?.toString() || '',
+          addedVolume: addedVolume?.toString() || '',
+          trimLeft: trimLeft?.toString() || '',
+          trimRight: trimRight?.toString() || '',
+          videoTrimLeft: videoTrimLeft?.toString() || '',
+          videoTrimRight: videoTrimRight?.toString() || '',
+          videoTrimStart: videoTrimStart || '',
+          videoTrimEnd: videoTrimEnd || '',
+          videoDuration: videoDurationSec.toString(),
+          exposure: exposure.toString(),
+          contrast: contrast.toString(),
+          activeFilter: activeFilter,
+          activeEffect: activeEffect || ''
+        }
+      } as any);
     } catch (error) {
       console.log('Export edited video error:', error);
       router.push({
         pathname: '/screens/create/post-details',
-        params: { 
-          uri: mockImage, 
+        params: {
+          uri: mockImage,
           mediaType: mediaType || 'photo',
-          overlayText: overlayText, 
+          overlayText: overlayText,
           soundUrl: soundUrl || '',
           title: title || '',
           soundDuration: soundDuration || '',
@@ -548,12 +548,12 @@ export default function EditMediaScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-black"
     >
       <View className="flex-1 bg-black" style={{ paddingTop: insets.top }}>
-        
+
         {/* Header */}
         {!isTextMode && !activePanel && (
           <View className="flex-row items-center justify-between px-4 py-4">
@@ -579,7 +579,7 @@ export default function EditMediaScreen() {
         {/* Main Content Area */}
         <View className="flex-1 relative">
           <View className="flex-1 bg-black overflow-hidden relative items-center justify-center">
-            
+
             {isVideo ? (
               <View
                 className="w-full h-full absolute inset-0"
@@ -594,8 +594,8 @@ export default function EditMediaScreen() {
                 />
               </View>
             ) : (
-              <Image 
-                source={{ uri: mockImage }} 
+              <Image
+                source={{ uri: mockImage }}
                 className="w-full h-full absolute inset-0"
                 resizeMode="cover"
                 style={{
@@ -603,7 +603,7 @@ export default function EditMediaScreen() {
                 }}
               />
             )}
-            
+
             {/* Simulate Glitch Effect (Chromatic Aberration) */}
             {activeEffect === 'Glitch' && (
               <>
@@ -625,37 +625,37 @@ export default function EditMediaScreen() {
             {/* Simulate Sparkle Effect */}
             {activeEffect === 'Sparkle' && (
               <View className="absolute inset-0" pointerEvents="none">
-                 <View className="absolute top-1/4 left-1/4"><Ionicons name="sparkles" size={24} color="white" /></View>
-                 <View className="absolute top-1/2 right-1/4"><Ionicons name="sparkles" size={32} color="white" /></View>
-                 <View className="absolute bottom-1/4 left-1/3"><Ionicons name="sparkles" size={16} color="white" /></View>
+                <View className="absolute top-1/4 left-1/4"><Ionicons name="sparkles" size={24} color="white" /></View>
+                <View className="absolute top-1/2 right-1/4"><Ionicons name="sparkles" size={32} color="white" /></View>
+                <View className="absolute bottom-1/4 left-1/3"><Ionicons name="sparkles" size={16} color="white" /></View>
               </View>
             )}
-            
+
             {/* Simulate Exposure Effect Overlay */}
             {exposure !== 50 && (
-              <View 
-                className="absolute inset-0 pointer-events-none" 
-                style={{ 
+              <View
+                className="absolute inset-0 pointer-events-none"
+                style={{
                   backgroundColor: exposure > 50 ? 'white' : 'black',
                   opacity: Math.abs(exposure - 50) / 100
-                }} 
+                }}
               />
             )}
 
             {/* Simulate Filter Effect Overlay */}
             {activeFilter !== 'Normal' && (
-              <View 
-                className="absolute inset-0 pointer-events-none" 
-                style={{ 
-                  backgroundColor: 
+              <View
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundColor:
                     activeFilter === 'Vivid' ? 'rgba(255, 50, 50, 0.15)' :
-                    activeFilter === 'Mono' ? 'rgba(0, 0, 0, 0.7)' :
-                    activeFilter === 'Vintage' ? 'rgba(112, 66, 20, 0.3)' :
-                    activeFilter === 'Warm' ? 'rgba(255, 165, 0, 0.2)' : 'transparent',
-                }} 
+                      activeFilter === 'Mono' ? 'rgba(0, 0, 0, 0.7)' :
+                        activeFilter === 'Vintage' ? 'rgba(112, 66, 20, 0.3)' :
+                          activeFilter === 'Warm' ? 'rgba(255, 165, 0, 0.2)' : 'transparent',
+                }}
               />
             )}
-            
+
             {/* Dim the background slightly when in text mode */}
             {isTextMode && (
               <View className="absolute inset-0 bg-black/40" />
@@ -685,10 +685,10 @@ export default function EditMediaScreen() {
                 </Text>
               </Animated.View>
             )}
-            
+
             {/* Display Music Card (Draggable) */}
             {soundUrl && title && showMusicCard && !isTextMode && !activePanel && (
-              <Animated.View 
+              <Animated.View
                 {...panResponder.panHandlers}
                 style={{ transform: [{ translateX: pan.x }, { translateY: pan.y }] }}
                 className="absolute top-10 self-center bg-black/60 px-4 py-2 rounded-full flex-col items-center justify-center z-10"
@@ -709,7 +709,7 @@ export default function EditMediaScreen() {
             )}
 
             {!isTextMode && !activePanel && (
-              <View className="absolute left-4 right-4 bottom-36 bg-black/70 rounded-2xl px-4 py-3 z-20">
+              <View className="absolute left-4 right-4 bottom-5 bg-black/70 rounded-2xl px-4 py-3 z-20">
                 <View className="flex-row items-center gap-3">
                   <Pressable
                     onPress={togglePreviewPlayback}
@@ -771,7 +771,7 @@ export default function EditMediaScreen() {
                   className="items-center relative"
                 >
                   <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
-                  <Ionicons name="musical-notes-outline" size={20} color="#98D83A" />
+                    <Ionicons name="musical-notes-outline" size={20} color="#98D83A" />
                   </View>
                   <Text className="text-white text-[10px] mt-1 font-inter-medium">Sound</Text>
                   {soundUrl && (
@@ -780,40 +780,40 @@ export default function EditMediaScreen() {
                     </View>
                   )}
                 </Pressable>
-                
+
                 {/* Scissors - Route to Edit Music if sound is added, otherwise maybe just trim video */}
                 <Pressable onPress={navigateToEditMusic} className="items-center">
                   <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
-                  <Ionicons name="cut-outline" size={20} color="#98D83A" />
+                    <Ionicons name="cut-outline" size={20} color="#98D83A" />
                   </View>
                   <Text className="text-white text-[10px] mt-1 font-inter-medium">Trim</Text>
                 </Pressable>
-                
+
                 {/* <Pressable onPress={() => setActivePanel('options')} className="items-center">
                   <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
                   <Ionicons name="options-outline" size={20} color="#98D83A" />
                   </View>
                   <Text className="text-white text-[10px] mt-1 font-inter-medium">Adjust</Text>
                 </Pressable> */}
-                
+
                 {/* Text Tool */}
                 <Pressable onPress={() => setIsTextMode(true)} className="items-center">
                   <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
-                  <Text className="text-[#98D83A] font-serif text-lg font-bold">Tt</Text>
+                    <Text className="text-[#98D83A] font-serif text-lg font-bold">Tt</Text>
                   </View>
                   <Text className="text-white text-[10px] mt-1 font-inter-medium">Text</Text>
                 </Pressable>
-                
+
                 <Pressable onPress={() => setActivePanel('filters')} className="items-center">
                   <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
-                  <Ionicons name="color-filter-outline" size={20} color="#98D83A" />
+                    <Ionicons name="color-filter-outline" size={20} color="#98D83A" />
                   </View>
                   <Text className="text-white text-[10px] mt-1 font-inter-medium">Filter</Text>
                 </Pressable>
-                
+
                 <Pressable onPress={() => setActivePanel('effects')} className="items-center">
                   <View className="w-12 h-12 bg-black rounded-full items-center justify-center">
-                  <Ionicons name="tablet-landscape-outline" size={20} color="#98D83A" style={{ transform: [{ rotate: '-45deg' }] }} />
+                    <Ionicons name="tablet-landscape-outline" size={20} color="#98D83A" style={{ transform: [{ rotate: '-45deg' }] }} />
                   </View>
                   <Text className="text-white text-[10px] mt-1 font-inter-medium">Effect</Text>
                 </Pressable>
@@ -821,7 +821,7 @@ export default function EditMediaScreen() {
             )}
 
             {/* Bottom Thumbnail Overlay */}
-            {!isTextMode && !activePanel && (
+            {/* {!isTextMode && !activePanel && (
               <View className="absolute bottom-4 left-4 right-4 bg-black/60 rounded-2xl p-4 min-h-[100px] z-20">
                 <View className="w-16 h-16 rounded-lg overflow-hidden relative border-2 border-[#98D83A]">
                   {isVideo ? (
@@ -838,14 +838,14 @@ export default function EditMediaScreen() {
                   </View>
                 </View>
               </View>
-            )}
+            )} */}
 
           </View>
         </View>
 
         {/* Bottom Panel Display for Tools */}
         {activePanel && (
-          <View 
+          <View
             className="absolute bottom-0 left-0 right-0 bg-[#222]/90 rounded-t-3xl p-6 z-30 shadow-lg"
             style={{ paddingBottom: Math.max(insets.bottom + 24, 24) }}
           >
@@ -858,15 +858,15 @@ export default function EditMediaScreen() {
 
             {activePanel === 'options' && (
               <View className="gap-2">
-                <CustomSlider 
-                  label="Exposure" 
-                  value={exposure} 
-                  onValueChange={setExposure} 
+                <CustomSlider
+                  label="Exposure"
+                  value={exposure}
+                  onValueChange={setExposure}
                 />
-                <CustomSlider 
-                  label="Contrast" 
-                  value={contrast} 
-                  onValueChange={setContrast} 
+                <CustomSlider
+                  label="Contrast"
+                  value={contrast}
+                  onValueChange={setContrast}
                 />
               </View>
             )}
@@ -876,7 +876,7 @@ export default function EditMediaScreen() {
                 {['Normal', 'Vivid', 'Mono', 'Vintage', 'Warm'].map((filter) => (
                   <Pressable key={filter} onPress={() => setActiveFilter(filter)} className="items-center mr-4">
                     <View className={`w-16 h-16 rounded-full border-2 ${activeFilter === filter ? 'border-[#98FF2F]' : 'border-transparent'} mb-2 overflow-hidden bg-black`}>
-                       <Image source={{ uri: mockImage }} className="w-full h-full opacity-80" />
+                      <Image source={{ uri: mockImage }} className="w-full h-full opacity-80" />
                     </View>
                     <Text className={`font-inter-medium text-sm ${activeFilter === filter ? 'text-[#98FF2F]' : 'text-white'}`}>{filter}</Text>
                   </Pressable>
@@ -891,7 +891,7 @@ export default function EditMediaScreen() {
                   return (
                     <Pressable key={effect} onPress={() => setActiveEffect(effect === 'None' ? null : effect)} className="items-center mr-4">
                       <View className={`w-16 h-16 rounded-2xl bg-[#333] items-center justify-center mb-2 border-2 ${isActive ? 'border-[#98FF2F]' : 'border-[#444]'}`}>
-                         <Ionicons name={effect === 'None' ? 'close' : 'sparkles'} size={24} color={isActive ? '#98FF2F' : 'white'} />
+                        <Ionicons name={effect === 'None' ? 'close' : 'sparkles'} size={24} color={isActive ? '#98FF2F' : 'white'} />
                       </View>
                       <Text className={`font-inter-medium text-sm ${isActive ? 'text-[#98FF2F]' : 'text-white'}`}>{effect}</Text>
                     </Pressable>
@@ -923,13 +923,13 @@ export default function EditMediaScreen() {
           </View>
         ) : !activePanel ? (
           <View className="flex-row items-center justify-center px-4 pt-4 gap-4" style={{ paddingBottom: Math.max(insets.bottom + 20, 20) }}>
-            <Pressable 
+            <Pressable
               onPress={() => router.back()}
               className="px-8 py-3 rounded-xl border border-[#98D83A] bg-[#222]"
             >
               <Text className="text-[#98D83A] font-inter-semibold">Cancel</Text>
             </Pressable>
-            <Pressable 
+            <Pressable
               onPress={navigateToPostDetails}
               disabled={isExporting}
               className={`px-8 py-3 rounded-xl bg-[#98D83A] ${isExporting ? 'opacity-60' : ''}`}
@@ -940,7 +940,7 @@ export default function EditMediaScreen() {
                   <Text className="text-black font-inter-semibold">Exporting</Text>
                 </View>
               ) : (
-                <Text className="text-black font-inter-semibold">Next(1)</Text>
+                <Text className="text-black font-inter-semibold">Next</Text>
               )}
             </Pressable>
           </View>
