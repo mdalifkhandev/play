@@ -131,7 +131,7 @@ export default function PostDetailsScreen() {
 
   const buildVideoEditPayload = (): ReelVideoEditInput => {
     const parsedVideoDuration = videoDuration ? Number(videoDuration) : 0;
-    const fallbackEndSeconds = parsedVideoDuration > 0 ? parsedVideoDuration : 1;
+    const fallbackEndSeconds = parsedVideoDuration > 0 ? parsedVideoDuration : 10;
     const startSeconds = videoTrimStart !== undefined && videoTrimStart !== ''
       ? Number(videoTrimStart)
       : (clampPercent(videoTrimLeft, 0) / 100) * fallbackEndSeconds;

@@ -205,7 +205,7 @@ export default function EditMediaScreen() {
     return `${mins < 10 ? '0' : ''}${mins}:${remainingSecs < 10 ? '0' : ''}${remainingSecs}`;
   };
 
-  const previewDurationSec = Math.max(1, isVideo ? selectedVideoDurationSec : audioDurationSec);
+  const previewDurationSec = isVideo ? Math.max(1, selectedVideoDurationSec) : 10;
   const previewProgressPercent = Math.max(0, Math.min(100, (previewCurrentTime / previewDurationSec) * 100));
 
   const seekSound = (player: any, seconds: number) => {
@@ -337,6 +337,16 @@ export default function EditMediaScreen() {
 
   useEffect(() => {
     const progressTimer = setInterval(() => {
+      if (!isVideo && !sound) {
+         setPreviewCurrentTime(prev => {
+            if (!isPreviewPlaying) return prev;
+            let updated = prev + 0.2; // 200ms
+            if (updated >= previewDurationSec) updated = 0;
+            return updated;
+         });
+         return;
+      }
+
       const videoCurrentTime = Number(videoPlayer.currentTime ?? 0);
       const nextTime = isVideo ? videoCurrentTime - videoTrimStartSec : Number(sound?.currentTime ?? 0) - getTrimTime(trimLeft);
       const safeTime = Math.max(0, nextTime);
