@@ -71,7 +71,7 @@ export default function EditMediaScreen() {
 
   const isPreviewPlayingRef = useRef(true);
   
-  const { videoPlayer, sound, getTrimTime, seekSound } = useVideoEditorPlayer({
+  const { videoPlayer, sound, getTrimTime, seekSound, isMediaReady } = useVideoEditorPlayer({
     uri: mockImage,
     isVideo,
     soundUrl,
@@ -101,7 +101,8 @@ export default function EditMediaScreen() {
     audioDurationSec,
     getTrimTime,
     seekSound,
-    isPreviewPlayingRef
+    isPreviewPlayingRef,
+    isMediaReady
   });
 
   // Local State
@@ -139,15 +140,12 @@ export default function EditMediaScreen() {
     return () => clearInterval(durationChecker);
   }, [isVideo, videoPlayer]);
 
-  // Apply edits to existing audio player
+  // Apply volume changes to existing audio player
   useEffect(() => {
-    if (sound) {
-      if (addedVolume !== undefined) {
-        sound.volume = Number(addedVolume) / 100;
-      }
-      seekSound(sound, getTrimTime(trimLeft));
+    if (sound && addedVolume !== undefined) {
+      sound.volume = Number(addedVolume) / 100;
     }
-  }, [sound, addedVolume, trimLeft, getTrimTime, seekSound]);
+  }, [sound, addedVolume]);
 
   // Drag logic for Music Card
   const pan = useRef(new Animated.ValueXY()).current;
@@ -241,6 +239,12 @@ export default function EditMediaScreen() {
               </View>
             ) : (
               <Image source={{ uri: mockImage }} className="w-full h-full absolute inset-0" contentFit="cover" style={{ transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }] }} />
+            )}
+
+            {!isMediaReady && (
+              <View className="absolute inset-0 items-center justify-center bg-black/50">
+                <ActivityIndicator size="large" color="#98FF2F" />
+              </View>
             )}
 
             {activeEffect === 'Glitch' && (

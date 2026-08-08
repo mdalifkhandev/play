@@ -152,8 +152,11 @@ export default function CreateScreen() {
           });
         } else if (mainMode === 'Live') {
           Alert.alert('Live Session Ended');
+        } else {
+          Alert.alert('Recording Failed', `Video data missing. video=${JSON.stringify(video)}`);
         }
-      } catch (error) {
+      } catch (error: any) {
+        Alert.alert('Error Recording', error?.message || 'Failed to record video');
         console.error('Failed to record video/live stream:', error);
       } finally {
         isRecordingRef.current = false;
@@ -252,7 +255,10 @@ export default function CreateScreen() {
           style={{ paddingTop: insets.top + 10 }}
         >
           {isRecording && (mainMode === 'Video' || mainMode === 'Live') && (
-            <View className="absolute left-4 bg-black/50 px-3 py-1.5 rounded-full flex-row items-center">
+            <View 
+              className="absolute left-4 bg-black/50 px-3 py-1.5 rounded-full flex-row items-center"
+              style={{ top: insets.top + 20 }}
+            >
               <View className="w-2 h-2 rounded-full bg-red-500 mr-2" />
               <Text className="text-white font-inter-semibold text-sm">
                 {Math.floor(recordingTime / 60).toString().padStart(2, '0')}:{(recordingTime % 60).toString().padStart(2, '0')}

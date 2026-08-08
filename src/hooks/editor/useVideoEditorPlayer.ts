@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { createAudioPlayer } from 'expo-audio';
 import { useVideoPlayer } from 'expo-video';
@@ -21,6 +21,8 @@ export function useVideoEditorPlayer({
   audioDurationSec,
 }: UseVideoEditorPlayerProps) {
   const [sound, setSound] = useState<any>(null);
+  const [isAudioReady, setIsAudioReady] = useState(!soundUrl);
+  const [isVideoReady, setIsVideoReady] = useState(!isVideo);
 
   const videoSource = useMemo(() => {
     return isVideo ? { uri, contentType: 'progressive' } as any : null;
@@ -32,6 +34,22 @@ export function useVideoEditorPlayer({
     player.muted = true;
   });
 
+  // Track video readiness
+  useEffect(() => {
+    if (!videoPlayer) return;
+    const sub = videoPlayer.addListener('statusChange', (payload: any) => {
+      const currentStatus = payload?.status || payload;
+      if (currentStatus === 'readyToPlay') {
+        setIsVideoReady(true);
+      }
+    });
+    // Check initial status
+    if (videoPlayer.status === 'readyToPlay') {
+      setIsVideoReady(true);
+    }
+    return () => sub.remove();
+  }, [videoPlayer]);
+
   const getTrimTime = useCallback((percentStr?: string, fallbackPercent = 0) => {
     const percent = percentStr !== undefined && percentStr !== '' ? Number(percentStr) : fallbackPercent;
     return Math.floor((percent / 100) * audioDurationSec * 1000) / 1000;
@@ -40,7 +58,12 @@ export function useVideoEditorPlayer({
   const seekSound = useCallback((player: any, seconds: number) => {
     if (!player || !Number.isFinite(seconds)) return;
     if (typeof player.seekTo === 'function') {
-      try { player.seekTo(seconds); } catch (e) { }
+      try { 
+        const result = player.seekTo(seconds);
+        if (result && typeof result.catch === 'function') {
+          result.catch(() => {});
+        }
+      } catch (e) { }
     }
     try { player.currentTime = seconds; } catch (e) { }
   }, []);
@@ -49,28 +72,53 @@ export function useVideoEditorPlayer({
     useCallback(() => {
       let player: any = null;
       
-      if (videoPlayer && isPreviewPlayingRef.current) {
-        try { videoPlayer.play(); } catch(e) {}
-      }
-      
+      // Reset audio readiness if soundUrl changes
+      setIsAudioReady(!soundUrl);
+
       if (soundUrl) {
         try {
           const source = /^\d+$/.test(soundUrl) ? parseInt(soundUrl, 10) : soundUrl;
           player = createAudioPlayer(source);
           
+          let hasInitialized = false;
           player.addListener('playbackStatusUpdate', (status: any) => {
-            // Check status if needed
+            if (status.isLoaded && !hasInitialized) {
+              hasInitialized = true;
+              const trimTime = getTrimTime(trimLeft);
+              if (typeof player.seekTo === 'function') {
+                const result = player.seekTo(trimTime);
+                if (result && typeof result.then === 'function') {
+                  result.then(() => {
+                    setIsAudioReady(true);
+                    if (isPreviewPlayingRef.current) {
+                      try { player.play(); } catch (e) {}
+                    }
+                  }).catch(() => {
+                    setIsAudioReady(true);
+                    if (isPreviewPlayingRef.current) {
+                      try { player.play(); } catch (e) {}
+                    }
+                  });
+                } else {
+                  setIsAudioReady(true);
+                  if (isPreviewPlayingRef.current) {
+                    try { player.play(); } catch (e) {}
+                  }
+                }
+              } else {
+                setIsAudioReady(true);
+                if (isPreviewPlayingRef.current) {
+                  try { player.play(); } catch (e) {}
+                }
+              }
+            }
           });
 
-          seekSound(player, getTrimTime(trimLeft));
-          if (isPreviewPlayingRef.current) {
-            player.play();
-          }
-          setTimeout(() => seekSound(player, getTrimTime(trimLeft)), 100);
           player.loop = true;
           setSound(player);
         } catch (error) {
           console.log("Preview audio error:", error);
+          setIsAudioReady(true); // Fallback so it doesn't hang
         }
       }
       
@@ -87,10 +135,13 @@ export function useVideoEditorPlayer({
     }, [soundUrl, trimLeft, audioDurationSec, videoPlayer])
   );
 
+  const isMediaReady = isVideoReady && isAudioReady;
+
   return {
     videoPlayer,
     sound,
     seekSound,
-    getTrimTime
+    getTrimTime,
+    isMediaReady
   };
 }
