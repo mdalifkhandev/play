@@ -226,12 +226,15 @@ export default function PostDetailsScreen() {
     setIsPosting(true);
 
     try {
+      const videoEditPayload = buildVideoEditPayload();
+      const audioPayload = buildAudioPayload(videoEditPayload);
+
       let reel = await publishReel({
         videoUri: mockImage,
         caption: caption.trim() || undefined,
         forKids,
-        audio: parsedVideoEdit?.audio || buildAudioPayload({} as any), // Fallback if no edit spec
-        videoEdit: parsedVideoEdit || buildVideoEditPayload(), // Fallback if no edit spec
+        audio: audioPayload,
+        videoEdit: videoEditPayload,
         onProgress: (p) => setUploadProgress(p),
       });
 
@@ -471,6 +474,7 @@ export default function PostDetailsScreen() {
         <Text className="text-white font-inter-semibold text-base mb-2">Caption</Text>
         <View className="bg-[#1C1C1E] rounded-xl p-4 min-h-[120px] mb-4 border border-[#333]">
           <TextInput
+            // @ts-ignore - React Native component accepts ref, but @types/react is mismatched
             ref={captionInputRef}
             className="text-white font-inter-regular text-base p-0 m-0"
             placeholder="Add a description......."

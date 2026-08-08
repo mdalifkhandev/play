@@ -30,6 +30,7 @@ const isAuthError = (error: any) => {
 
   return (
     status === 401 ||
+    status === 403 ||
     AUTH_ERROR_CODES.has(code) ||
     message.includes('access token is invalid') ||
     message.includes('access token') && message.includes('expired')

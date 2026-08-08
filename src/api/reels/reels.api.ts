@@ -48,6 +48,7 @@ export async function publishReel(input: PublishReelInput): Promise<ReelPublishR
     '/reels',
     {
       mediaAssetId: completed.mediaAssetId,
+      rawMediaKey: completed.mediaKey,
       caption: input.caption,
       visibility: 'public',
       forKids: input.forKids ?? false,
