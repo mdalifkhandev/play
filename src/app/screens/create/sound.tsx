@@ -284,6 +284,7 @@ export default function SoundScreen() {
           const isThisLoading = loadingId === track.providerTrackId;
 
           return (
+            // @ts-ignore - React Native View accepts key, but @types/react is mismatched
             <View key={track.providerTrackId} className="flex-row items-center bg-[#1A1A1A] rounded-xl p-2.5 mb-3 border border-[#333]">
               <Pressable onPress={() => handleTogglePlay(track)} className="relative">
                 <View className="w-[60px] h-[60px] rounded-lg bg-[#333] items-center justify-center relative overflow-hidden">

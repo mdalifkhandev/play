@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
 import { getFeed } from "../../api/reels/reels.api";
 import { ReelFeedItem } from "../../api/reels/reels.types";
+import { useFeedSection } from "../../hooks/feed/useFeedSection";
 
 const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 
@@ -40,30 +41,19 @@ export default function HomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('following');
   const [activeItemIndex, setActiveItemIndex] = useState(0);
-  const [feedData, setFeedData] = useState<Omit<FeedItemProps, 'isActive' | 'shouldMountVideo'>[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
 
-  const fetchFeed = async (isRefresh = false) => {
-    try {
-      if (isRefresh) setIsRefreshing(true);
-      const response = await getFeed();
-      const mappedData = response.items.map(mapBackendReelToFeedItem);
-      setFeedData(mappedData);
-    } catch (error) {
-      console.log('Error fetching feed:', error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
+  const fetchReelsData = useCallback(async () => {
+    const response = await getFeed();
+    return response.items.map(mapBackendReelToFeedItem);
+  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchFeed();
-    }, [])
-  );
+  const { data, isLoading, isRefreshing, error, refetch } = useFeedSection(fetchReelsData);
+  const feedData = data || [];
+
+  if (error) {
+    console.log("Feed Error:", error);
+  }
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0) {
@@ -111,13 +101,23 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      {isLoading ? (
+      {isLoading && feedData.length === 0 ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#98FF2F" />
+        </View>
+      ) : error ? (
+        <View className="flex-1 justify-center items-center">
+          <Text className="text-white text-base font-inter-medium">Error: {error}</Text>
+          <Pressable onPress={() => refetch()} className="mt-4 px-4 py-2 bg-[#98FF2F] rounded-lg">
+            <Text className="text-black font-semibold">Retry</Text>
+          </Pressable>
         </View>
       ) : feedData.length === 0 ? (
         <View className="flex-1 justify-center items-center">
           <Text className="text-white text-base font-inter-medium">No reels found</Text>
+          <Pressable onPress={() => refetch()} className="mt-4 px-4 py-2 bg-[#98FF2F] rounded-lg">
+            <Text className="text-black font-semibold">Refresh</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList
@@ -143,7 +143,7 @@ export default function HomeScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
-              onRefresh={() => fetchFeed(true)}
+              onRefresh={() => refetch()}
               tintColor="#98FF2F"
               colors={["#98FF2F"]}
               progressViewOffset={insets.top + 50}
