@@ -32,9 +32,10 @@ export default function Login() {
       {
         onSuccess: (response) => {
           const accessToken = response.data?.data?.tokens?.accessToken;
+          const refreshToken = response.data?.data?.tokens?.refreshToken;
           const user = response.data?.data?.user;
           if (accessToken) {
-            setAuth(accessToken, user);
+            setAuth(accessToken, refreshToken || "", user);
           }
           toast.success('Login Successful!');
           router.push('/home');

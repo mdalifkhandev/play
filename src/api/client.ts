@@ -50,12 +50,70 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Token refresh logic
+let isRefreshing = false;
+let failedQueue: any[] = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  
+  failedQueue = [];
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (isAuthError(error)) {
-      useAppStore.getState().logout();
-      router.replace('/(auth)/login');
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (isAuthError(error) && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise(function(resolve, reject) {
+          failedQueue.push({ resolve, reject });
+        }).then(token => {
+          originalRequest.headers.Authorization = 'Bearer ' + token;
+          return apiClient(originalRequest);
+        }).catch(err => {
+          return Promise.reject(err);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+      const refreshToken = useAppStore.getState().refreshToken;
+
+      if (!refreshToken) {
+        useAppStore.getState().logout();
+        router.replace('/(auth)/login');
+        return Promise.reject(error);
+      }
+
+      try {
+        const { data } = await axios.post(`${BASE_URL}/api/v1/auth/refresh-token`, { refreshToken });
+        const newAccessToken = data?.data?.tokens?.accessToken;
+        const newRefreshToken = data?.data?.tokens?.refreshToken || refreshToken;
+
+        if (newAccessToken) {
+          useAppStore.getState().setAuth(newAccessToken, newRefreshToken, useAppStore.getState().user);
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          processQueue(null, newAccessToken);
+          return apiClient(originalRequest);
+        } else {
+          throw new Error('No access token returned');
+        }
+      } catch (err) {
+        processQueue(err, null);
+        useAppStore.getState().logout();
+        router.replace('/(auth)/login');
+        return Promise.reject(err);
+      } finally {
+        isRefreshing = false;
+      }
     }
 
     return Promise.reject(error);

@@ -6,6 +6,7 @@ interface AppState {
   // Example state for authentication
   isAuthenticated: boolean;
   token: string | null;
+  refreshToken: string | null;
   user: any | null;
   
   // Kids Mode state
@@ -17,7 +18,7 @@ interface AppState {
   coinBalance: number;
   
   // Actions
-  setAuth: (token: string, user: any) => void;
+  setAuth: (token: string, refreshToken: string, user: any) => void;
   setKidsModeActive: (active: boolean) => void;
   setKidsModeExpireTime: (timestamp: number | null) => void;
   setKidsModeDuration: (durationMs: number | null) => void;
@@ -31,13 +32,14 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       isAuthenticated: false,
       token: null,
+      refreshToken: null,
       user: null,
       isKidsModeActive: false,
       kidsModeExpireTimestamp: null,
       kidsModeDurationMs: null,
       coinBalance: 0,
 
-      setAuth: (token, user) => set({ isAuthenticated: true, token, user }),
+      setAuth: (token, refreshToken, user) => set({ isAuthenticated: true, token, refreshToken, user }),
       setKidsModeActive: (active: boolean) => set((state) => {
         if (active) {
           return { isKidsModeActive: true };
@@ -60,6 +62,7 @@ export const useAppStore = create<AppState>()(
       logout: () => set({ 
         isAuthenticated: false, 
         token: null, 
+        refreshToken: null,
         user: null, 
         isKidsModeActive: false,
         kidsModeExpireTimestamp: null,
