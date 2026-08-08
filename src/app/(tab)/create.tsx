@@ -136,9 +136,9 @@ export default function CreateScreen() {
 
         let maxDuration = 60;
         if (mainMode === 'Video') {
-          maxDuration = recordingMode === '15s' ? 15 : recordingMode === '30s' ? 30 : recordingMode === '1m' ? 60 : 600;
+          maxDuration = recordingMode === '15s' ? 15 : recordingMode === '30s' ? 30 : 60;
         } else {
-          maxDuration = 3600;
+          maxDuration = 3600; // Live can be longer
         }
 
         const video = await cameraRef.current.recordAsync({
@@ -170,21 +170,22 @@ export default function CreateScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images', 'videos'],
         allowsEditing: true,
-        quality: 0.8,
+        quality: 0.7,
+        videoMaxDuration: 60,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        
+
         if (asset.type === 'video') {
-           const info = await FileSystem.getInfoAsync(asset.uri);
-           // 500 MB limit
-           if (info.exists && typeof info.size === 'number' && info.size > 500 * 1024 * 1024) {
-             Alert.alert('Video too large', 'Please select a video smaller than 500MB.');
-             return;
-           }
+          const info = await FileSystem.getInfoAsync(asset.uri);
+          // 500 MB limit
+          if (info.exists && typeof info.size === 'number' && info.size > 500 * 1024 * 1024) {
+            Alert.alert('Video too large', 'Please select a video smaller than 500MB.');
+            return;
+          }
         }
-        
+
         if (isMountedRef.current) {
           router.push({
             pathname: '/screens/create/edit',
@@ -202,9 +203,15 @@ export default function CreateScreen() {
   };
 
   const requestAllPermissions = async () => {
-    if (!camPermission?.granted) await requestCamPermission();
-    if (!micPermission?.granted) await requestMicPermission();
+    if (!camPermission?.granted && camPermission?.canAskAgain) await requestCamPermission();
+    if (!micPermission?.granted && micPermission?.canAskAgain) await requestMicPermission();
   };
+
+  useEffect(() => {
+    if (camPermission && micPermission && (!camPermission.granted || !micPermission.granted)) {
+      requestAllPermissions();
+    }
+  }, [camPermission, micPermission]);
 
   if (!camPermission || !micPermission) {
     return <View className="flex-1 bg-black" />;
@@ -227,6 +234,7 @@ export default function CreateScreen() {
       <View className="flex-1 overflow-hidden rounded-b-xl">
         {isScreenFocused && (
           <CameraView
+            // @ts-ignore - React Native component accepts ref, but @types/react is mismatched
             ref={cameraRef}
             style={StyleSheet.absoluteFill}
             facing={facing}
@@ -300,14 +308,12 @@ export default function CreateScreen() {
             <Pressable
               onPress={handleRecordAction}
               disabled={!isCameraReady || isStoppingRecording}
-              className={`w-[72px] h-[72px] rounded-full border-[3px] items-center justify-center ${
-                isRecording ? 'border-red-500' : 'border-white'
-              } ${!isCameraReady || isStoppingRecording ? 'opacity-50' : ''}`}
+              className={`w-[72px] h-[72px] rounded-full border-[3px] items-center justify-center ${isRecording ? 'border-red-500' : 'border-white'
+                } ${!isCameraReady || isStoppingRecording ? 'opacity-50' : ''}`}
             >
               <View
-                className={`${
-                  isRecording ? 'w-8 h-8 rounded-lg bg-red-500' : 'w-[60px] h-[60px] bg-red-500 rounded-full'
-                }`}
+                className={`${isRecording ? 'w-8 h-8 rounded-lg bg-red-500' : 'w-[60px] h-[60px] bg-red-500 rounded-full'
+                  }`}
               />
             </Pressable>
           </View>

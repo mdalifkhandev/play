@@ -7,8 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer } from 'expo-audio';
 import { SearchIcon } from '../../../components/icons/SearchIcon';
 import { useLocalSearchParams } from 'expo-router';
-import { handleApiError } from '../../../api/client';
-import { searchMusicTracks } from '../../../api/music/music.api';
+import { useMusicSearch } from '../../../hooks/music/useMusicSearch';
 import type { MusicTrack } from '../../../api/music/music.types';
 
 const formatDuration = (seconds: number) => {
@@ -48,19 +47,23 @@ export default function SoundScreen() {
   }>();
 
   const [activeTab, setActiveTab] = useState('Trending');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [tracks, setTracks] = useState<MusicTrack[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [isLoadingTracks, setIsLoadingTracks] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [loadError, setLoadError] = useState('');
-  const lastRequestKeyRef = useRef('');
+  const {
+    tracks,
+    searchQuery,
+    setSearchQuery,
+    isLoading: isLoadingTracks,
+    isLoadingMore,
+    hasNextPage,
+    error: loadError,
+    loadMore,
+    retry,
+  } = useMusicSearch(activeTab, '');
+
 
   // Audio state
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
-  
+
   // Use a ref to strictly track the active player and prevent overlapping sounds
   const activePlayerRef = useRef<any>(null);
   const isPlayerReadyRef = useRef<boolean>(false);
@@ -68,14 +71,14 @@ export default function SoundScreen() {
 
   const stopActivePlayer = useCallback(() => {
     const player = activePlayerRef.current;
-    
+
     activePlayerRef.current = null;
     isPlayerReadyRef.current = false;
-    
+
     if (!player) return;
 
-    try { player.pause(); } catch (e) {}
-    try { player.release(); } catch (e) {}
+    try { player.pause(); } catch (e) { }
+    try { player.release(); } catch (e) { }
   }, []);
 
   // Cleanup on unmount
@@ -84,52 +87,6 @@ export default function SoundScreen() {
       stopActivePlayer();
     };
   }, [stopActivePlayer]);
-
-  const loadTracks = useCallback(async (nextPage = 1, query = searchQuery) => {
-    const requestKey = `${activeTab}:${query.trim().toLowerCase()}:${nextPage}`;
-    if (nextPage === 1 && lastRequestKeyRef.current === requestKey && (isLoadingTracks || loadError)) {
-      return;
-    }
-    lastRequestKeyRef.current = requestKey;
-
-    const isFirstPage = nextPage === 1;
-    setLoadError('');
-    isFirstPage ? setIsLoadingTracks(true) : setIsLoadingMore(true);
-
-    try {
-      const result = await searchMusicTracks({
-        search: query,
-        page: nextPage,
-        limit: 20,
-        order: activeTab === 'Trending' ? 'popularity_total' : activeTab === 'Mood' ? 'popularity_week' : 'releasedate',
-      });
-      const playableTracks = result.tracks.filter(track => track.downloadAllowed);
-      setTracks(prev => isFirstPage ? playableTracks : [...prev, ...playableTracks]);
-      setPage(result.pagination.page);
-      setHasNextPage(result.pagination.hasNextPage);
-    } catch (error: any) {
-      const message = handleApiError(error, 'Could not load music.');
-      setLoadError(
-        error?.response?.status === 502
-          ? 'Music provider is unavailable. Check backend JAMENDO_CLIENT_ID or try again later.'
-          : message,
-      );
-      if (isFirstPage) {
-        setTracks([]);
-      }
-    } finally {
-      setIsLoadingTracks(false);
-      setIsLoadingMore(false);
-    }
-  }, [activeTab, isLoadingTracks, loadError, searchQuery]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      loadTracks(1, searchQuery);
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [activeTab, searchQuery]);
 
   const handleTogglePlay = (track: MusicTrack) => {
     const now = Date.now();
@@ -157,7 +114,7 @@ export default function SoundScreen() {
 
       newSound.addListener('playbackStatusUpdate', (status: any) => {
         if (activePlayerRef.current !== newSound) return;
-        
+
         if (status.isLoaded) {
           isPlayerReadyRef.current = true;
         }
@@ -266,7 +223,7 @@ export default function SoundScreen() {
           <View className="items-center justify-center py-10 px-4">
             <Ionicons name="warning-outline" size={34} color="#98FF2F" />
             <Text className="text-white font-inter-semibold text-base mt-3 text-center">{loadError}</Text>
-            <Pressable onPress={() => loadTracks(1)} className="border border-[#98D83A] rounded-lg px-5 py-2 mt-4">
+            <Pressable onPress={retry} className="border border-[#98D83A] rounded-lg px-5 py-2 mt-4">
               <Text className="text-[#98D83A] font-inter-semibold">Retry</Text>
             </Pressable>
           </View>
@@ -325,7 +282,7 @@ export default function SoundScreen() {
         })}
         {!isLoadingTracks && hasNextPage && (
           <Pressable
-            onPress={() => loadTracks(page + 1)}
+            onPress={loadMore}
             disabled={isLoadingMore}
             className="border border-[#98D83A] rounded-lg py-3 items-center mb-3"
           >

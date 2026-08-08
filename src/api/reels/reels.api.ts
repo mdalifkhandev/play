@@ -31,19 +31,15 @@ export async function publishReel(input: PublishReelInput): Promise<ReelPublishR
   });
   const uploadData = uploadUrlResponse.data.data;
 
-  const formData = new FormData();
-  formData.append('file', {
-    uri: input.videoUri,
-    name: file.name,
-    type: file.type,
-  } as any);
-  formData.append('api_key', uploadData.apiKey);
-  formData.append('timestamp', String(uploadData.timestamp));
-  formData.append('signature', uploadData.signature);
-  formData.append('public_id', uploadData.publicId);
-  formData.append('overwrite', 'false');
+  const params = {
+    api_key: uploadData.apiKey,
+    timestamp: String(uploadData.timestamp),
+    signature: uploadData.signature,
+    public_id: uploadData.publicId,
+    overwrite: 'false',
+  };
 
-  await uploadToCloudinary(uploadData.uploadUrl, formData, input.onProgress);
+  await uploadToCloudinary(uploadData.uploadUrl, input.videoUri, file.type, params, input.onProgress);
 
   const completeResponse = await completeUploadWithRetry(uploadData.uploadId);
   const completed = completeResponse.data.data;
@@ -103,38 +99,56 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export async function uploadToCloudinary(uploadUrl: string, formData: FormData, onProgress?: (progress: number) => void) {
+export async function uploadToCloudinary(
+  uploadUrl: string, 
+  videoUri: string, 
+  mimeType: string,
+  params: Record<string, string>, 
+  onProgress?: (progress: number) => void
+) {
   const delays = [1000, 2000, 4000];
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= delays.length; attempt += 1) {
     try {
-      await new Promise<void>((resolve, reject) => {
-        const request = new XMLHttpRequest();
-
-        request.open('POST', uploadUrl);
-        if (onProgress) {
-          request.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              const progress = Math.round((event.loaded / event.total) * 100);
+      let uploadTask: FileSystem.UploadTask | null = null;
+      
+      if (onProgress) {
+        uploadTask = FileSystem.createUploadTask(
+          uploadUrl,
+          videoUri,
+          {
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            fieldName: 'file',
+            mimeType,
+            parameters: params,
+          },
+          (progressData) => {
+            if (progressData.totalBytesExpectedToSend > 0) {
+              const progress = Math.round((progressData.totalBytesSent / progressData.totalBytesExpectedToSend) * 100);
               onProgress(progress);
             }
-          };
-        }
-        
-        request.onload = () => {
-          if (request.status >= 200 && request.status < 300) {
-            resolve();
-            return;
           }
-          reject(new Error(`Cloudinary upload failed with status ${request.status}.`));
-        };
-        request.onerror = () => reject(new Error('Cloudinary upload failed.'));
-        request.ontimeout = () => reject(new Error('Cloudinary upload timed out.'));
-        request.timeout = 120000;
-        request.send(formData);
-      });
-      return; // Success
+        );
+        const result = await uploadTask.uploadAsync();
+        if (result && result.status >= 200 && result.status < 300) {
+          return; // Success
+        }
+        throw new Error(`Cloudinary upload failed with status ${result?.status}.`);
+      } else {
+        const result = await FileSystem.uploadAsync(uploadUrl, videoUri, {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'file',
+          mimeType,
+          parameters: params,
+        });
+        if (result.status >= 200 && result.status < 300) {
+          return; // Success
+        }
+        throw new Error(`Cloudinary upload failed with status ${result.status}.`);
+      }
     } catch (error: any) {
       lastError = error;
       if (attempt < delays.length) {

@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Device from 'expo-device';
 import { MediaVideoPreview } from '../../../components/editor/MediaVideoPreview';
 import { CustomSlider } from '../../../components/editor/CustomSlider';
 import { TextOverlay } from '../../../components/editor/TextOverlay';
@@ -60,8 +61,8 @@ export default function EditMediaScreen() {
   const mockImage = uri || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
   const isVideo = mediaType === 'video';
   const audioDurationSec = parseDurationSeconds(soundDuration, title);
-  
   const [videoDurationSec, setVideoDurationSec] = useState(videoDuration ? Number(videoDuration) : 0);
+  const isLowEndDevice = (Device.totalMemory ?? 0) < 3 * 1024 * 1024 * 1024;
   
   // Custom Hooks
   const { videoTrimStartSec, videoTrimEndSec, selectedVideoDurationSec } = useTrimState({
@@ -284,7 +285,7 @@ export default function EditMediaScreen() {
 
             <BottomPreviewBar isTextMode={isTextMode} activePanel={activePanel} togglePreviewPlayback={togglePreviewPlayback} isPreviewPlaying={isPreviewPlaying} previewCurrentTime={previewCurrentTime} previewDurationSec={previewDurationSec} previewProgressPercent={previewProgressPercent} formatSeconds={formatSeconds} />
 
-            <EditorRightActions isTextMode={isTextMode} activePanel={activePanel} router={router} mockImage={mockImage} mediaType={mediaType} soundUrl={soundUrl} title={title} soundDuration={soundDuration} musicId={musicId} musicArtist={musicArtist} musicCoverUrl={musicCoverUrl} originalVolume={originalVolume} addedVolume={addedVolume} trimLeft={trimLeft} trimRight={trimRight} videoTrimLeft={videoTrimLeft} videoTrimRight={videoTrimRight} videoTrimStart={videoTrimStart} videoTrimEnd={videoTrimEnd} videoDurationSec={videoDurationSec} setIsTextMode={setIsTextMode} setActivePanel={setActivePanel} />
+            <EditorRightActions isTextMode={isTextMode} activePanel={activePanel} router={router} mockImage={mockImage} mediaType={mediaType} soundUrl={soundUrl} title={title} soundDuration={soundDuration} musicId={musicId} musicArtist={musicArtist} musicCoverUrl={musicCoverUrl} originalVolume={originalVolume} addedVolume={addedVolume} trimLeft={trimLeft} trimRight={trimRight} videoTrimLeft={videoTrimLeft} videoTrimRight={videoTrimRight} videoTrimStart={videoTrimStart} videoTrimEnd={videoTrimEnd} videoDurationSec={videoDurationSec} setIsTextMode={setIsTextMode} setActivePanel={setActivePanel} isLowEndDevice={isLowEndDevice} />
           </View>
         </View>
 
@@ -312,6 +313,7 @@ export default function EditMediaScreen() {
         {isTextMode ? (
           <View className="bg-[#222] flex-row items-center px-4 py-3" style={{ paddingBottom: Math.max(insets.bottom + 12, 12) }}>
             <Ionicons name="add" size={28} color="#98FF2F" />
+            {/* @ts-ignore - React Native TextInput accepts ref, but @types/react is mismatched */}
             <TextInput ref={inputRef} className="flex-1 text-white font-inter-regular text-base ml-2 bg-[#333] px-4 py-2 rounded-lg" placeholder="Type something..." placeholderTextColor="#888" value={overlayText} onChangeText={setOverlayText} returnKeyType="done" onSubmitEditing={handleDoneText} autoFocus />
             <Pressable onPress={handleDoneText} className="ml-3"><Ionicons name="send" size={24} color="#98FF2F" /></Pressable>
           </View>

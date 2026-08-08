@@ -26,6 +26,7 @@ interface EditorRightActionsProps {
   videoDurationSec: number;
   setIsTextMode: (val: boolean) => void;
   setActivePanel: (val: 'options' | 'filters' | 'effects' | null) => void;
+  isLowEndDevice?: boolean;
 }
 
 export function EditorRightActions({
@@ -50,7 +51,8 @@ export function EditorRightActions({
   videoTrimEnd,
   videoDurationSec,
   setIsTextMode,
-  setActivePanel
+  setActivePanel,
+  isLowEndDevice
 }: EditorRightActionsProps) {
   if (isTextMode || activePanel) return null;
 
@@ -144,12 +146,14 @@ export function EditorRightActions({
         <Text className="text-white font-inter-semibold text-[10px]" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Filters</Text>
       </Pressable>
 
-      <Pressable onPress={() => setActivePanel('effects')} className="items-center">
-        <View className="w-10 h-10 bg-black/60 rounded-full items-center justify-center mb-1">
-          <Ionicons name="sparkles" size={20} color="white" />
-        </View>
-        <Text className="text-white font-inter-semibold text-[10px]" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Effects</Text>
-      </Pressable>
+      {!isLowEndDevice && (
+        <Pressable onPress={() => setActivePanel('effects')} className="items-center">
+          <View className="w-10 h-10 bg-black/60 rounded-full items-center justify-center mb-1">
+            <Ionicons name="sparkles" size={20} color="white" />
+          </View>
+          <Text className="text-white font-inter-semibold text-[10px]" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Effects</Text>
+        </Pressable>
+      )}
 
       <Pressable onPress={() => setActivePanel('options')} className="items-center">
         <View className="w-10 h-10 bg-black/60 rounded-full items-center justify-center mb-1">
