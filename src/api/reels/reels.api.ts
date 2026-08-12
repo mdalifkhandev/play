@@ -1,7 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { apiClient } from '../client';
-import type { PublishReelInput, ReelPublishResult, ReelStatusResult, ReelFeedResponse } from './reels.types';
+import type { PublishReelInput, ReelFeedResponse, ReelPublishResult, ReelStatusResult, ReelViewResponse } from './reels.types';
 
 type UploadUrlResponse = {
   uploadId: string;
@@ -169,6 +169,11 @@ export async function getReelStatus(reelId: string): Promise<ReelStatusResult> {
 export async function getFeed(cursor?: string): Promise<ReelFeedResponse> {
   const params = cursor ? { cursor } : {};
   const response = await apiClient.get<{ data: ReelFeedResponse }>('/reels/feed', { params });
+  return response.data.data;
+}
+
+export async function recordReelView(reelId: string): Promise<ReelViewResponse> {
+  const response = await apiClient.post<{ data: ReelViewResponse }>(`/reels/${reelId}/views`);
   return response.data.data;
 }
 

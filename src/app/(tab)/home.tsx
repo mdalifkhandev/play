@@ -15,12 +15,6 @@ function isImageUrl(url?: string | null): url is string {
   return !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(url);
 }
 
-function formatNumber(num: number): string {
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-  return String(num);
-}
-
 function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
   return {
     id: reel.id,
@@ -34,11 +28,13 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
     description: reel.caption || '',
     date: new Date(reel.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
     stats: {
-      likes: formatNumber(reel.stats.likes),
-      comments: formatNumber(reel.stats.comments),
-      bookmarks: '0', 
-      shares: formatNumber(reel.stats.shares),
+      likes: reel.stats.likes,
+      comments: reel.stats.comments,
+      bookmarks: 0,
+      shares: reel.stats.shares,
+      views: reel.stats.views,
     },
+    viewerState: reel.viewerState,
   };
 }
 

@@ -86,3 +86,8 @@ export type ReelFeedResponse = {
   items: ReelFeedItem[];
   nextCursor?: string;
 };
+
+export type ReelViewResponse = {
+  viewCount: number;
+  counted: boolean;
+};

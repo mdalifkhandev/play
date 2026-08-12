@@ -21,6 +21,7 @@ const AUTH_ERROR_CODES = new Set([
   'ACCESS_TOKEN_EXPIRED',
   'ACCESS_TOKEN_REQUIRED',
   'INVALID_ACCESS_TOKEN',
+  'SESSION_REVOKED',
   'TOKEN_EXPIRED',
 ]);
 
@@ -32,7 +33,6 @@ const isAuthError = (error: any) => {
 
   return (
     status === 401 ||
-    status === 403 ||
     AUTH_ERROR_CODES.has(code) ||
     message.includes('access token is invalid') ||
     message.includes('access token') && message.includes('expired')
@@ -91,8 +91,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl = String(originalRequest?.url || '');
 
-    if (isAuthError(error) && !originalRequest._retry) {
+    if (isAuthError(error) && originalRequest && !originalRequest._retry && !requestUrl.includes('/auth/refresh')) {
       if (isRefreshing) {
         return new Promise(function(resolve, reject) {
           failedQueue.push({ resolve, reject });
@@ -118,7 +119,7 @@ apiClient.interceptors.response.use(
           throw new Error('EXPO_PUBLIC_API_URL is not configured.');
         }
 
-        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh-token`, { refreshToken }, { timeout: 30000 });
+        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { timeout: 30000 });
         const newAccessToken = data?.data?.tokens?.accessToken;
         const newRefreshToken = data?.data?.tokens?.refreshToken || refreshToken;
 
