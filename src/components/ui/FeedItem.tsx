@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Pressable, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Pressable, Share, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { handleApiError } from '../../api/client';
@@ -70,11 +70,13 @@ function CommentsModal({
   visible,
   onClose,
   onCommentCountChange,
+  onCommentCountSet,
 }: {
   reelId: string;
   visible: boolean;
   onClose: () => void;
   onCommentCountChange: (nextCount: number) => void;
+  onCommentCountSet: (nextCount: number) => void;
 }) {
   const insets = useSafeAreaInsets();
   const currentUser = useAppStore(state => state.user);
@@ -97,13 +99,16 @@ function CommentsModal({
       const result = await listReelComments(reelId, cursor);
       setComments(previous => cursor ? [...previous, ...result.items] : result.items);
       setNextCursor(result.nextCursor);
+      if (!cursor && typeof result.totalCount === 'number') {
+        onCommentCountSet(result.totalCount);
+      }
     } catch (error) {
       toast.error(handleApiError(error, 'Failed to load comments'));
     } finally {
       isLoadingRef.current = false;
       setIsLoading(false);
     }
-  }, [reelId, visible]);
+  }, [onCommentCountSet, reelId, visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -121,6 +126,9 @@ function CommentsModal({
           .then(result => {
             setComments(result.items);
             setNextCursor(result.nextCursor);
+            if (typeof result.totalCount === 'number') {
+              onCommentCountSet(result.totalCount);
+            }
           })
           .catch(error => {
             toast.error(handleApiError(error, 'Failed to load comments'));
@@ -133,7 +141,7 @@ function CommentsModal({
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [reelId, visible]);
+  }, [onCommentCountSet, reelId, visible]);
 
   const submitComment = async () => {
     const trimmed = text.trim();
@@ -282,6 +290,78 @@ function CommentsModal({
           )}
         </View>
       </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+type ShareChannel = 'profile' | 'other';
+
+function ShareOptionsSheet({
+  visible,
+  isSharing,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  isSharing: boolean;
+  onClose: () => void;
+  onSelect: (channel: ShareChannel) => void;
+}) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable className="flex-1 justify-end bg-black/55" onPress={onClose}>
+        <Pressable
+          className="rounded-t-3xl bg-[#151515] px-5 pt-4"
+          style={{ paddingBottom: Math.max(insets.bottom + 12, 24) }}
+          onPress={(event) => event.stopPropagation()}
+        >
+          <View className="mb-5 h-1 w-12 self-center rounded-full bg-white/25" />
+          <Text className="text-white text-lg font-inter-bold">Share reel</Text>
+          <Text className="mt-1 text-gray-400 text-sm">Where do you want to share this?</Text>
+
+          <View className="mt-5 gap-3">
+            <Pressable
+              disabled={isSharing}
+              onPress={() => onSelect('profile')}
+              className="flex-row items-center rounded-2xl bg-white/10 px-4 py-4"
+            >
+              <View className="h-10 w-10 items-center justify-center rounded-full bg-[#98FF2F]">
+                <Ionicons name="person-circle-outline" size={24} color="#000" />
+              </View>
+              <View className="ml-3 flex-1">
+                <Text className="text-white text-base font-inter-semibold">Share to my profile</Text>
+                <Text className="text-gray-400 text-xs">Post this reel share on your profile.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#777" />
+            </Pressable>
+
+            <Pressable
+              disabled={isSharing}
+              onPress={() => onSelect('other')}
+              className="flex-row items-center rounded-2xl bg-white/10 px-4 py-4"
+            >
+              <View className="h-10 w-10 items-center justify-center rounded-full bg-white/10">
+                <Ionicons name="share-social-outline" size={22} color="#FFF" />
+              </View>
+              <View className="ml-3 flex-1">
+                <Text className="text-white text-base font-inter-semibold">Share somewhere else</Text>
+                <Text className="text-gray-400 text-xs">Open your phone share options.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#777" />
+            </Pressable>
+          </View>
+
+          <Pressable
+            disabled={isSharing}
+            onPress={onClose}
+            className="mt-4 h-12 items-center justify-center rounded-2xl bg-white/10"
+          >
+            {isSharing ? <ActivityIndicator color="#98FF2F" /> : <Text className="text-white font-inter-semibold">Cancel</Text>}
+          </Pressable>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -549,6 +629,7 @@ export const FeedItem = memo(({
   const [bookmarkCount, setBookmarkCount] = useState(stats.bookmarks);
   const [shareCount, setShareCount] = useState(stats.shares);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<'like' | 'save' | 'share' | null>(null);
   const [shouldRenderVideo, setShouldRenderVideo] = useState(shouldMountVideo);
   const lastTap = useRef(0);
@@ -598,7 +679,7 @@ export const FeedItem = memo(({
     }
   }, [bookmarkCount, busyAction, id, isSaved]);
 
-  const handleShare = useCallback(async () => {
+  const handleShare = useCallback(async (channel: ShareChannel) => {
     if (busyAction === 'share') return;
 
     const previousCount = shareCount;
@@ -606,16 +687,24 @@ export const FeedItem = memo(({
     setShareCount(current => current + 1);
 
     try {
-      const result = await shareReel(id);
+      if (channel === 'other') {
+        await Share.share({
+          message: description ? `${description}\n${source}` : source,
+          url: source,
+        });
+      }
+
+      const result = await shareReel(id, channel);
       if (typeof result.shareCount === 'number') setShareCount(result.shareCount);
-      toast.success('Share counted');
+      setIsShareSheetOpen(false);
+      toast.success(channel === 'profile' ? 'Shared to your profile' : 'Share counted');
     } catch (error) {
       setShareCount(previousCount);
       toast.error(handleApiError(error, 'Failed to share reel'));
     } finally {
       setBusyAction(null);
     }
-  }, [busyAction, id, shareCount]);
+  }, [busyAction, description, id, shareCount, source]);
 
   const handleCommentCountChange = useCallback((delta: number) => {
     setCommentCount(current => Math.max(0, current + delta));
@@ -732,7 +821,7 @@ export const FeedItem = memo(({
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{formatCount(bookmarkCount)}</Text>
         </Pressable>
 
-        <Pressable className="items-center justify-center" onPress={handleShare} disabled={busyAction === 'share'}>
+        <Pressable className="items-center justify-center" onPress={() => setIsShareSheetOpen(true)} disabled={busyAction === 'share'}>
           <Ionicons name="arrow-redo-outline" size={24} color="#FFF" />
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{formatCount(shareCount)}</Text>
         </Pressable>
@@ -802,6 +891,13 @@ export const FeedItem = memo(({
         visible={isCommentsOpen}
         onClose={() => setIsCommentsOpen(false)}
         onCommentCountChange={handleCommentCountChange}
+        onCommentCountSet={setCommentCount}
+      />
+      <ShareOptionsSheet
+        visible={isShareSheetOpen}
+        isSharing={busyAction === 'share'}
+        onClose={() => setIsShareSheetOpen(false)}
+        onSelect={handleShare}
       />
     </View>
   );

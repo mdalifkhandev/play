@@ -22,4 +22,5 @@ export type ReelCommentsResponse = {
   items: ReelComment[];
   nextCursor: string | null;
   hasNextPage: boolean;
+  totalCount?: number;
 };

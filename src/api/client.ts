@@ -24,6 +24,12 @@ const AUTH_ERROR_CODES = new Set([
   'TOKEN_EXPIRED',
 ]);
 
+const REFRESH_LOGOUT_ERROR_CODES = new Set([
+  'REFRESH_TOKEN_INVALID',
+  'REFRESH_TOKEN_REQUIRED',
+  'SESSION_REVOKED',
+]);
+
 const isAuthError = (error: any) => {
   const status = error?.response?.status;
   const errorData = error?.response?.data?.error;
@@ -35,6 +41,19 @@ const isAuthError = (error: any) => {
     AUTH_ERROR_CODES.has(code) ||
     message.includes('access token is invalid') ||
     message.includes('access token') && message.includes('expired')
+  );
+};
+
+const shouldLogoutAfterRefreshFailure = (error: any) => {
+  const status = error?.response?.status;
+  const code = error?.response?.data?.error?.code;
+  const message = String(error?.response?.data?.error?.message || error?.message || '').toLowerCase();
+
+  return (
+    status === 401 ||
+    REFRESH_LOGOUT_ERROR_CODES.has(code) ||
+    message.includes('refresh token is invalid') ||
+    message.includes('refresh token is required')
   );
 };
 
@@ -73,10 +92,15 @@ apiClient.interceptors.request.use(
 // Token refresh logic
 let isRefreshing = false;
 let failedQueue: any[] = [];
+let refreshPromise: Promise<string> | null = null;
 
 export const refreshAccessToken = async () => {
   if (!API_BASE_URL) {
     throw new Error('EXPO_PUBLIC_API_URL is not configured.');
+  }
+
+  if (refreshPromise) {
+    return refreshPromise;
   }
 
   const refreshToken = useAppStore.getState().refreshToken;
@@ -85,16 +109,24 @@ export const refreshAccessToken = async () => {
     throw new Error('Refresh token is missing.');
   }
 
-  const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { timeout: 30000 });
-  const newAccessToken = data?.data?.tokens?.accessToken;
-  const newRefreshToken = data?.data?.tokens?.refreshToken || refreshToken;
+  refreshPromise = axios
+    .post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { timeout: 30000 })
+    .then(({ data }) => {
+      const newAccessToken = data?.data?.tokens?.accessToken;
+      const newRefreshToken = data?.data?.tokens?.refreshToken || refreshToken;
 
-  if (!newAccessToken) {
-    throw new Error('No access token returned');
-  }
+      if (!newAccessToken) {
+        throw new Error('No access token returned');
+      }
 
-  useAppStore.getState().setAuth(newAccessToken, newRefreshToken, useAppStore.getState().user);
-  return newAccessToken;
+      useAppStore.getState().setAuth(newAccessToken, newRefreshToken, useAppStore.getState().user);
+      return newAccessToken;
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+
+  return refreshPromise;
 };
 
 const processQueue = (error: any, token: string | null = null) => {
@@ -120,6 +152,7 @@ apiClient.interceptors.response.use(
         return new Promise(function(resolve, reject) {
           failedQueue.push({ resolve, reject });
         }).then(token => {
+          originalRequest.headers = originalRequest.headers || {};
           originalRequest.headers.Authorization = 'Bearer ' + token;
           return apiClient(originalRequest);
         }).catch(err => {
@@ -138,12 +171,15 @@ apiClient.interceptors.response.use(
 
       try {
         const newAccessToken = await refreshAccessToken();
+        originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         processQueue(null, newAccessToken);
         return apiClient(originalRequest);
       } catch (err) {
         processQueue(err, null);
-        logoutAndRedirectToLogin();
+        if (shouldLogoutAfterRefreshFailure(err)) {
+          logoutAndRedirectToLogin();
+        }
         return Promise.reject(err);
       } finally {
         isRefreshing = false;

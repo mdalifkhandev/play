@@ -23,7 +23,7 @@ export async function unsaveReel(reelId: string) {
   return dataOf<EngagementCountResponse>(response);
 }
 
-export async function shareReel(reelId: string, channel = 'copy_link') {
+export async function shareReel(reelId: string, channel: 'profile' | 'copy_link' | 'whatsapp' | 'facebook' | 'messenger' | 'other' = 'copy_link') {
   const response = await apiClient.post<{ data: EngagementCountResponse }>(`/engagements/reels/${reelId}/share`, { channel });
   return dataOf<EngagementCountResponse>(response);
 }
