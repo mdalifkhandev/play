@@ -30,10 +30,16 @@ export interface FeedItemProps {
 const isRemoteUri = (source: string) => /^https?:\/\//i.test(source);
 const isImageThumbnail = (source?: string) => !!source && !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(source);
 
-function FeedFallback({ showSpinner = false }: { showSpinner?: boolean }) {
+function FeedFallback({
+  showSpinner = false,
+  showPlayIcon = true,
+}: {
+  showSpinner?: boolean;
+  showPlayIcon?: boolean;
+}) {
   return (
     <View className="absolute inset-0 items-center justify-center bg-[#111]">
-      <Ionicons name="play-circle-outline" size={48} color="#98FF2F" />
+      {showPlayIcon && <Ionicons name="play-circle-outline" size={48} color="#98FF2F" />}
       {showSpinner && <ActivityIndicator size="small" color="#98FF2F" className="mt-4" />}
     </View>
   );
@@ -43,11 +49,13 @@ function FeedVideo({
   source,
   thumbnailUrl,
   isActive,
+  isMuted,
   onDoubleTap,
 }: {
   source: string;
   thumbnailUrl?: string;
   isActive: boolean;
+  isMuted: boolean;
   onDoubleTap: () => void;
 }) {
   const [isBuffering, setIsBuffering] = useState(true);
@@ -67,8 +75,18 @@ function FeedVideo({
 
   const player = useVideoPlayer(videoSource, currentPlayer => {
     currentPlayer.loop = true;
-    currentPlayer.muted = false;
+    currentPlayer.muted = isMuted;
   });
+
+  useEffect(() => {
+    try {
+      // expo-video exposes mutable playback controls on the player instance.
+      // eslint-disable-next-line react-hooks/immutability
+      player.muted = isMuted;
+    } catch (error) {
+      console.log('Feed video mute toggle failed:', error);
+    }
+  }, [isMuted, player]);
 
   const pauseSafely = useCallback(() => {
     if (!isMountedRef.current) return;
@@ -199,7 +217,7 @@ function FeedVideo({
       {isImageThumbnail(thumbnailUrl) ? (
         <Image source={{ uri: thumbnailUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
       ) : (
-        <FeedFallback showSpinner={isBuffering && !hasFirstFrame && !hasError} />
+        <FeedFallback showSpinner={isBuffering && !hasFirstFrame && !hasError} showPlayIcon={hasError} />
       )}
       <VideoView
         player={player}
@@ -225,9 +243,7 @@ function FeedVideo({
       )}
       {feedbackIcon && (
         <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
-          <View className="w-20 h-20 rounded-full bg-black/45 items-center justify-center">
-            <Ionicons name={feedbackIcon} size={42} color="#FFF" />
-          </View>
+          <Ionicons name={`${feedbackIcon}-circle-outline`} size={64} color="#98FF2F" />
         </View>
       )}
     </Pressable>
@@ -252,6 +268,7 @@ export const FeedItem = memo(({
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [shouldRenderVideo, setShouldRenderVideo] = useState(shouldMountVideo);
   const lastTap = useRef(0);
 
@@ -284,7 +301,13 @@ export const FeedItem = memo(({
 
       {type === 'video' ? (
         shouldRenderVideo ? (
-          <FeedVideo source={source} thumbnailUrl={thumbnailUrl} isActive={isActive && shouldMountVideo} onDoubleTap={handleDoubleTap} />
+          <FeedVideo
+            source={source}
+            thumbnailUrl={thumbnailUrl}
+            isActive={isActive && shouldMountVideo}
+            isMuted={isMuted}
+            onDoubleTap={handleDoubleTap}
+          />
         ) : (
           <View className="absolute inset-0">
             {isImageThumbnail(thumbnailUrl) ? (
@@ -331,7 +354,7 @@ export const FeedItem = memo(({
         </Pressable>
 
         <Pressable className="items-center justify-center">
-          <Ionicons name="chatbubble-ellipses" size={24} color="#FFF" />
+          <Ionicons name="chatbubble-ellipses-outline" size={24} color="#FFF" />
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{stats.comments}</Text>
         </Pressable>
 
@@ -341,11 +364,11 @@ export const FeedItem = memo(({
         </Pressable>
 
         <Pressable className="items-center justify-center">
-          <Ionicons name="arrow-redo" size={24} color="#FFF" />
+          <Ionicons name="arrow-redo-outline" size={24} color="#FFF" />
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{stats.shares}</Text>
         </Pressable>
-        <Pressable className="items-center justify-center">
-          <Ionicons name="volume-high-outline" size={24} color="#FFF" />
+        <Pressable className="items-center justify-center" onPress={() => setIsMuted(!isMuted)}>
+          <Ionicons name={isMuted ? "volume-mute-outline" : "volume-high-outline"} size={24} color="#FFF" />
          
         </Pressable>
 
