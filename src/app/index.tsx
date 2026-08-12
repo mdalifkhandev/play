@@ -1,16 +1,10 @@
 import { Redirect } from "expo-router";
 import { useAppStore } from "../store";
-import { useEffect, useState } from "react";
 import { View, ActivityIndicator } from "react-native";
 
 export default function Index() {
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  useEffect(() => {
-    useAppStore.persist.onFinishHydration(() => setIsHydrated(true));
-    setIsHydrated(useAppStore.persist.hasHydrated());
-  }, []);
+  const isHydrated = useAppStore((state) => state.hasHydrated);
 
   if (!isHydrated) {
     return (

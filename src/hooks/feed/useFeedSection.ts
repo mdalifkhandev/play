@@ -7,6 +7,7 @@ export function useFeedSection<T>(fetcher: () => Promise<T>) {
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const isMountedRef = useRef(true);
+  const lastLoggedErrorRef = useRef<string | null>(null);
 
   const fetchData = useCallback(async (refresh = false) => {
     const requestId = requestIdRef.current + 1;
@@ -25,7 +26,12 @@ export function useFeedSection<T>(fetcher: () => Promise<T>) {
       setError(null);
     } catch (e: any) {
       if (!isMountedRef.current || requestId !== requestIdRef.current) return;
-      setError(e?.message || 'Unable to load feed');
+      const message = e?.message || 'Unable to load feed';
+      if (lastLoggedErrorRef.current !== message) {
+        console.log('Feed Error:', message);
+        lastLoggedErrorRef.current = message;
+      }
+      setError(message);
     } finally {
       if (!isMountedRef.current || requestId !== requestIdRef.current) return;
       setIsLoading(false);

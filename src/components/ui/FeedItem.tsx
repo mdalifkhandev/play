@@ -25,6 +25,8 @@ export interface FeedItemProps {
   };
   isActive: boolean;
   shouldMountVideo?: boolean;
+  isFullscreen?: boolean;
+  onFullscreenChange?: (isFullscreen: boolean) => void;
 }
 
 const isRemoteUri = (source: string) => /^https?:\/\//i.test(source);
@@ -259,7 +261,9 @@ export const FeedItem = memo(({
   date,
   stats,
   isActive,
-  shouldMountVideo = true
+  shouldMountVideo = true,
+  isFullscreen = false,
+  onFullscreenChange,
 }: FeedItemProps) => {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
@@ -330,12 +334,13 @@ export const FeedItem = memo(({
         <View className="absolute inset-0 bg-black" />
       )}
 
-      {/* Top Gradient Overlay */}
-      <LinearGradient
-        colors={['rgba(0, 0, 0, 0.5)', 'transparent']}
-        style={{ position: 'absolute', left: 0, right: 0, top: 0, height: '25%', paddingTop: insets.top }}
-        pointerEvents="none"
-      />
+      {!isFullscreen && (
+        <LinearGradient
+          colors={['rgba(0, 0, 0, 0.5)', 'transparent']}
+          style={{ position: 'absolute', left: 0, right: 0, top: 0, height: '25%', paddingTop: insets.top }}
+          pointerEvents="none"
+        />
+      )}
 
       {/* Bottom Gradient Overlay for text readability */}
       <LinearGradient
@@ -347,6 +352,7 @@ export const FeedItem = memo(({
 
 
       {/* Right Action Buttons */}
+      {!isFullscreen && (
       <View className="absolute right-4 items-center gap-5" style={{ bottom: insets.bottom + 100 }}>
         <Pressable className="items-center justify-center" onPress={() => setIsLiked(!isLiked)}>
           <Ionicons name={isLiked ? "heart" : "heart-outline"} size={24} color={isLiked ? "#E4FB52" : "#FFF"} style={{ textShadowColor: 'rgba(255,255,255,0.8)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 }} />
@@ -374,19 +380,20 @@ export const FeedItem = memo(({
 
 
       </View>
+      )}
 
       {/* Centered Full Screen Button */}
       {!isExpanded && (
         <View className="absolute left-0 right-0 items-center pointer-events-auto" style={{ bottom: insets.bottom + 130 }}>
-          <Pressable className="flex-row items-center bg-black/50 px-3 py-1.5 rounded-2xl">
-            <Ionicons name="scan-outline" size={16} color="#FFF" />
-            <Text className="text-white ml-1.5 text-xs font-medium">Full screen</Text>
+          <Pressable className="flex-row items-center bg-black/50 px-3 py-1.5 rounded-2xl" onPress={() => onFullscreenChange?.(!isFullscreen)}>
+            <Ionicons name={isFullscreen ? "contract-outline" : "scan-outline"} size={16} color="#FFF" />
+            <Text className="text-white ml-1.5 text-xs font-medium">{isFullscreen ? 'Back' : 'Full screen'}</Text>
           </Pressable>
         </View>
       )}
 
       {/* Bottom Text Details */}
-      <View className="absolute left-4 right-20 pb-2" style={{ bottom: insets.bottom + 60 }} pointerEvents="box-none">
+      <View className={`absolute left-4 pb-2 ${isFullscreen ? 'right-4' : 'right-20'}`} style={{ bottom: insets.bottom + 60 }} pointerEvents="box-none">
 
         <View className="flex-row items-center mb-2">
           <Image

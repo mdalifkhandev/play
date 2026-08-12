@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
-import { Link, useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, AppState, AppStateStatus, FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
+import { Link, useFocusEffect, useNavigation, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
 import { getFeed } from "../../api/reels/reels.api";
@@ -44,9 +44,11 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('following');
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [isScreenActive, setIsScreenActive] = useState(true);
+  const [fullscreenItemId, setFullscreenItemId] = useState<string | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -57,10 +59,6 @@ export default function HomeScreen() {
 
   const { data, isLoading, isRefreshing, error, refetch } = useFeedSection(fetchReelsData);
   const feedData = data || [];
-
-  if (error) {
-    console.log("Feed Error:", error);
-  }
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const nextVisibleItem = viewableItems
@@ -91,6 +89,34 @@ export default function HomeScreen() {
     }, [])
   );
 
+  useEffect(() => {
+    const parent = navigation.getParent();
+
+    parent?.setOptions({
+      tabBarStyle: fullscreenItemId
+        ? { display: 'none' }
+        : {
+            backgroundColor: '#121212',
+            borderTopWidth: 0,
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom,
+            paddingTop: 10,
+            marginBottom: 5,
+          },
+    });
+  }, [fullscreenItemId, insets.bottom, navigation]);
+
+  useEffect(() => {
+    if (!fullscreenItemId) return;
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setFullscreenItemId(null);
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [fullscreenItemId]);
+
   const getItemLayout = useCallback((_: ArrayLike<FeedListItem> | null | undefined, index: number) => ({
     length: windowHeight,
     offset: windowHeight * index,
@@ -99,39 +125,41 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-black">
-      <View
-        className="absolute left-4 right-4 z-10 flex-row justify-between items-center "
-        style={{ top: insets.top + 10 }}
-      >
-        <View style={{ width: 32 }} />
-        <View className="flex-row gap-5 items-center">
-          
-          <Pressable onPress={() => setActiveTab('foryou')} className="relative items-center">
-            <Text className={`text-base font-semibold ${activeTab === 'foryou' ? 'text-white' : 'text-white/60'}`}>For You</Text>
-            {activeTab === 'foryou' && (
-              <View className="absolute -bottom-1.5 w-6 h-[3px] bg-white rounded-full" />
-            )}
-          </Pressable>
+      {!fullscreenItemId && (
+        <View
+          className="absolute left-4 right-4 z-10 flex-row justify-between items-center "
+          style={{ top: insets.top + 10 }}
+        >
+          <View style={{ width: 32 }} />
+          <View className="flex-row gap-5 items-center">
+            
+            <Pressable onPress={() => setActiveTab('foryou')} className="relative items-center">
+              <Text className={`text-base font-semibold ${activeTab === 'foryou' ? 'text-white' : 'text-white/60'}`}>For You</Text>
+              {activeTab === 'foryou' && (
+                <View className="absolute -bottom-1.5 w-6 h-[3px] bg-white rounded-full" />
+              )}
+            </Pressable>
 
-          <Pressable onPress={() => setActiveTab('following')} className="relative items-center">
-            <Text className={`text-base font-semibold ${activeTab === 'following' ? 'text-white' : 'text-white/60'}`}>Following</Text>
-            {activeTab === 'following' && (
-              <View className="absolute -bottom-1.5 w-6 h-[3px] bg-white rounded-full" />
-            )}
-          </Pressable>
+            <Pressable onPress={() => setActiveTab('following')} className="relative items-center">
+              <Text className={`text-base font-semibold ${activeTab === 'following' ? 'text-white' : 'text-white/60'}`}>Following</Text>
+              {activeTab === 'following' && (
+                <View className="absolute -bottom-1.5 w-6 h-[3px] bg-white rounded-full" />
+              )}
+            </Pressable>
 
-          <Link href="/live" asChild>
-            <Text className="text-white/60 text-base font-semibold">Live</Text>
-          </Link>
+            <Link href="/live" asChild>
+              <Text className="text-white/60 text-base font-semibold">Live</Text>
+            </Link>
+          </View>
+          <Pressable onPress={() => router.push('/screens/search' as any)}>
+            <Image
+              source={require('../../../assets/icon/search.svg')}
+              style={{ width: 28, height: 28 }}
+              contentFit="contain"
+            />
+          </Pressable>
         </View>
-        <Pressable onPress={() => router.push('/screens/search' as any)}>
-          <Image
-            source={require('../../../assets/icon/search.svg')}
-            style={{ width: 28, height: 28 }}
-            contentFit="contain"
-          />
-        </Pressable>
-      </View>
+      )}
 
       {isLoading && feedData.length === 0 ? (
         <View className="flex-1 justify-center items-center">
@@ -159,6 +187,8 @@ export default function HomeScreen() {
               {...item} 
               isActive={isScreenActive && index === activeItemIndex} 
               shouldMountVideo={isScreenActive && index === activeItemIndex}
+              isFullscreen={fullscreenItemId === item.id}
+              onFullscreenChange={(nextIsFullscreen) => setFullscreenItemId(nextIsFullscreen ? item.id : null)}
             />
           )}
           keyExtractor={(item) => item.id}
@@ -176,13 +206,17 @@ export default function HomeScreen() {
           removeClippedSubviews
           updateCellsBatchingPeriod={80}
           refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => refetch()}
-              tintColor="#98FF2F"
-              colors={["#98FF2F"]}
-              progressViewOffset={insets.top + 50}
-            />
+            fullscreenItemId
+              ? undefined
+              : (
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={() => refetch()}
+                    tintColor="#98FF2F"
+                    colors={["#98FF2F"]}
+                    progressViewOffset={insets.top + 50}
+                  />
+                )
           }
         />
       )}
