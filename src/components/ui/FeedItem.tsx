@@ -490,6 +490,8 @@ function FeedVideo({
         style={{ width: '100%', height: '100%', opacity: hasError ? 0 : 1 }}
         nativeControls={false}
         contentFit="cover"
+        surfaceType="textureView"
+        useExoShutter={false}
         onFirstFrameRender={() => {
           if (firstFrameFallbackTimerRef.current) {
             clearTimeout(firstFrameFallbackTimerRef.current);
