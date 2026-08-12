@@ -32,7 +32,17 @@ export default function SoundScreen() {
     videoTrimRight,
     videoTrimStart,
     videoTrimEnd,
-    videoDuration
+    videoDuration,
+    overlayText,
+    textOffsetX,
+    textOffsetY,
+    musicOffsetX,
+    musicOffsetY,
+    showMusicCard,
+    exposure,
+    contrast,
+    activeFilter,
+    activeEffect
   } = useLocalSearchParams<{
     returnTo?: string;
     uri?: string;
@@ -44,6 +54,16 @@ export default function SoundScreen() {
     videoTrimLeft?: string;
     videoTrimRight?: string;
     videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
+    overlayText?: string;
+    textOffsetX?: string;
+    textOffsetY?: string;
+    musicOffsetX?: string;
+    musicOffsetY?: string;
+    showMusicCard?: string;
+    exposure?: string;
+    contrast?: string;
+    activeFilter?: string;
+    activeEffect?: string;
   }>();
 
   const [activeTab, setActiveTab] = useState('Trending');
@@ -162,7 +182,17 @@ export default function SoundScreen() {
         ...(videoTrimRight ? { videoTrimRight } : {}),
         ...(videoTrimStart ? { videoTrimStart } : {}),
         ...(videoTrimEnd ? { videoTrimEnd } : {}),
-        ...(videoDuration ? { videoDuration } : {})
+        ...(videoDuration ? { videoDuration } : {}),
+        ...(overlayText ? { overlayText } : {}),
+        ...(textOffsetX ? { textOffsetX } : {}),
+        ...(textOffsetY ? { textOffsetY } : {}),
+        ...(musicOffsetX ? { musicOffsetX } : {}),
+        ...(musicOffsetY ? { musicOffsetY } : {}),
+        ...(showMusicCard ? { showMusicCard } : {}),
+        ...(exposure ? { exposure } : {}),
+        ...(contrast ? { contrast } : {}),
+        ...(activeFilter ? { activeFilter } : {}),
+        ...(activeEffect ? { activeEffect } : {})
       }
     });
   };

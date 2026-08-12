@@ -1,6 +1,3 @@
-
-import * as FileSystem from 'expo-file-system/legacy';
-
 type ExportEditedMediaInput = {
   uri: string;
   mediaType?: 'photo' | 'video';

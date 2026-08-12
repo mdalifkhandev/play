@@ -2,6 +2,9 @@ export type ReelAudioInput = {
   originalVolume: number;
   musicVolume: number;
   musicId?: string;
+  soundUri?: string;
+  musicTitle?: string;
+  musicArtist?: string;
   musicTrim?: {
     startMs: number;
     endMs: number;
@@ -27,6 +30,7 @@ export type ReelVideoEditInput = {
 
 export type PublishReelInput = {
   videoUri: string;
+  mediaType?: 'photo' | 'video';
   caption?: string;
   forKids?: boolean;
   audio?: ReelAudioInput;

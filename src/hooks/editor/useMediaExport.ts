@@ -117,7 +117,9 @@ export function useMediaExport({
           exposure: exposure.toString(),
           contrast: contrast.toString(),
           activeFilter: activeFilter,
-          activeEffect: activeEffect || ''
+          activeEffect: activeEffect || '',
+          textOffsetX: ((textPan.x as any)._value ?? 0).toString(),
+          textOffsetY: ((textPan.y as any)._value ?? 0).toString()
         }
       } as any);
     } catch (error) {

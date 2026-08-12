@@ -24,6 +24,16 @@ interface EditorRightActionsProps {
   videoTrimStart?: string;
   videoTrimEnd?: string;
   videoDurationSec: number;
+  overlayText?: string;
+  textOffsetX?: number;
+  textOffsetY?: number;
+  musicOffsetX?: number;
+  musicOffsetY?: number;
+  showMusicCard?: boolean;
+  exposure?: number;
+  contrast?: number;
+  activeFilter?: string;
+  activeEffect?: string | null;
   setIsTextMode: (val: boolean) => void;
   setActivePanel: (val: 'options' | 'filters' | 'effects' | null) => void;
   isLowEndDevice?: boolean;
@@ -50,6 +60,16 @@ export function EditorRightActions({
   videoTrimStart,
   videoTrimEnd,
   videoDurationSec,
+  overlayText,
+  textOffsetX,
+  textOffsetY,
+  musicOffsetX,
+  musicOffsetY,
+  showMusicCard,
+  exposure,
+  contrast,
+  activeFilter,
+  activeEffect,
   setIsTextMode,
   setActivePanel,
   isLowEndDevice
@@ -76,7 +96,17 @@ export function EditorRightActions({
         videoTrimRight: videoTrimRight?.toString() || '',
         videoTrimStart: videoTrimStart || '',
         videoTrimEnd: videoTrimEnd || '',
-        videoDuration: videoDurationSec.toString()
+        videoDuration: videoDurationSec.toString(),
+        overlayText: overlayText || '',
+        textOffsetX: textOffsetX?.toString() || '0',
+        textOffsetY: textOffsetY?.toString() || '0',
+        musicOffsetX: musicOffsetX?.toString() || '0',
+        musicOffsetY: musicOffsetY?.toString() || '0',
+        showMusicCard: showMusicCard === false ? 'false' : 'true',
+        exposure: exposure?.toString() || '50',
+        contrast: contrast?.toString() || '50',
+        activeFilter: activeFilter || 'Normal',
+        activeEffect: activeEffect || ''
       }
     } as any);
   };
@@ -100,7 +130,17 @@ export function EditorRightActions({
         videoTrimRight: videoTrimRight?.toString() || '',
         videoTrimStart: videoTrimStart || '',
         videoTrimEnd: videoTrimEnd || '',
-        videoDuration: videoDurationSec.toString()
+        videoDuration: videoDurationSec.toString(),
+        overlayText: overlayText || '',
+        textOffsetX: textOffsetX?.toString() || '0',
+        textOffsetY: textOffsetY?.toString() || '0',
+        musicOffsetX: musicOffsetX?.toString() || '0',
+        musicOffsetY: musicOffsetY?.toString() || '0',
+        showMusicCard: showMusicCard === false ? 'false' : 'true',
+        exposure: exposure?.toString() || '50',
+        contrast: contrast?.toString() || '50',
+        activeFilter: activeFilter || 'Normal',
+        activeEffect: activeEffect || ''
       }
     } as any);
   };
@@ -114,7 +154,7 @@ export function EditorRightActions({
         <View className="w-10 h-10 bg-black/60 rounded-full items-center justify-center mb-1">
           <Ionicons name="musical-notes" size={20} color="white" />
         </View>
-        <Text className="text-white font-inter-semibold text-[10px]" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Sound</Text>
+        <Text className="text-white font-inter-semibold text-[10px]" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Music</Text>
         {soundUrl ? (
           <View className="absolute -top-1 -right-1 w-4 h-4 bg-[#98FF2F] rounded-full border border-black items-center justify-center">
             <Ionicons name="checkmark" size={10} color="black" />
@@ -129,7 +169,7 @@ export function EditorRightActions({
         <View className="w-10 h-10 bg-black/60 rounded-full items-center justify-center mb-1">
           <Ionicons name="options" size={20} color="white" />
         </View>
-        <Text className="text-white font-inter-semibold text-[10px]" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Edit sound</Text>
+        <Text className="text-white font-inter-semibold text-[10px]" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Edit </Text>
       </Pressable>
 
       <Pressable onPress={() => setIsTextMode(true)} className="items-center">

@@ -6,9 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer } from 'expo-audio';
 import * as Location from 'expo-location';
-import * as FileSystem from 'expo-file-system/legacy';
 import { handleApiError } from '../../../api/client';
-import { publishReel, getReelStatus } from '../../../api/reels/reels.api';
+import { publishReel } from '../../../api/reels/reels.api';
 import type { ReelAudioInput, ReelVideoEditInput } from '../../../api/reels/reels.types';
 
 const DEFAULT_AUDIO_DURATION_SEC = 30;
@@ -53,6 +52,9 @@ const mapFilter = (value?: string): ReelVideoEditInput['filter'] => {
   return 'none';
 };
 
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const firstParam = (value?: string | string[]) => Array.isArray(value) ? value[0] : value;
+
 export default function PostDetailsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -60,7 +62,9 @@ export default function PostDetailsScreen() {
     uri, mediaType, overlayText, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
     originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight,
     videoTrimStart, videoTrimEnd, videoDuration,
-    exposure: expParam, contrast: contParam, activeFilter, activeEffect, videoEdit
+    exposure: expParam, contrast: contParam, activeFilter, activeEffect, videoEdit,
+    textOffsetX,
+    textOffsetY
   } = useLocalSearchParams<{ 
     uri: string; mediaType?: 'photo' | 'video'; overlayText: string; soundUrl: string; title: string; soundDuration?: string;
     musicId?: string; musicArtist?: string; musicCoverUrl?: string;
@@ -69,6 +73,8 @@ export default function PostDetailsScreen() {
     videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
     exposure: string; contrast: string; activeFilter: string; activeEffect: string;
     videoEdit?: string;
+    textOffsetX?: string;
+    textOffsetY?: string;
   }>();
 
   const parsedVideoEdit = React.useMemo(() => {
@@ -81,6 +87,7 @@ export default function PostDetailsScreen() {
   }, [videoEdit]);
 
   const exposure = expParam ? parseInt(expParam) : 50;
+  const normalizedMediaType: 'photo' | 'video' = firstParam(mediaType) === 'video' ? 'video' : 'photo';
 
   const [caption, setCaption] = useState('');
   const [forKids, setForKids] = useState(false);
@@ -164,8 +171,8 @@ export default function PostDetailsScreen() {
         ? {
             overlayText: {
               text: overlayText.trim(),
-              x: 0.5,
-              y: 0.5,
+              x: clamp01(0.5 + (Number(textOffsetX || 0) || 0) / 360),
+              y: clamp01(0.5 + (Number(textOffsetY || 0) || 0) / 640),
               fontSize: 42,
             },
           }
@@ -177,7 +184,7 @@ export default function PostDetailsScreen() {
     const original = originalVolume ? parseInt(originalVolume, 10) : 100;
     const added = addedVolume ? parseInt(addedVolume, 10) : 100;
 
-    if (!musicId) {
+    if (!musicId && !soundUrl) {
       return {
         originalVolume: original,
         musicVolume: 0,
@@ -193,7 +200,10 @@ export default function PostDetailsScreen() {
     return {
       originalVolume: original,
       musicVolume: added,
-      musicId,
+      ...(musicId ? { musicId } : {}),
+      ...(soundUrl ? { soundUri: soundUrl } : {}),
+      ...(title ? { musicTitle: title } : {}),
+      ...(musicArtist ? { musicArtist } : {}),
       musicTrim: {
         startMs: trimStartMs,
         endMs: trimEndMs,
@@ -204,25 +214,6 @@ export default function PostDetailsScreen() {
   const handlePost = async () => {
     if (isPosting) return;
 
-    if (mediaType !== 'video') {
-      router.push({
-        pathname: '/screens/create/post-success',
-        params: { 
-          uri: mockImage,
-          mediaType: mediaType || 'photo',
-          overlayText, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
-          originalVolume, addedVolume, trimLeft, trimRight,
-          videoTrimLeft: videoTrimLeft || '',
-          videoTrimRight: videoTrimRight || '',
-          videoTrimStart: videoTrimStart || '',
-          videoTrimEnd: videoTrimEnd || '',
-          videoDuration: videoDuration || '',
-          exposure: expParam, contrast: contParam, activeFilter, activeEffect
-        }
-      } as any);
-      return;
-    }
-
     setIsPosting(true);
 
     try {
@@ -231,6 +222,7 @@ export default function PostDetailsScreen() {
 
       let reel = await publishReel({
         videoUri: mockImage,
+        mediaType: normalizedMediaType,
         caption: caption.trim() || undefined,
         forKids,
         audio: audioPayload,
@@ -238,31 +230,11 @@ export default function PostDetailsScreen() {
         onProgress: (p) => setUploadProgress(p),
       });
 
-      // Poll until backend FFmpeg processing finishes
-      while (reel.status === 'processing' || reel.status === 'queued') {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        const status = await getReelStatus(reel.reelId);
-        reel = {
-          ...reel,
-          status: status.status as any,
-          progress: status.progress
-        };
-      }
-
-      if (reel.status === 'failed') {
-        throw new Error('Backend video processing failed');
-      }
-
-      // Cleanup cached file if it's from cache (i.e., ffmpeg output)
-      if (mockImage.startsWith(FileSystem.cacheDirectory!)) {
-        try { await FileSystem.deleteAsync(mockImage); } catch(e) {}
-      }
-
     router.push({
       pathname: '/screens/create/post-success',
       params: { 
         uri: mockImage,
-        mediaType: mediaType || 'photo',
+        mediaType: normalizedMediaType,
         overlayText, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
         reelId: reel.reelId,
         reelStatus: reel.status,

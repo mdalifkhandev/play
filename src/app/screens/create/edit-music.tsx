@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Pressable, Dimensions, PanResponder, ScrollView } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, Pressable, Dimensions, PanResponder, ScrollView, Image as RNImage } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +31,19 @@ const parseDurationSeconds = (duration?: string, title?: string) => {
   }
 
   return DEFAULT_MUSIC_DURATION_SEC;
+};
+
+const firstParam = (value?: string | string[]) => Array.isArray(value) ? value[0] : value;
+
+const normalizeMediaUri = (value?: string | string[]) => {
+  const mediaUri = firstParam(value);
+  if (!mediaUri) return undefined;
+
+  try {
+    return decodeURI(mediaUri);
+  } catch {
+    return mediaUri;
+  }
 };
 
 // Custom interactive slider using PanResponder
@@ -89,13 +101,33 @@ export default function EditMusicScreen() {
     videoTrimRight: initVideoTrimRight,
     videoTrimStart: initVideoTrimStart,
     videoTrimEnd: initVideoTrimEnd,
-    videoDuration: initVideoDuration
+    videoDuration: initVideoDuration,
+    overlayText,
+    textOffsetX,
+    textOffsetY,
+    musicOffsetX,
+    musicOffsetY,
+    showMusicCard,
+    exposure,
+    contrast,
+    activeFilter,
+    activeEffect
   } = useLocalSearchParams<{ 
     uri: string; mediaType?: 'photo' | 'video'; soundUrl: string; title: string; soundDuration?: string;
     musicId?: string; musicArtist?: string; musicCoverUrl?: string;
     originalVolume?: string; addedVolume?: string; trimLeft?: string; trimRight?: string;
     videoTrimLeft?: string; videoTrimRight?: string;
     videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
+    overlayText?: string;
+    textOffsetX?: string;
+    textOffsetY?: string;
+    musicOffsetX?: string;
+    musicOffsetY?: string;
+    showMusicCard?: string;
+    exposure?: string;
+    contrast?: string;
+    activeFilter?: string;
+    activeEffect?: string;
   }>();
 
   const [originalVolume, setOriginalVolume] = useState(initOrigVol ? parseInt(initOrigVol, 10) : 100);
@@ -107,7 +139,10 @@ export default function EditMusicScreen() {
   const [videoDurationSec, setVideoDurationSec] = useState(initVideoDuration ? Number(initVideoDuration) : 0);
   const [musicDurationSec, setMusicDurationSec] = useState(() => parseDurationSeconds(soundDuration, title));
   const [sound, setSound] = useState<any>(null);
-  const isVideo = mediaType === 'video';
+  const normalizedParamMediaType = firstParam(mediaType);
+  const normalizedMediaType: 'photo' | 'video' | undefined =
+    normalizedParamMediaType === 'video' || normalizedParamMediaType === 'photo' ? normalizedParamMediaType : undefined;
+  const isVideo = normalizedMediaType === 'video';
   const [trimTarget, setTrimTarget] = useState<'music' | 'video'>(isVideo ? 'video' : 'music');
   const trimTargetRef = useRef<'music' | 'video'>(isVideo ? 'video' : 'music');
   
@@ -117,7 +152,7 @@ export default function EditMusicScreen() {
   const [videoTrimLeft, setVideoTrimLeft] = useState(initVideoTrimLeft ? parseInt(initVideoTrimLeft, 10) : 0);
   const [videoTrimRight, setVideoTrimRight] = useState(initVideoTrimRight ? parseInt(initVideoTrimRight, 10) : 100);
 
-  const mockImage = uri || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
+  const mockImage = normalizeMediaUri(uri) || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
   const selectedVideoDurationSec = Math.max(1, ((videoTrimRight - videoTrimLeft) / 100) * videoDurationSec);
   const maxMusicTrimPercentSpan = isVideo ? Math.max(1, (selectedVideoDurationSec / musicDurationSec) * 100) : 100;
   const musicWindowSpan = Math.min(100, maxMusicTrimPercentSpan);
@@ -461,7 +496,7 @@ export default function EditMusicScreen() {
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>
         <Text className="text-white font-inter-semibold text-[17px]">
-          Edit Music
+          Edit 
         </Text>
         <Pressable 
           onPress={() => {
@@ -476,7 +511,7 @@ export default function EditMusicScreen() {
             router.replace({
               pathname: '/screens/create/edit' as any,
               params: {
-                uri,
+                uri: mockImage,
                 soundUrl,
                 title,
                 soundDuration: soundDuration || '',
@@ -492,7 +527,17 @@ export default function EditMusicScreen() {
                 videoTrimStart: videoTrimStartSec.toString(),
                 videoTrimEnd: videoTrimEndSec.toString(),
                 videoDuration: videoDurationSec.toString(),
-                mediaType: mediaType || 'photo'
+                mediaType: normalizedMediaType || 'photo',
+                overlayText: overlayText || '',
+                textOffsetX: textOffsetX || '0',
+                textOffsetY: textOffsetY || '0',
+                musicOffsetX: musicOffsetX || '0',
+                musicOffsetY: musicOffsetY || '0',
+                showMusicCard: showMusicCard || 'true',
+                exposure: exposure || '50',
+                contrast: contrast || '50',
+                activeFilter: activeFilter || 'Normal',
+                activeEffect: activeEffect || ''
               }
             });
           }}
@@ -517,10 +562,11 @@ export default function EditMusicScreen() {
                 onFirstFrameRender={() => setHasVideoFrame(true)}
               />
             ) : (
-              <Image 
-                source={{ uri: mockImage }} 
-                className="w-full h-full"
-                contentFit="cover"
+              <RNImage 
+                source={{ uri: mockImage }}
+                resizeMode="cover"
+                onError={(error) => console.log('Edit music photo preview failed:', error.nativeEvent)}
+                style={{ width: '100%', height: '100%' }}
               />
             )}
             <View className="absolute inset-0 bg-black/20" />
@@ -619,10 +665,11 @@ export default function EditMusicScreen() {
           
           {/* Mock Trim Timeline (Interactive) */}
           <View className="h-16 w-full flex-row rounded-lg overflow-hidden relative bg-[#222]">
-            <Image 
-              source={{ uri: mockImage }} 
-              className="w-full h-full opacity-50 absolute inset-0"
+            <RNImage 
+              source={{ uri: mockImage }}
               resizeMode="cover"
+              onError={(error) => console.log('Edit music timeline image failed:', error.nativeEvent)}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.5 }}
             />
             <View 
               className="absolute inset-y-0 border-4 border-[#98FF2F] bg-black/10 flex-row justify-between rounded-lg overflow-hidden"

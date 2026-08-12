@@ -12,7 +12,6 @@ export const apiClient = axios.create({
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
-    'origin': 'http://localhost:3000',
   },
 });
 
@@ -75,6 +74,29 @@ apiClient.interceptors.request.use(
 let isRefreshing = false;
 let failedQueue: any[] = [];
 
+export const refreshAccessToken = async () => {
+  if (!API_BASE_URL) {
+    throw new Error('EXPO_PUBLIC_API_URL is not configured.');
+  }
+
+  const refreshToken = useAppStore.getState().refreshToken;
+
+  if (!refreshToken) {
+    throw new Error('Refresh token is missing.');
+  }
+
+  const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { timeout: 30000 });
+  const newAccessToken = data?.data?.tokens?.accessToken;
+  const newRefreshToken = data?.data?.tokens?.refreshToken || refreshToken;
+
+  if (!newAccessToken) {
+    throw new Error('No access token returned');
+  }
+
+  useAppStore.getState().setAuth(newAccessToken, newRefreshToken, useAppStore.getState().user);
+  return newAccessToken;
+};
+
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach(prom => {
     if (error) {
@@ -115,22 +137,10 @@ apiClient.interceptors.response.use(
       }
 
       try {
-        if (!API_BASE_URL) {
-          throw new Error('EXPO_PUBLIC_API_URL is not configured.');
-        }
-
-        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { timeout: 30000 });
-        const newAccessToken = data?.data?.tokens?.accessToken;
-        const newRefreshToken = data?.data?.tokens?.refreshToken || refreshToken;
-
-        if (newAccessToken) {
-          useAppStore.getState().setAuth(newAccessToken, newRefreshToken, useAppStore.getState().user);
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-          processQueue(null, newAccessToken);
-          return apiClient(originalRequest);
-        } else {
-          throw new Error('No access token returned');
-        }
+        const newAccessToken = await refreshAccessToken();
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        processQueue(null, newAccessToken);
+        return apiClient(originalRequest);
       } catch (err) {
         processQueue(err, null);
         logoutAndRedirectToLogin();

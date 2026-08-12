@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
-import { apiClient } from '../client';
+import { apiClient, refreshAccessToken } from '../client';
 import type { PublishReelInput, ReelFeedResponse, ReelPublishResult, ReelStatusResult, ReelViewResponse } from './reels.types';
 
 type UploadUrlResponse = {
@@ -13,18 +13,23 @@ type UploadUrlResponse = {
 };
 
 type CompleteUploadResponse = {
-  mediaAssetId: string;
-  mediaKey: string;
+  id?: string;
+  mediaAssetId?: string;
+  mediaKey?: string | null;
 };
 
 const VIDEO_MIME_TYPE = 'video/mp4';
 
 export async function publishReel(input: PublishReelInput): Promise<ReelPublishResult> {
-  const file = await createUploadFile(input.videoUri);
+  const mediaType = input.mediaType ?? 'video';
+  const uploadMediaType = mediaType === 'photo' ? 'image' : 'video';
+  const file = await createUploadFile(input.videoUri, mediaType);
+
+  await refreshAccessTokenIfPossible();
 
   const uploadUrlResponse = await apiClient.post<{ data: UploadUrlResponse }>('/uploads/prepare', {
     fileName: file.name,
-    mediaType: 'video',
+    mediaType: uploadMediaType,
     mimeType: file.type,
     fileSizeBytes: file.size,
     purpose: 'reel',
@@ -41,15 +46,23 @@ export async function publishReel(input: PublishReelInput): Promise<ReelPublishR
 
   await uploadToCloudinary(uploadData.uploadUrl, input.videoUri, file.type, params, input.onProgress);
 
+  await refreshAccessTokenIfPossible();
+
   const completeResponse = await completeUploadWithRetry(uploadData.uploadId);
   const completed = completeResponse.data.data;
+  const mediaAssetId = completed.mediaAssetId || completed.id;
+
+  if (!mediaAssetId) {
+    throw new Error('Upload completed but media asset id was missing.');
+  }
 
   const reelResponse = await apiClient.post<{ data: ReelPublishResult }>(
     '/reels',
     {
-      mediaAssetId: completed.mediaAssetId,
-      rawMediaKey: completed.mediaKey,
+      mediaAssetId,
+      ...(completed.mediaKey ? { rawMediaKey: completed.mediaKey } : {}),
       caption: input.caption,
+      mediaType,
       visibility: 'public',
       forKids: input.forKids ?? false,
       audio: input.audio,
@@ -63,6 +76,14 @@ export async function publishReel(input: PublishReelInput): Promise<ReelPublishR
   );
 
   return reelResponse.data.data;
+}
+
+async function refreshAccessTokenIfPossible() {
+  try {
+    await refreshAccessToken();
+  } catch (error) {
+    console.log('Token refresh before reel upload step failed:', error);
+  }
 }
 
 async function completeUploadWithRetry(uploadId: string) {
@@ -177,29 +198,34 @@ export async function recordReelView(reelId: string): Promise<ReelViewResponse> 
   return response.data.data;
 }
 
-async function createUploadFile(uri: string) {
+async function createUploadFile(uri: string, mediaType: 'photo' | 'video' = 'video') {
   const info = await FileSystem.getInfoAsync(uri);
 
   return {
-    name: fileNameFromUri(uri),
-    type: mimeTypeFromUri(uri),
+    name: fileNameFromUri(uri, mediaType),
+    type: mimeTypeFromUri(uri, mediaType),
     size: info.exists && typeof info.size === 'number' ? info.size : 1,
   };
 }
 
-function fileNameFromUri(uri: string) {
+function fileNameFromUri(uri: string, mediaType: 'photo' | 'video' = 'video') {
   const lastPart = uri.split('/').pop()?.split('?')[0];
 
   if (lastPart && /\.[a-z0-9]+$/i.test(lastPart)) {
     return lastPart;
   }
 
+  if (mediaType === 'photo') return `reel-${Date.now()}.jpg`;
   return `reel-${Date.now()}.mp4`;
 }
 
-function mimeTypeFromUri(uri: string) {
+function mimeTypeFromUri(uri: string, mediaType: 'photo' | 'video' = 'video') {
   const lowerUri = uri.toLowerCase().split('?')[0];
+  if (lowerUri.endsWith('.jpg') || lowerUri.endsWith('.jpeg')) return 'image/jpeg';
+  if (lowerUri.endsWith('.png')) return 'image/png';
+  if (lowerUri.endsWith('.webp')) return 'image/webp';
   if (lowerUri.endsWith('.mov')) return 'video/quicktime';
   if (lowerUri.endsWith('.mp4') || lowerUri.endsWith('.m4v')) return 'video/mp4';
+  if (mediaType === 'photo') return 'image/jpeg';
   return VIDEO_MIME_TYPE;
 }

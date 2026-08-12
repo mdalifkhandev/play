@@ -32,6 +32,41 @@ const parseDurationSeconds = (duration?: string, title?: string) => {
   return DEFAULT_AUDIO_DURATION_SEC;
 };
 
+const clampProgress = (progress?: number) => Math.max(0, Math.min(100, Math.round(progress ?? 0)));
+
+const getStatusCopy = (reel: ReelStatusResult | null, statusError: string) => {
+  if (statusError) return statusError;
+  if (!reel) return 'Preparing reel status...';
+
+  const progress = clampProgress(reel.progress);
+
+  if (reel.status === 'queued') {
+    return 'Waiting for the processing server to start your reel.';
+  }
+
+  if (reel.status === 'processing') {
+    return `${progress}% complete`;
+  }
+
+  if (reel.status === 'ready') {
+    return '100% complete';
+  }
+
+  if (reel.status === 'failed') {
+    return reel.error?.message || 'Processing failed. Please try posting again.';
+  }
+
+  return `${progress}% complete`;
+};
+
+const getStatusTitle = (reel: ReelStatusResult | null) => {
+  if (reel?.status === 'queued') return 'Queued';
+  if (reel?.status === 'processing') return 'Processing';
+  if (reel?.status === 'ready') return 'Ready';
+  if (reel?.status === 'failed') return 'Failed';
+  return 'Queued';
+};
+
 export default function PostSuccessScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -66,6 +101,7 @@ export default function PostSuccessScreen() {
   );
   const [statusError, setStatusError] = useState('');
   const isReelProcessing = reel?.status === 'queued' || reel?.status === 'processing';
+  const progress = clampProgress(reel?.progress);
 
   // Audio Player for final preview
   const [sound, setSound] = useState<any>(null);
@@ -226,8 +262,10 @@ export default function PostSuccessScreen() {
         </Text>
 
         <Text className="text-[#888] font-inter-regular text-center mb-8 px-4">
-          {isReelProcessing
-            ? 'Backend is creating the final video with your music and edits.'
+          {reel?.status === 'queued'
+            ? 'Your upload is saved. Processing will begin as soon as the video worker picks it up.'
+            : isReelProcessing
+            ? 'Creating the final video with your music and edits.'
             : reel?.status === 'failed'
               ? reel.error?.message || 'Please try posting again.'
               : 'Shared with your community and the explore feed.'}
@@ -237,13 +275,13 @@ export default function PostSuccessScreen() {
           <View className="w-full bg-[#171717] rounded-2xl p-4 mb-6 border border-[#2A2A2A]">
             <View className="flex-row items-center justify-between mb-3">
               <Text className="text-white font-inter-semibold text-base">Reel status</Text>
-              <Text className="text-[#98FF2F] font-inter-semibold capitalize">{reel?.status || 'queued'}</Text>
+              <Text className="text-[#98FF2F] font-inter-semibold">{getStatusTitle(reel)}</Text>
             </View>
             <View className="h-2 bg-white/20 rounded-full overflow-hidden mb-2">
-              <View className="h-full bg-[#98FF2F]" style={{ width: `${Math.max(0, Math.min(100, reel?.progress ?? 0))}%` }} />
+              <View className="h-full bg-[#98FF2F]" style={{ width: `${progress}%` }} />
             </View>
             <Text className="text-[#888] font-inter-regular text-xs">
-              {statusError || `${Math.max(0, Math.min(100, reel?.progress ?? 0))}% complete`}
+              {getStatusCopy(reel, statusError)}
             </Text>
           </View>
         )}

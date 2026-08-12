@@ -305,6 +305,7 @@ function FeedVideo({
   const [feedbackIcon, setFeedbackIcon] = useState<'play' | 'pause' | null>(null);
   const playRequestRef = useRef(0);
   const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstFrameFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
   const lastTapRef = useRef(0);
@@ -318,6 +319,12 @@ function FeedVideo({
     currentPlayer.loop = true;
     currentPlayer.muted = isMuted;
   });
+
+  useEffect(() => {
+    setIsBuffering(true);
+    setHasFirstFrame(false);
+    setHasError(!source);
+  }, [source]);
 
   useEffect(() => {
     try {
@@ -371,6 +378,11 @@ function FeedVideo({
         playTimerRef.current = null;
       }
 
+      if (firstFrameFallbackTimerRef.current) {
+        clearTimeout(firstFrameFallbackTimerRef.current);
+        firstFrameFallbackTimerRef.current = null;
+      }
+
       if (feedbackTimerRef.current) {
         clearTimeout(feedbackTimerRef.current);
         feedbackTimerRef.current = null;
@@ -390,6 +402,14 @@ function FeedVideo({
       }
 
       if (status === 'readyToPlay' && isActive && !hasError) {
+        if (!firstFrameFallbackTimerRef.current) {
+          firstFrameFallbackTimerRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              setHasFirstFrame(true);
+              setIsBuffering(false);
+            }
+          }, 350);
+        }
         playSafely();
       }
     });
@@ -410,6 +430,10 @@ function FeedVideo({
       if (playTimerRef.current) {
         clearTimeout(playTimerRef.current);
         playTimerRef.current = null;
+      }
+      if (firstFrameFallbackTimerRef.current) {
+        clearTimeout(firstFrameFallbackTimerRef.current);
+        firstFrameFallbackTimerRef.current = null;
       }
     };
   }, [hasError, isActive, pauseSafely, playSafely, player]);
@@ -455,18 +479,22 @@ function FeedVideo({
 
   return (
     <Pressable className="absolute inset-0" onPress={handlePress}>
-      {isImageThumbnail(thumbnailUrl) ? (
+      {!hasFirstFrame && isImageThumbnail(thumbnailUrl) ? (
         <Image source={{ uri: thumbnailUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
       ) : (
-        <FeedFallback showSpinner={isBuffering && !hasFirstFrame && !hasError} showPlayIcon={hasError} />
+        hasError ? <FeedFallback showSpinner={false} showPlayIcon /> : null
       )}
       <VideoView
         player={player}
         className="absolute inset-0"
-        style={{ width: '100%', height: '100%', opacity: hasFirstFrame ? 1 : 0 }}
+        style={{ width: '100%', height: '100%', opacity: hasError ? 0 : 1 }}
         nativeControls={false}
         contentFit="cover"
         onFirstFrameRender={() => {
+          if (firstFrameFallbackTimerRef.current) {
+            clearTimeout(firstFrameFallbackTimerRef.current);
+            firstFrameFallbackTimerRef.current = null;
+          }
           setHasFirstFrame(true);
           setIsBuffering(false);
         }}

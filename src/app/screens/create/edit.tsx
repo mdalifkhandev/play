@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Pressable, TextInput, KeyboardAvoidingView, Platform, Keyboard, Animated, PanResponder, ActivityIndicator, Dimensions } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, Pressable, TextInput, KeyboardAvoidingView, Platform, Keyboard, Animated, PanResponder, ActivityIndicator, Dimensions, Image as RNImage } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,24 +41,65 @@ const parseDurationSeconds = (duration?: string, title?: string) => {
   return DEFAULT_AUDIO_DURATION_SEC;
 };
 
+const firstParam = (value?: string | string[]) => Array.isArray(value) ? value[0] : value;
+
+const normalizeMediaUri = (value?: string | string[]) => {
+  const mediaUri = firstParam(value);
+  if (!mediaUri) return undefined;
+
+  try {
+    return decodeURI(mediaUri);
+  } catch {
+    return mediaUri;
+  }
+};
+
+const parseNumberParam = (value?: string | string[], fallback = 0) => {
+  const parsed = Number(firstParam(value));
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 export default function EditMediaScreen() {
   const {
     uri, mediaType, soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl,
     originalVolume, addedVolume, trimLeft, trimRight, videoTrimLeft, videoTrimRight,
-    videoTrimStart, videoTrimEnd, videoDuration
+    videoTrimStart, videoTrimEnd, videoDuration,
+    overlayText: initialOverlayText,
+    textOffsetX,
+    textOffsetY,
+    musicOffsetX,
+    musicOffsetY,
+    showMusicCard: initialShowMusicCard,
+    exposure: initialExposure,
+    contrast: initialContrast,
+    activeFilter: initialActiveFilter,
+    activeEffect: initialActiveEffect
   } = useLocalSearchParams<{
     uri: string; mediaType?: 'photo' | 'video'; soundUrl: string; title: string; soundDuration?: string;
     musicId?: string; musicArtist?: string; musicCoverUrl?: string;
     originalVolume?: string; addedVolume?: string; trimLeft?: string; trimRight?: string;
     videoTrimLeft?: string; videoTrimRight?: string;
     videoTrimStart?: string; videoTrimEnd?: string; videoDuration?: string;
+    overlayText?: string;
+    textOffsetX?: string;
+    textOffsetY?: string;
+    musicOffsetX?: string;
+    musicOffsetY?: string;
+    showMusicCard?: string;
+    exposure?: string;
+    contrast?: string;
+    activeFilter?: string;
+    activeEffect?: string;
   }>();
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const mockImage = uri || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
-  const isVideo = mediaType === 'video';
+  const normalizedParamMediaType = firstParam(mediaType);
+  const normalizedMediaType: 'photo' | 'video' | undefined =
+    normalizedParamMediaType === 'video' || normalizedParamMediaType === 'photo' ? normalizedParamMediaType : undefined;
+  const mockImage = normalizeMediaUri(uri) || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
+  const isVideo = normalizedMediaType === 'video';
   const audioDurationSec = parseDurationSeconds(soundDuration, title);
   const [videoDurationSec, setVideoDurationSec] = useState(videoDuration ? Number(videoDuration) : 0);
   const isLowEndDevice = (Device.totalMemory ?? 0) < 3 * 1024 * 1024 * 1024;
@@ -106,20 +146,25 @@ export default function EditMediaScreen() {
   });
 
   // Local State
-  const [showMusicCard, setShowMusicCard] = useState(true);
+  const [showMusicCard, setShowMusicCard] = useState(initialShowMusicCard !== 'false');
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
+  const [photoFailedUri, setPhotoFailedUri] = useState<string | null>(null);
   const [isTextMode, setIsTextMode] = useState(false);
-  const [overlayText, setOverlayText] = useState('');
-  const [exposure, setExposure] = useState(50);
-  const [contrast, setContrast] = useState(50);
-  const [activeFilter, setActiveFilter] = useState('Normal');
-  const [activeEffect, setActiveEffect] = useState<string | null>(null);
+  const [overlayText, setOverlayText] = useState(firstParam(initialOverlayText) || '');
+  const [exposure, setExposure] = useState(parseNumberParam(initialExposure, 50));
+  const [contrast, setContrast] = useState(parseNumberParam(initialContrast, 50));
+  const [activeFilter, setActiveFilter] = useState(firstParam(initialActiveFilter) || 'Normal');
+  const [activeEffect, setActiveEffect] = useState<string | null>(firstParam(initialActiveEffect) || null);
   const [activePanel, setActivePanel] = useState<'options' | 'filters' | 'effects' | null>(null);
   
   const isMountedRef = useRef(true);
   useEffect(() => {
     return () => { isMountedRef.current = false; };
   }, []);
+
+  const photoLoadFailed = !isVideo && photoFailedUri === mockImage;
+  const showLoadingOverlay = isVideo && !isMediaReady;
+  const showPreviewBar = isVideo || !!soundUrl;
 
   const formatSeconds = (seconds: number) => {
     const safeSeconds = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
@@ -148,7 +193,10 @@ export default function EditMediaScreen() {
   }, [sound, addedVolume]);
 
   // Drag logic for Music Card
-  const pan = useRef(new Animated.ValueXY()).current;
+  const pan = useRef(new Animated.ValueXY({
+    x: parseNumberParam(musicOffsetX, 0),
+    y: parseNumberParam(musicOffsetY, 0),
+  })).current;
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: () => true,
@@ -170,7 +218,10 @@ export default function EditMediaScreen() {
   latestOverlayText.current = overlayText;
   const latestIsTextMode = useRef(isTextMode);
   latestIsTextMode.current = isTextMode;
-  const textPan = useRef(new Animated.ValueXY()).current;
+  const textPan = useRef(new Animated.ValueXY({
+    x: parseNumberParam(textOffsetX, 0),
+    y: parseNumberParam(textOffsetY, 0),
+  })).current;
   const textPanResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: () => latestOverlayText.current.trim().length > 0 && !latestIsTextMode.current,
@@ -199,7 +250,7 @@ export default function EditMediaScreen() {
   };
 
   const { isExporting, navigateToPostDetails } = useMediaExport({
-    mockImage, mediaType, soundUrl, overlayText, originalVolume, addedVolume,
+    mockImage, mediaType: normalizedMediaType, soundUrl, overlayText, originalVolume, addedVolume,
     trimLeft, trimRight, audioDurationSec, videoTrimStartSec, videoTrimEndSec,
     activeFilter, activeEffect, textPan, title, soundDuration, musicId, musicArtist,
     musicCoverUrl, videoTrimLeft, videoTrimRight, videoTrimStart, videoTrimEnd,
@@ -238,10 +289,34 @@ export default function EditMediaScreen() {
                 <MediaVideoPreview player={videoPlayer} hasFirstFrame={hasVideoFrame} onFirstFrameRender={() => setHasVideoFrame(true)} />
               </View>
             ) : (
-              <Image source={{ uri: mockImage }} className="w-full h-full absolute inset-0" contentFit="cover" style={{ transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }] }} />
+              <RNImage
+                source={{ uri: mockImage }}
+                resizeMode="cover"
+                onError={(error) => {
+                  setPhotoFailedUri(mockImage);
+                  console.log('Photo preview load failed:', error);
+                }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }],
+                }}
+              />
             )}
 
-            {!isMediaReady && (
+            {photoLoadFailed && !isVideo && (
+              <View className="absolute inset-0 items-center justify-center bg-black px-6">
+                <Ionicons name="image-outline" size={48} color="#98FF2F" />
+                <Text className="text-white font-inter-semibold mt-3 text-center">Photo preview could not load</Text>
+              </View>
+            )}
+
+            {showLoadingOverlay && (
               <View className="absolute inset-0 items-center justify-center bg-black/50">
                 <ActivityIndicator size="large" color="#98FF2F" />
               </View>
@@ -287,9 +362,11 @@ export default function EditMediaScreen() {
 
             <MusicCard soundUrl={soundUrl} title={title} musicCoverUrl={musicCoverUrl} musicArtist={musicArtist} showMusicCard={showMusicCard} isTextMode={isTextMode} activePanel={activePanel} panResponder={panResponder} pan={pan} onClose={() => setShowMusicCard(false)} />
 
-            <BottomPreviewBar isTextMode={isTextMode} activePanel={activePanel} togglePreviewPlayback={togglePreviewPlayback} isPreviewPlaying={isPreviewPlaying} previewCurrentTime={previewCurrentTime} previewDurationSec={previewDurationSec} previewProgressPercent={previewProgressPercent} formatSeconds={formatSeconds} />
+            {showPreviewBar && (
+              <BottomPreviewBar isTextMode={isTextMode} activePanel={activePanel} togglePreviewPlayback={togglePreviewPlayback} isPreviewPlaying={isPreviewPlaying} previewCurrentTime={previewCurrentTime} previewDurationSec={previewDurationSec} previewProgressPercent={previewProgressPercent} formatSeconds={formatSeconds} />
+            )}
 
-            <EditorRightActions isTextMode={isTextMode} activePanel={activePanel} router={router} mockImage={mockImage} mediaType={mediaType} soundUrl={soundUrl} title={title} soundDuration={soundDuration} musicId={musicId} musicArtist={musicArtist} musicCoverUrl={musicCoverUrl} originalVolume={originalVolume} addedVolume={addedVolume} trimLeft={trimLeft} trimRight={trimRight} videoTrimLeft={videoTrimLeft} videoTrimRight={videoTrimRight} videoTrimStart={videoTrimStart} videoTrimEnd={videoTrimEnd} videoDurationSec={videoDurationSec} setIsTextMode={setIsTextMode} setActivePanel={setActivePanel} isLowEndDevice={isLowEndDevice} />
+            <EditorRightActions isTextMode={isTextMode} activePanel={activePanel} router={router} mockImage={mockImage} mediaType={normalizedMediaType} soundUrl={soundUrl} title={title} soundDuration={soundDuration} musicId={musicId} musicArtist={musicArtist} musicCoverUrl={musicCoverUrl} originalVolume={originalVolume} addedVolume={addedVolume} trimLeft={trimLeft} trimRight={trimRight} videoTrimLeft={videoTrimLeft} videoTrimRight={videoTrimRight} videoTrimStart={videoTrimStart} videoTrimEnd={videoTrimEnd} videoDurationSec={videoDurationSec} overlayText={overlayText} textOffsetX={(textPan.x as any)._value} textOffsetY={(textPan.y as any)._value} musicOffsetX={(pan.x as any)._value} musicOffsetY={(pan.y as any)._value} showMusicCard={showMusicCard} exposure={exposure} contrast={contrast} activeFilter={activeFilter} activeEffect={activeEffect} setIsTextMode={setIsTextMode} setActivePanel={setActivePanel} isLowEndDevice={isLowEndDevice} />
           </View>
         </View>
 
