@@ -1,18 +1,20 @@
 import axios from 'axios';
 import { router } from 'expo-router';
+import { useAppStore } from '../store';
 
 // Get the base URL from environment variables
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_BASE_URL = BASE_URL ? `${BASE_URL.replace(/\/$/, '')}/api/v1` : undefined;
 
+// eslint-disable-next-line import/no-named-as-default-member
 export const apiClient = axios.create({
-  baseURL: `${BASE_URL}/api/v1`,
+  baseURL: API_BASE_URL,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     'origin': 'http://localhost:3000',
   },
 });
-
-import { useAppStore } from '../store';
 
 const AUTH_ERROR_CODES = new Set([
   'ACCESS_TOKEN_INVALID',
@@ -37,9 +39,27 @@ const isAuthError = (error: any) => {
   );
 };
 
+let hasRedirectedToLogin = false;
+
+const logoutAndRedirectToLogin = () => {
+  useAppStore.getState().logout();
+
+  if (!hasRedirectedToLogin) {
+    hasRedirectedToLogin = true;
+    router.replace('/(auth)/login');
+    setTimeout(() => {
+      hasRedirectedToLogin = false;
+    }, 1000);
+  }
+};
+
 // Example of how you might add an interceptor for authentication tokens later
 apiClient.interceptors.request.use(
   (config) => {
+    if (!API_BASE_URL) {
+      return Promise.reject(new Error('EXPO_PUBLIC_API_URL is not configured.'));
+    }
+
     const token = useAppStore.getState().token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -89,13 +109,16 @@ apiClient.interceptors.response.use(
       const refreshToken = useAppStore.getState().refreshToken;
 
       if (!refreshToken) {
-        useAppStore.getState().logout();
-        router.replace('/(auth)/login');
+        logoutAndRedirectToLogin();
         return Promise.reject(error);
       }
 
       try {
-        const { data } = await axios.post(`${BASE_URL}/api/v1/auth/refresh-token`, { refreshToken });
+        if (!API_BASE_URL) {
+          throw new Error('EXPO_PUBLIC_API_URL is not configured.');
+        }
+
+        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh-token`, { refreshToken }, { timeout: 30000 });
         const newAccessToken = data?.data?.tokens?.accessToken;
         const newRefreshToken = data?.data?.tokens?.refreshToken || refreshToken;
 
@@ -109,8 +132,7 @@ apiClient.interceptors.response.use(
         }
       } catch (err) {
         processQueue(err, null);
-        useAppStore.getState().logout();
-        router.replace('/(auth)/login');
+        logoutAndRedirectToLogin();
         return Promise.reject(err);
       } finally {
         isRefreshing = false;

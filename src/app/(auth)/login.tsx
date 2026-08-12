@@ -50,9 +50,16 @@ export default function Login() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       className="flex-1 bg-[#121212]"
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 24 }} className="px-6 pt-16">
+      <ScrollView
+        className="px-6 pt-16"
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 160 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={false}
+      >
         <Header showBackButton={true} />
 
         <Text className="text-3xl font-inter-bold text-white mb-2">Welcome Back</Text>

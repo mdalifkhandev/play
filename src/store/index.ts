@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface AppState {
   // Example state for authentication
   isAuthenticated: boolean;
+  hasHydrated: boolean;
   token: string | null;
   refreshToken: string | null;
   user: any | null;
@@ -19,6 +20,7 @@ interface AppState {
   
   // Actions
   setAuth: (token: string, refreshToken: string, user: any) => void;
+  setHasHydrated: (hasHydrated: boolean) => void;
   setKidsModeActive: (active: boolean) => void;
   setKidsModeExpireTime: (timestamp: number | null) => void;
   setKidsModeDuration: (durationMs: number | null) => void;
@@ -31,6 +33,7 @@ export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       isAuthenticated: false,
+      hasHydrated: false,
       token: null,
       refreshToken: null,
       user: null,
@@ -40,6 +43,7 @@ export const useAppStore = create<AppState>()(
       coinBalance: 0,
 
       setAuth: (token, refreshToken, user) => set({ isAuthenticated: true, token, refreshToken, user }),
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
       setKidsModeActive: (active: boolean) => set((state) => {
         if (active) {
           return { isKidsModeActive: true };
@@ -73,6 +77,9 @@ export const useAppStore = create<AppState>()(
     {
       name: 'app-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

@@ -1,14 +1,19 @@
 import { Image } from "expo-image";
-import { Link, useRouter, useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState, useEffect } from "react";
-import { Dimensions, FlatList, Pressable, Text, View, ViewToken, ActivityIndicator, RefreshControl } from "react-native";
+import { Link, useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { ActivityIndicator, AppState, AppStateStatus, FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
 import { getFeed } from "../../api/reels/reels.api";
 import { ReelFeedItem } from "../../api/reels/reels.types";
 import { useFeedSection } from "../../hooks/feed/useFeedSection";
 
-const { height: WINDOW_HEIGHT } = Dimensions.get('window');
+type FeedListItem = Omit<FeedItemProps, 'isActive' | 'shouldMountVideo'>;
+
+function isImageUrl(url?: string | null): url is string {
+  if (!url) return false;
+  return !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(url);
+}
 
 function formatNumber(num: number): string {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -16,12 +21,12 @@ function formatNumber(num: number): string {
   return String(num);
 }
 
-function mapBackendReelToFeedItem(reel: ReelFeedItem): Omit<FeedItemProps, 'isActive' | 'shouldMountVideo'> {
+function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
   return {
     id: reel.id,
     type: 'video', // backend reels are always videos initially
     source: reel.videoUrl,
-    thumbnailUrl: reel.thumbnailUrl,
+    thumbnailUrl: isImageUrl(reel.thumbnailUrl) ? reel.thumbnailUrl : undefined,
     user: {
       username: reel.user.username || 'Anonymous',
       profileImage: reel.user.avatarUrl || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80',
@@ -41,6 +46,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('following');
   const [activeItemIndex, setActiveItemIndex] = useState(0);
+  const [isScreenActive, setIsScreenActive] = useState(true);
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   const fetchReelsData = useCallback(async () => {
@@ -56,14 +63,39 @@ export default function HomeScreen() {
   }
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    if (viewableItems.length > 0) {
-      setActiveItemIndex(viewableItems[0].index ?? 0);
+    const nextVisibleItem = viewableItems
+      .filter(item => item.index !== null && item.index !== undefined)
+      .sort((a, b) => (Number(b.isViewable) - Number(a.isViewable)))[0];
+
+    if (nextVisibleItem?.index !== null && nextVisibleItem?.index !== undefined) {
+      setActiveItemIndex(nextVisibleItem.index);
     }
   }, []);
 
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-  }).current;
+  const viewabilityConfig = useMemo(() => ({
+    itemVisiblePercentThreshold: 80,
+    minimumViewTime: 120,
+  }), []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsScreenActive(true);
+      const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
+        setIsScreenActive(state === 'active');
+      });
+
+      return () => {
+        setIsScreenActive(false);
+        subscription.remove();
+      };
+    }, [])
+  );
+
+  const getItemLayout = useCallback((_: ArrayLike<FeedListItem> | null | undefined, index: number) => ({
+    length: windowHeight,
+    offset: windowHeight * index,
+    index,
+  }), [windowHeight]);
 
   return (
     <View className="flex-1 bg-black">
@@ -125,21 +157,24 @@ export default function HomeScreen() {
           renderItem={({ item, index }) => (
             <FeedItem 
               {...item} 
-              isActive={index === activeItemIndex} 
-              shouldMountVideo={Math.abs(index - activeItemIndex) <= 1}
+              isActive={isScreenActive && index === activeItemIndex} 
+              shouldMountVideo={isScreenActive && index === activeItemIndex}
             />
           )}
           keyExtractor={(item) => item.id}
           pagingEnabled
           showsVerticalScrollIndicator={false}
-          snapToInterval={WINDOW_HEIGHT}
+          snapToInterval={windowHeight}
           snapToAlignment="start"
           decelerationRate="fast"
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          initialNumToRender={2}
-          maxToRenderPerBatch={3}
-          windowSize={5}
+          getItemLayout={getItemLayout}
+          initialNumToRender={1}
+          maxToRenderPerBatch={1}
+          windowSize={3}
+          removeClippedSubviews
+          updateCellsBatchingPeriod={80}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -154,4 +189,3 @@ export default function HomeScreen() {
     </View>
   );
 }
-

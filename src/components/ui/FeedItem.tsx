@@ -2,11 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Pressable, Text, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const { height: WINDOW_HEIGHT, width: WINDOW_WIDTH } = Dimensions.get('window');
 
 export interface FeedItemProps {
   id: string;
@@ -29,46 +27,214 @@ export interface FeedItemProps {
   shouldMountVideo?: boolean;
 }
 
-// Extract video to its own component to safely delay its mounting
-function FeedVideo({ source, isActive }: { source: any, isActive: boolean }) {
-  const player = useVideoPlayer(source, player => {
-    player.loop = true;
+const isRemoteUri = (source: string) => /^https?:\/\//i.test(source);
+const isImageThumbnail = (source?: string) => !!source && !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(source);
+
+function FeedFallback({ showSpinner = false }: { showSpinner?: boolean }) {
+  return (
+    <View className="absolute inset-0 items-center justify-center bg-[#111]">
+      <Ionicons name="play-circle-outline" size={48} color="#98FF2F" />
+      {showSpinner && <ActivityIndicator size="small" color="#98FF2F" className="mt-4" />}
+    </View>
+  );
+}
+
+function FeedVideo({
+  source,
+  thumbnailUrl,
+  isActive,
+  onDoubleTap,
+}: {
+  source: string;
+  thumbnailUrl?: string;
+  isActive: boolean;
+  onDoubleTap: () => void;
+}) {
+  const [isBuffering, setIsBuffering] = useState(true);
+  const [hasFirstFrame, setHasFirstFrame] = useState(false);
+  const [hasError, setHasError] = useState(!source);
+  const [feedbackIcon, setFeedbackIcon] = useState<'play' | 'pause' | null>(null);
+  const playRequestRef = useRef(0);
+  const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
+  const lastTapRef = useRef(0);
+
+  const videoSource = useMemo(() => {
+    if (!source) return null;
+    return isRemoteUri(source) ? { uri: source, contentType: 'progressive' as const } : source;
+  }, [source]);
+
+  const player = useVideoPlayer(videoSource, currentPlayer => {
+    currentPlayer.loop = true;
+    currentPlayer.muted = false;
   });
 
-  useEffect(() => {
-    if (player) {
-      if (isActive) {
-        player.play();
-      } else {
-        player.pause();
-      }
-    }
-  }, [isActive, player]);
+  const pauseSafely = useCallback(() => {
+    if (!isMountedRef.current) return;
 
-  const togglePlay = () => {
-    if (player) {
-      if (player.playing) {
-        player.pause();
-      } else {
-        player.play();
-      }
+    try {
+      player?.pause();
+    } catch (error) {
+      console.log('Feed video pause failed:', error);
     }
+  }, [player]);
+
+  const playSafely = useCallback(() => {
+    const requestId = ++playRequestRef.current;
+    if (playTimerRef.current) {
+      clearTimeout(playTimerRef.current);
+    }
+
+    playTimerRef.current = setTimeout(() => {
+      if (!isMountedRef.current || requestId !== playRequestRef.current || !isActive || hasError) return;
+
+      try {
+        if (player?.status === 'readyToPlay') {
+          player.play();
+        }
+      } catch (error) {
+        console.log('Feed video play failed:', error);
+        setHasError(true);
+      }
+    }, 120);
+  }, [hasError, isActive, player]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      playRequestRef.current += 1;
+
+      if (playTimerRef.current) {
+        clearTimeout(playTimerRef.current);
+        playTimerRef.current = null;
+      }
+
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+        feedbackTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!player) return;
+
+    const subscription = player.addListener('statusChange', payload => {
+      const status = payload?.status || player.status;
+      setIsBuffering(status === 'loading' || status === 'idle');
+
+      if (status === 'error') {
+        setHasError(true);
+      }
+
+      if (status === 'readyToPlay' && isActive && !hasError) {
+        playSafely();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [hasError, isActive, playSafely, player]);
+
+  useEffect(() => {
+    if (isActive && !hasError) {
+      playSafely();
+    } else {
+      playRequestRef.current += 1;
+      pauseSafely();
+    }
+
+    return () => {
+      playRequestRef.current += 1;
+      if (playTimerRef.current) {
+        clearTimeout(playTimerRef.current);
+        playTimerRef.current = null;
+      }
+    };
+  }, [hasError, isActive, pauseSafely, playSafely, player]);
+
+  const showFeedbackIcon = useCallback((icon: 'play' | 'pause') => {
+    setFeedbackIcon(icon);
+
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current);
+    }
+
+    feedbackTimerRef.current = setTimeout(() => {
+      setFeedbackIcon(null);
+    }, 650);
+  }, []);
+
+  const togglePlay = useCallback(() => {
+    try {
+      if (player?.playing) {
+        player.pause();
+        showFeedbackIcon('pause');
+      } else if (player?.status === 'readyToPlay' && !hasError) {
+        player.play();
+        showFeedbackIcon('play');
+      }
+    } catch (error) {
+      console.log('Feed video toggle failed:', error);
+      setHasError(true);
+    }
+  }, [hasError, player, showFeedbackIcon]);
+
+  const handlePress = () => {
+    const now = Date.now();
+
+    if (now - lastTapRef.current < 300) {
+      onDoubleTap();
+    } else {
+      togglePlay();
+    }
+
+    lastTapRef.current = now;
   };
 
   return (
-    <Pressable className="absolute inset-0" onPress={togglePlay}>
+    <Pressable className="absolute inset-0" onPress={handlePress}>
+      {isImageThumbnail(thumbnailUrl) ? (
+        <Image source={{ uri: thumbnailUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
+      ) : (
+        <FeedFallback showSpinner={isBuffering && !hasFirstFrame && !hasError} />
+      )}
       <VideoView
         player={player}
         className="absolute inset-0"
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: '100%', opacity: hasFirstFrame ? 1 : 0 }}
         nativeControls={false}
         contentFit="cover"
+        onFirstFrameRender={() => {
+          setHasFirstFrame(true);
+          setIsBuffering(false);
+        }}
       />
+      {isBuffering && !hasError && !hasFirstFrame && isImageThumbnail(thumbnailUrl) && (
+        <View className="absolute inset-0 items-center justify-center bg-black/20">
+          <ActivityIndicator size="large" color="#98FF2F" />
+        </View>
+      )}
+      {hasError && (
+        <View className="absolute inset-0 items-center justify-center bg-black/70 px-8">
+          <Ionicons name="alert-circle-outline" size={34} color="#98FF2F" />
+          <Text className="text-white text-center text-sm font-inter-semibold mt-3">Video could not play</Text>
+        </View>
+      )}
+      {feedbackIcon && (
+        <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+          <View className="w-20 h-20 rounded-full bg-black/45 items-center justify-center">
+            <Ionicons name={feedbackIcon} size={42} color="#FFF" />
+          </View>
+        </View>
+      )}
     </Pressable>
   );
 }
 
-export const FeedItem = ({
+export const FeedItem = memo(({
   type,
   source,
   thumbnailUrl,
@@ -80,12 +246,13 @@ export const FeedItem = ({
   shouldMountVideo = true
 }: FeedItemProps) => {
   const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
 
-  // State to delay video initialization until Activity is guaranteed to be ready
-  const [isReady, setIsReady] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [shouldRenderVideo, setShouldRenderVideo] = useState(shouldMountVideo);
   const lastTap = useRef(0);
 
   const handleDoubleTap = () => {
@@ -97,47 +264,38 @@ export const FeedItem = ({
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsReady(true), 500);
+    let timer: ReturnType<typeof setTimeout>;
+
+    if (shouldMountVideo) {
+      timer = setTimeout(() => {
+        setShouldRenderVideo(true);
+      }, 0);
+    } else {
+      timer = setTimeout(() => {
+        setShouldRenderVideo(false);
+      }, 350);
+    }
+
     return () => clearTimeout(timer);
-  }, []);
-
-  const spinValue = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    spinValue.setValue(0);
-    Animated.loop(
-      Animated.timing(spinValue, {
-        toValue: 1,
-        duration: 4000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-      { iterations: -1 }
-    ).start();
-  }, [spinValue]);
-
-  const spin = spinValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg']
-  });
+  }, [shouldMountVideo]);
 
   return (
-    <View style={{ height: WINDOW_HEIGHT, width: WINDOW_WIDTH }} className="">
+    <View style={{ height, width }} className="">
 
-      {type === 'video' && isReady ? (
-        shouldMountVideo ? (
-          <FeedVideo source={source} isActive={isActive} />
+      {type === 'video' ? (
+        shouldRenderVideo ? (
+          <FeedVideo source={source} thumbnailUrl={thumbnailUrl} isActive={isActive && shouldMountVideo} onDoubleTap={handleDoubleTap} />
         ) : (
           <View className="absolute inset-0">
-            {thumbnailUrl ? (
+            {isImageThumbnail(thumbnailUrl) ? (
               <Image source={{ uri: thumbnailUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
             ) : (
-              <View className="absolute inset-0 bg-black" />
+              <FeedFallback />
             )}
           </View>
         )
       ) : type === 'image' ? (
-        <Pressable className="absolute inset-0">
+        <Pressable className="absolute inset-0" onPress={handleDoubleTap}>
           <Image
             source={{ uri: source }}
             className="absolute inset-0"
@@ -148,9 +306,6 @@ export const FeedItem = ({
       ) : (
         <View className="absolute inset-0 bg-black" />
       )}
-
-      {/* Double tap area spanning the entire media */}
-      <Pressable onPress={handleDoubleTap} className="absolute inset-0" />
 
       {/* Top Gradient Overlay */}
       <LinearGradient
@@ -170,44 +325,31 @@ export const FeedItem = ({
 
       {/* Right Action Buttons */}
       <View className="absolute right-4 items-center gap-5" style={{ bottom: insets.bottom + 100 }}>
-        <View className="items-center justify-center">
-          <View className="w-12 h-12 mb-2">
-            <Image source={{ uri: user.profileImage }} className="w-12 h-12 rounded-full border border-white" style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: 'white' }} />
-            <View className="absolute -bottom-4 right-1.5 self-center bg-[#E4FB52] w-6 h-6 rounded-full items-center justify-center">
-              <Ionicons name="add" size={14} color="#000" />
-            </View>
-          </View>
-        </View>
-
         <Pressable className="items-center justify-center" onPress={() => setIsLiked(!isLiked)}>
-          <Ionicons name={isLiked ? "heart" : "heart-outline"} size={36} color={isLiked ? "#E4FB52" : "#FFF"} style={{ textShadowColor: 'rgba(255,255,255,0.8)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 }} />
+          <Ionicons name={isLiked ? "heart" : "heart-outline"} size={24} color={isLiked ? "#E4FB52" : "#FFF"} style={{ textShadowColor: 'rgba(255,255,255,0.8)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 }} />
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{stats.likes}</Text>
         </Pressable>
 
         <Pressable className="items-center justify-center">
-          <Ionicons name="chatbubble-ellipses" size={32} color="#FFF" />
+          <Ionicons name="chatbubble-ellipses" size={24} color="#FFF" />
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{stats.comments}</Text>
         </Pressable>
 
         <Pressable className="items-center justify-center" onPress={() => setIsSaved(!isSaved)}>
-          <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={32} color={isSaved ? "#FFF" : "#FFF"} style={isSaved ? { textShadowColor: 'rgba(255,255,255,0.8)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 } : undefined} />
+          <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={24} color={isSaved ? "#FFF" : "#FFF"} style={isSaved ? { textShadowColor: 'rgba(255,255,255,0.8)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10 } : undefined} />
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{stats.bookmarks}</Text>
         </Pressable>
 
         <Pressable className="items-center justify-center">
-          <Ionicons name="arrow-redo" size={36} color="#FFF" />
+          <Ionicons name="arrow-redo" size={24} color="#FFF" />
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{stats.shares}</Text>
         </Pressable>
+        <Pressable className="items-center justify-center">
+          <Ionicons name="volume-high-outline" size={24} color="#FFF" />
+         
+        </Pressable>
 
-        {/* Record/Music Icon */}
-        <Animated.View className="mt-2.5" style={{ transform: [{ rotate: spin }] }}>
-          <Image
-            source={require('../../../assets/icon/musicdisc.svg')}
-            className="w-11 h-11"
-            style={{ width: 44, height: 44 }}
-            contentFit="contain"
-          />
-        </Animated.View>
+
       </View>
 
       {/* Centered Full Screen Button */}
@@ -223,12 +365,32 @@ export const FeedItem = ({
       {/* Bottom Text Details */}
       <View className="absolute left-4 right-20 pb-2" style={{ bottom: insets.bottom + 60 }} pointerEvents="box-none">
 
-        <Text
-          className="text-white text-base font-bold mb-1.5"
-          style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
-        >
-          {user.username} <Text className="font-normal text-[#CCC]">• {date}</Text>
-        </Text>
+        <View className="flex-row items-center mb-2">
+          <Image
+            source={{ uri: user.profileImage }}
+            className="w-9 h-9 rounded-full border border-white"
+            style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: 'white' }}
+          />
+          <View className="flex-1 ml-2.5">
+            <View className="flex-row items-center flex-wrap">
+              <Text
+                className="text-white text-base font-bold"
+                style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
+              >
+                {user.username}
+              </Text>
+              <Text className="text-[#CCC] text-sm font-normal"> • {date}</Text>
+            </View>
+          </View>
+          <Pressable
+            className={`px-3 py-1.5 rounded-full border ${isFollowing ? 'bg-white/10 border-white/40' : 'bg-[#98FF2F] border-[#98FF2F]'}`}
+            onPress={() => setIsFollowing(!isFollowing)}
+          >
+            <Text className={`text-xs font-inter-bold ${isFollowing ? 'text-white' : 'text-black'}`}>
+              {isFollowing ? 'Following' : 'Follow'}
+            </Text>
+          </Pressable>
+        </View>
 
         <Pressable onPress={() => setIsExpanded(!isExpanded)}>
           <Text
@@ -244,4 +406,6 @@ export const FeedItem = ({
       </View>
     </View>
   );
-};
+});
+
+FeedItem.displayName = 'FeedItem';

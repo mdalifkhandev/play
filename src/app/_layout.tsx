@@ -2,6 +2,7 @@ import { Stack, useRouter, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
+import * as Sentry from "@sentry/react-native";
 import { 
   useFonts, 
   Inter_100Thin, 
@@ -20,9 +21,17 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    enableNative: true,
+  });
+}
+
 const defaultErrorHandler = ErrorUtils.getGlobalHandler();
 ErrorUtils.setGlobalHandler((error, isFatal) => {
   console.error('Unhandled JS Exception:', error);
+  Sentry.captureException(error);
   defaultErrorHandler(error, isFatal);
 });
 
@@ -40,6 +49,7 @@ export default function RootLayout() {
   const pathname = usePathname();
   const isKidsModeActive = useAppStore((state) => state.isKidsModeActive);
   const kidsModeExpireTimestamp = useAppStore((state) => state.kidsModeExpireTimestamp);
+  const hasHydrated = useAppStore((state) => state.hasHydrated);
 
   const [loaded, error] = useFonts({
     Inter_100Thin,
@@ -49,10 +59,10 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (loaded || error) {
+    if ((loaded || error) && hasHydrated) {
       SplashScreen.hideAsync();
     }
-  }, [loaded, error]);
+  }, [hasHydrated, loaded, error]);
 
   // Kids Mode Watchdog Timer
   useEffect(() => {
@@ -83,7 +93,7 @@ export default function RootLayout() {
     return () => clearInterval(interval);
   }, [isKidsModeActive, kidsModeExpireTimestamp, router, pathname]);
 
-  if (!loaded && !error) {
+  if ((!loaded && !error) || !hasHydrated) {
     return null;
   }
 
