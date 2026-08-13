@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Pressable, Share, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -43,6 +43,25 @@ export interface FeedItemProps {
 const isRemoteUri = (source: string) => /^https?:\/\//i.test(source);
 const isImageThumbnail = (source?: string) => !!source && !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(source);
 const recordedViewIds = new Set<string>();
+
+class FeedVideoBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.log('Feed video render failed:', error);
+  }
+
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
 
 function formatCount(value: number): string {
   if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
@@ -631,7 +650,7 @@ export const FeedItem = memo(({
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<'like' | 'save' | 'share' | null>(null);
-  const [shouldRenderVideo, setShouldRenderVideo] = useState(shouldMountVideo);
+  const [shouldRenderVideo, setShouldRenderVideo] = useState(false);
   const lastTap = useRef(0);
 
   const handleLike = useCallback(async () => {
@@ -721,19 +740,19 @@ export const FeedItem = memo(({
   }, [handleLike, isLiked]);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     if (shouldMountVideo) {
       timer = setTimeout(() => {
         setShouldRenderVideo(true);
-      }, 0);
+      }, 220);
     } else {
-      timer = setTimeout(() => {
-        setShouldRenderVideo(false);
-      }, 350);
+      setShouldRenderVideo(false);
     }
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [shouldMountVideo]);
 
   useEffect(() => {
@@ -757,13 +776,15 @@ export const FeedItem = memo(({
 
       {type === 'video' ? (
         shouldRenderVideo ? (
-          <FeedVideo
-            source={source}
-            thumbnailUrl={thumbnailUrl}
-            isActive={isActive && shouldMountVideo}
-            isMuted={isMuted}
-            onDoubleTap={handleDoubleTap}
-          />
+          <FeedVideoBoundary fallback={<FeedFallback showSpinner={false} showPlayIcon />}>
+            <FeedVideo
+              source={source}
+              thumbnailUrl={thumbnailUrl}
+              isActive={isActive && shouldMountVideo}
+              isMuted={isMuted}
+              onDoubleTap={handleDoubleTap}
+            />
+          </FeedVideoBoundary>
         ) : (
           <View className="absolute inset-0">
             {isImageThumbnail(thumbnailUrl) ? (

@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { Link, useFocusEffect, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
+import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, InteractionManager, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
 import { getFeed } from "../../api/reels/reels.api";
@@ -43,7 +43,7 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('following');
   const [activeItemIndex, setActiveItemIndex] = useState(0);
-  const [isScreenActive, setIsScreenActive] = useState(true);
+  const [isScreenActive, setIsScreenActive] = useState(false);
   const [fullscreenItemId, setFullscreenItemId] = useState<string | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -73,12 +73,20 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setIsScreenActive(true);
+      let isFocused = true;
+      const task = InteractionManager.runAfterInteractions(() => {
+        if (isFocused && AppState.currentState === 'active') {
+          setIsScreenActive(true);
+        }
+      });
+
       const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
-        setIsScreenActive(state === 'active');
+        setIsScreenActive(isFocused && state === 'active');
       });
 
       return () => {
+        isFocused = false;
+        task.cancel();
         setIsScreenActive(false);
         subscription.remove();
       };

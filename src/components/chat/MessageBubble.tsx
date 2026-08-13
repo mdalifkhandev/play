@@ -12,6 +12,7 @@ export interface MessageType {
   avatar?: string;
   attachmentType?: 'image' | 'video' | 'audio' | 'file';
   attachmentUrl?: string;
+  isRead?: boolean;
 }
 
 function VideoMessage({ uri }: { uri: string }) {
