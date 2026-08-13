@@ -23,7 +23,7 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
     thumbnailUrl: isImageUrl(reel.thumbnailUrl) ? reel.thumbnailUrl : undefined,
     user: {
       username: reel.user.username || 'Anonymous',
-      profileImage: reel.user.avatarUrl || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80',
+      profileImage: reel.user.avatarUrl || '',
     },
     description: reel.caption || '',
     date: new Date(reel.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),

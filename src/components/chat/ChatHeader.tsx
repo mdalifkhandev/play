@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { avatarSource } from '../../utils/avatar';
 
 interface ChatHeaderProps {
   onBack: () => void;
@@ -21,7 +22,7 @@ export function ChatHeader({ onBack, onOptions, userName, avatarUrl, status = 'O
 
         <View className="relative">
           <Image
-            source={{ uri: avatarUrl }}
+            source={avatarSource(avatarUrl)}
             style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
             contentFit="cover"
           />

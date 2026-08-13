@@ -11,6 +11,7 @@ import { createReelComment, deleteComment, editComment, likeReel, listReelCommen
 import type { ReelComment } from '../../api/engagement/engagement.types';
 import { recordReelView } from '../../api/reels/reels.api';
 import { useAppStore } from '../../store';
+import { avatarSource } from '../../utils/avatar';
 
 export interface FeedItemProps {
   id: string;
@@ -242,7 +243,7 @@ function CommentsModal({
               return (
                 <View className="mb-4 flex-row">
                   <Image
-                    source={{ uri: item.authorAvatar || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80' }}
+                    source={avatarSource(item.authorAvatar)}
                     style={{ width: 34, height: 34, borderRadius: 17 }}
                     contentFit="cover"
                   />
@@ -881,7 +882,7 @@ export const FeedItem = memo(({
 
         <View className="flex-row items-center mb-2">
           <Image
-            source={{ uri: user.profileImage }}
+            source={avatarSource(user.profileImage)}
             className="w-9 h-9 rounded-full border border-white"
             style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: 'white' }}
           />

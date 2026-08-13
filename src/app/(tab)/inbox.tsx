@@ -11,6 +11,7 @@ import {
   fetchRecommendedUsers,
   searchConversationUsers,
 } from '../../api/conversations/conversation.api';
+import { avatarSource } from '../../utils/avatar';
 
 export default function InboxScreen() {
   const insets = useSafeAreaInsets();
@@ -202,7 +203,7 @@ export default function InboxScreen() {
                     <Pressable key={user.id} className="flex-row items-center justify-between px-4 py-3" onPress={() => openRecommendedChat(user.id)}>
                       <View className="flex-row items-center flex-1">
                         <Image
-                          source={user.avatarUrl ? { uri: user.avatarUrl } : require('../../../assets/icon/user-add.svg')}
+                          source={avatarSource(user.avatarUrl)}
                           style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12 }}
                           contentFit="cover"
                         />
@@ -246,7 +247,7 @@ export default function InboxScreen() {
                     <View className="flex-row items-center flex-1">
                       <View className="relative">
                         <Image
-                          source={chat.avatar ? { uri: chat.avatar } : require('../../../assets/icon/user-add.svg')}
+                          source={avatarSource(chat.avatar)}
                           style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12 }}
                           contentFit="cover"
                         />
@@ -281,7 +282,7 @@ export default function InboxScreen() {
                   <Pressable key={user.id} className="flex-row items-center justify-between px-4 py-3" onPress={() => openRecommendedChat(user.id)}>
                     <View className="flex-row items-center flex-1">
                       <Image
-                        source={user.avatarUrl ? { uri: user.avatarUrl } : require('../../../assets/icon/user-add.svg')}
+                        source={avatarSource(user.avatarUrl)}
                         style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12 }}
                         contentFit="cover"
                       />

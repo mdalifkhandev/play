@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import React from 'react';
 import { Text, View } from 'react-native';
 
-const fallbackAvatar = 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80';
+import { avatarSource } from '../../utils/avatar';
 
 type ProfileInfoProps = {
   avatarUrl?: string;
@@ -28,7 +28,7 @@ export function ProfileInfo({
       {/* Avatar */}
       <View className="relative">
         <Image
-          source={{ uri: avatarUrl || fallbackAvatar }}
+          source={avatarSource(avatarUrl)}
           style={{ width: 88, height: 88, borderRadius: 44 }}
           contentFit="cover"
         />

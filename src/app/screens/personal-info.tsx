@@ -6,6 +6,7 @@ import { Header } from '../../components/ui/Header';
 import { CustomInput } from '../../components/inputs/CustomInput';
 import { CustomButton } from '../../components/ui/CustomButton';
 import { useAppStore } from '../../store';
+import { defaultUserAvatar } from '../../utils/avatar';
 
 export default function PersonalInfoScreen() {
   const insets = useSafeAreaInsets();
@@ -34,11 +35,10 @@ export default function PersonalInfoScreen() {
 
         <View className="items-center mt-6 mb-8">
           <View className="w-24 h-24 rounded-full bg-gray-800 overflow-hidden items-center justify-center mb-3">
-            {user?.profilePicture ? (
-              <Image source={{ uri: user.profilePicture }} className="w-full h-full" />
-            ) : (
-              <Ionicons name="person" size={40} color="#666" />
-            )}
+            <Image
+              source={user?.profilePicture ? { uri: user.profilePicture } : defaultUserAvatar}
+              className="w-full h-full"
+            />
           </View>
           <Pressable>
             <Text className="text-white text-base font-inter-medium">Change Photo</Text>
