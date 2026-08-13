@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { Linking, Pressable, View, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { avatarSource } from '../../utils/avatar';
 
 export interface MessageType {
   id: string;
@@ -20,7 +21,13 @@ function VideoMessage({ uri }: { uri: string }) {
     player.loop = true;
     player.muted = true;
   });
-  return <VideoView player={player} style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 8 }} />;
+  return (
+    <VideoView
+      player={player}
+      nativeControls
+      style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 8 }}
+    />
+  );
 }
 
 export function MessageBubble({ msg }: { msg: MessageType }) {
@@ -31,7 +38,7 @@ export function MessageBubble({ msg }: { msg: MessageType }) {
       {!isMe && (
         <View className="mr-2 justify-end pb-1 relative">
           <Image
-            source={{ uri: msg.avatar }}
+            source={avatarSource(msg.avatar)}
             style={{ width: 32, height: 32, borderRadius: 16 }}
             contentFit="cover"
           />
@@ -55,16 +62,22 @@ export function MessageBubble({ msg }: { msg: MessageType }) {
           <VideoMessage uri={msg.attachmentUrl} />
         )}
         {msg.attachmentType === 'audio' && (
-          <View className="flex-row items-center mb-2 bg-[#333] p-2 rounded-lg">
+          <Pressable
+            className="flex-row items-center mb-2 bg-[#333] p-2 rounded-lg"
+            onPress={() => msg.attachmentUrl && Linking.openURL(msg.attachmentUrl)}
+          >
             <Ionicons name="musical-notes" size={24} color="#FFF" />
             <Text className="text-white ml-2">Audio File</Text>
-          </View>
+          </Pressable>
         )}
         {msg.attachmentType === 'file' && (
-          <View className="flex-row items-center mb-2 bg-[#333] p-2 rounded-lg">
+          <Pressable
+            className="flex-row items-center mb-2 bg-[#333] p-2 rounded-lg"
+            onPress={() => msg.attachmentUrl && Linking.openURL(msg.attachmentUrl)}
+          >
             <Ionicons name="document" size={24} color="#FFF" />
             <Text className="text-white ml-2">Document</Text>
-          </View>
+          </Pressable>
         )}
         <Text className={`text-base ${isMe ? 'text-white' : 'text-black'}`}>
           {msg.text}

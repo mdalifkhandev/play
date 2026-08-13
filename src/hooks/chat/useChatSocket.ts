@@ -64,11 +64,13 @@ export function socketSendMessage(
   conversationId: string,
   text?: string,
   mediaUrl?: string,
+  attachmentType?: 'image' | 'video' | 'audio' | 'file',
 ) {
   return emitChatEvent<Message>(CHAT_SOCKET_EVENTS.SEND_MESSAGE, {
     conversationId,
     ...(text ? { text } : {}),
     ...(mediaUrl ? { mediaUrl } : {}),
+    ...(attachmentType ? { attachmentType } : {}),
   });
 }
 

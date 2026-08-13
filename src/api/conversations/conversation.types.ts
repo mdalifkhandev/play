@@ -15,6 +15,7 @@ export interface Conversation {
     id?: string;
     text?: string;
     mediaUrl?: string;
+    attachmentType?: 'image' | 'video' | 'audio' | 'file';
     senderId: string;
     createdAt: string;
   };
@@ -36,6 +37,7 @@ export interface Message {
   };
   text?: string;
   mediaUrl?: string;
+  attachmentType?: 'image' | 'video' | 'audio' | 'file';
   deliveredAt?: string;
   isRead: boolean;
   readAt?: string;
@@ -94,3 +96,11 @@ export type SocketErrorPayload = {
 export type ChatSocketAck<T = unknown> =
   | { success: true; data: T }
   | { success: false; error: SocketErrorPayload };
+
+export interface ChatAttachmentUploadResult {
+  url: string;
+  attachmentType: 'image' | 'video' | 'audio' | 'file';
+  mimeType: string;
+  fileName: string;
+  size: number;
+}

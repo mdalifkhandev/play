@@ -4,6 +4,7 @@ import type {
   Message,
   PaginatedMessages,
   CreateConversationResponse,
+  ChatAttachmentUploadResult,
 } from './conversation.types';
 
 export async function createConversation(targetUserId: string): Promise<CreateConversationResponse> {
@@ -58,11 +59,38 @@ export async function sendTextMessage(
 export async function sendMessageWithMedia(
   conversationId: string,
   mediaUrl: string,
+  attachmentType: 'image' | 'video' | 'audio' | 'file' = 'file',
 ): Promise<Message> {
   const response = await apiClient.post<{ data: Message }>(
     `/conversations/${conversationId}/messages`,
-    { mediaUrl },
+    { mediaUrl, attachmentType },
   );
+  return response.data.data;
+}
+
+export async function uploadChatAttachment(input: {
+  uri: string;
+  name: string;
+  mimeType: string;
+}): Promise<ChatAttachmentUploadResult> {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: input.uri,
+    name: input.name,
+    type: input.mimeType,
+  } as any);
+
+  const response = await apiClient.post<{ data: ChatAttachmentUploadResult }>(
+    '/conversations/attachments',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 120000,
+    },
+  );
+
   return response.data.data;
 }
 

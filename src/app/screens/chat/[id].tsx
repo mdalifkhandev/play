@@ -17,6 +17,7 @@ import {
   fetchMessages,
   sendTextMessage,
   sendMessageWithMedia,
+  uploadChatAttachment,
 } from '../../../api/conversations/conversation.api';
 import {
   useChatSocket,
@@ -41,9 +42,9 @@ const convertMessage = (msg: SocketMessage): MessageType => ({
   text: msg.text || '',
   time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   sender: msg.sender.id === useAppStore.getState().user?.id ? 'me' : 'other',
-  avatar: undefined,
+  avatar: msg.sender.avatarUrl,
   isRead: msg.isRead,
-  attachmentType: msg.mediaUrl ? ('image' as const) : undefined,
+  attachmentType: msg.attachmentType || inferAttachmentType(msg.mediaUrl),
   attachmentUrl: msg.mediaUrl,
 });
 
@@ -142,6 +143,7 @@ export default function ChatScreen() {
                 id: otherMsg.sender.id,
                 username: otherMsg.sender.username,
                 displayName: otherMsg.sender.displayName,
+                ...(otherMsg.sender.avatarUrl ? { avatarUrl: otherMsg.sender.avatarUrl } : {}),
               });
             }
           }
@@ -241,7 +243,11 @@ export default function ChatScreen() {
     }
   };
 
-  const sendAttachment = async (uri: string, type: 'image' | 'video' | 'audio' | 'file') => {
+  const sendAttachment = async (
+    uri: string,
+    type: 'image' | 'video' | 'audio' | 'file',
+    file?: { name?: string | null; mimeType?: string | null },
+  ) => {
     const text = type === 'image' ? '[Image]' : type === 'video' ? '[Video]' : type === 'audio' ? '[Audio]' : '[File]';
     
     const optimisticMessage: MessageType = {
@@ -257,10 +263,20 @@ export default function ChatScreen() {
     setShowAttachMenu(false);
     
     try {
-      const socketResult = await socketSendMessage(id, undefined, uri);
+      const uploaded = await uploadChatAttachment({
+        uri,
+        name: file?.name || fileNameFromUri(uri, type),
+        mimeType: file?.mimeType || mimeTypeFromUri(uri, type),
+      });
+      const socketResult = await socketSendMessage(
+        id,
+        text,
+        uploaded.url,
+        uploaded.attachmentType,
+      );
       if (!socketResult.success) {
         // Fallback to REST
-        const apiMessage = await sendMessageWithMedia(id, uri);
+        const apiMessage = await sendMessageWithMedia(id, uploaded.url, uploaded.attachmentType);
         setMessages((prev) => prev.map((m) => m.id === optimisticMessage.id ? convertMessage(apiMessage) : m));
       } else {
         setMessages((prev) => prev.map((m) => m.id === optimisticMessage.id ? convertMessage(socketResult.data as SocketMessage) : m));
@@ -300,7 +316,12 @@ export default function ChatScreen() {
       quality: 1,
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      sendAttachment(result.assets[0].uri, result.assets[0].type === 'video' ? 'video' : 'image');
+      const asset = result.assets[0];
+      sendAttachment(
+        asset.uri,
+        asset.type === 'video' ? 'video' : 'image',
+        { name: asset.fileName, mimeType: asset.mimeType },
+      );
     }
   };
 
@@ -316,7 +337,12 @@ export default function ChatScreen() {
       quality: 1,
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      sendAttachment(result.assets[0].uri, result.assets[0].type === 'video' ? 'video' : 'image');
+      const asset = result.assets[0];
+      sendAttachment(
+        asset.uri,
+        asset.type === 'video' ? 'video' : 'image',
+        { name: asset.fileName, mimeType: asset.mimeType },
+      );
     }
   };
 
@@ -325,7 +351,8 @@ export default function ChatScreen() {
       type: type === 'audio' ? 'audio/*' : type === 'video' ? 'video/*' : '*/*',
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      sendAttachment(result.assets[0].uri, type);
+      const asset = result.assets[0];
+      sendAttachment(asset.uri, type, { name: asset.name, mimeType: asset.mimeType });
     }
   };
 
@@ -454,4 +481,57 @@ export default function ChatScreen() {
       </BottomSheetModal>
     </KeyboardAvoidingView>
   );
+}
+
+function inferAttachmentType(url?: string): 'image' | 'video' | 'audio' | 'file' | undefined {
+  if (!url) return undefined;
+  if (/\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url)) return 'image';
+  if (/\.(mp4|mov|m4v|webm)(\?|$)/i.test(url)) return 'video';
+  if (/\.(mp3|m4a|wav|aac|ogg)(\?|$)/i.test(url)) return 'audio';
+  return 'file';
+}
+
+function fileNameFromUri(uri: string, type: 'image' | 'video' | 'audio' | 'file') {
+  const rawName = uri.split('/').pop()?.split('?')[0];
+  if (rawName && rawName.includes('.')) {
+    return rawName;
+  }
+
+  const extension =
+    type === 'image' ? 'jpg' : type === 'video' ? 'mp4' : type === 'audio' ? 'm4a' : 'bin';
+
+  return `chat-${Date.now()}.${extension}`;
+}
+
+function mimeTypeFromUri(uri: string, type: 'image' | 'video' | 'audio' | 'file') {
+  const extension = uri.split('?')[0]?.split('.').pop()?.toLowerCase();
+  const byExtension: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    mp4: 'video/mp4',
+    mov: 'video/quicktime',
+    m4v: 'video/mp4',
+    webm: 'video/webm',
+    mp3: 'audio/mpeg',
+    m4a: 'audio/mp4',
+    wav: 'audio/wav',
+    aac: 'audio/aac',
+    pdf: 'application/pdf',
+    txt: 'text/plain',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    zip: 'application/zip',
+  };
+
+  if (extension && byExtension[extension]) {
+    return byExtension[extension];
+  }
+
+  if (type === 'image') return 'image/jpeg';
+  if (type === 'video') return 'video/mp4';
+  if (type === 'audio') return 'audio/mp4';
+  return 'application/octet-stream';
 }
