@@ -79,3 +79,25 @@ export async function fetchRecommendedUsers(): Promise<RecommendedUser[]> {
   const response = await apiClient.get<{ data: RecommendedUser[] }>('/conversations/recommended');
   return response.data.data;
 }
+
+export async function searchConversationUsers(query: string): Promise<RecommendedUser[]> {
+  const params = { q: query.trim(), limit: 20 };
+
+  try {
+    const response = await apiClient.get<{ data: RecommendedUser[] }>('/users/search', {
+      params,
+    });
+
+    return response.data.data;
+  } catch (error: any) {
+    if (error?.response?.status !== 404) {
+      throw error;
+    }
+
+    const response = await apiClient.get<{ data: RecommendedUser[] }>('/conversations/users/search', {
+      params,
+    });
+
+    return response.data.data;
+  }
+}

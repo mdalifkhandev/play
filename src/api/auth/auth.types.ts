@@ -4,6 +4,11 @@ export interface LoginRequest {
   rememberMe?: boolean;
 }
 
+export interface GoogleLoginRequest {
+  idToken: string;
+  rememberMe?: boolean;
+}
+
 export interface SignupRequest {
   email: string;
   password?: string;

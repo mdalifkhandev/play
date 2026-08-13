@@ -51,9 +51,11 @@ const shouldLogoutAfterRefreshFailure = (error: any) => {
 
   return (
     status === 401 ||
+    status === 403 ||
     REFRESH_LOGOUT_ERROR_CODES.has(code) ||
     message.includes('refresh token is invalid') ||
-    message.includes('refresh token is required')
+    message.includes('refresh token is required') ||
+    message.includes('invalid or expired')
   );
 };
 
@@ -147,6 +149,17 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
     const requestUrl = String(originalRequest?.url || '');
 
+    if (__DEV__) {
+      console.log('API error:', {
+        method: originalRequest?.method,
+        baseURL: originalRequest?.baseURL,
+        url: requestUrl,
+        status: error?.response?.status,
+        code: error?.response?.data?.error?.code,
+        message: error?.response?.data?.error?.message || error?.message,
+      });
+    }
+
     if (isAuthError(error) && originalRequest && !originalRequest._retry && !requestUrl.includes('/auth/refresh')) {
       if (isRefreshing) {
         return new Promise(function(resolve, reject) {
@@ -178,6 +191,9 @@ apiClient.interceptors.response.use(
       } catch (err) {
         processQueue(err, null);
         if (shouldLogoutAfterRefreshFailure(err)) {
+          if (__DEV__) {
+            console.log('Auth refresh failed; clearing stored session.');
+          }
           logoutAndRedirectToLogin();
         }
         return Promise.reject(err);

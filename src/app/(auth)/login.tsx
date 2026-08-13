@@ -1,4 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
 import { Link, router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
@@ -6,11 +8,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 import { handleApiError } from "../../../src/api/client";
 import { useAppStore } from "../../../src/store";
-import { useLoginMutation } from "../../../src/api/auth";
+import { useGoogleLoginMutation, useLoginMutation } from "../../../src/api/auth";
 import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { CustomButton } from "../../components/ui/CustomButton";
 import { Header } from "../../components/ui/Header";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -20,6 +24,25 @@ export default function Login() {
   const setAuth = useAppStore((state) => state.setAuth);
 
   const loginMutation = useLoginMutation();
+  const googleLoginMutation = useGoogleLoginMutation();
+  const [googleRequest, , promptGoogleLogin] = Google.useIdTokenAuthRequest({
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    scopes: ['openid', 'profile', 'email'],
+    selectAccount: true,
+  });
+
+  const finishAuth = (response: any, successMessage: string) => {
+    const accessToken = response.data?.data?.tokens?.accessToken;
+    const refreshToken = response.data?.data?.tokens?.refreshToken;
+    const user = response.data?.data?.user;
+
+    if (accessToken) {
+      setAuth(accessToken, refreshToken || "", user);
+    }
+
+    toast.success(successMessage);
+    router.push('/home');
+  };
 
   const handleLogin = () => {
     if (!email || !password) {
@@ -31,19 +54,44 @@ export default function Login() {
       { email, password, rememberMe },
       {
         onSuccess: (response) => {
-          const accessToken = response.data?.data?.tokens?.accessToken;
-          const refreshToken = response.data?.data?.tokens?.refreshToken;
-          const user = response.data?.data?.user;
-          if (accessToken) {
-            setAuth(accessToken, refreshToken || "", user);
-          }
-          toast.success('Login Successful!');
-          router.push('/home');
+          finishAuth(response, 'Login Successful!');
         },
         onError: (error: any) => {
           toast.error(handleApiError(error, 'Failed to login'));
         }
       }
+    );
+  };
+
+  const handleGoogleLogin = async () => {
+    if (!process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID) {
+      toast.error('Google login is not configured');
+      return;
+    }
+
+    const result = await promptGoogleLogin();
+
+    if (result.type !== 'success') {
+      return;
+    }
+
+    const idToken = result.params?.id_token;
+
+    if (!idToken) {
+      toast.error('Google did not return an ID token');
+      return;
+    }
+
+    googleLoginMutation.mutate(
+      { idToken, rememberMe: true },
+      {
+        onSuccess: (response) => {
+          finishAuth(response, 'Google login successful!');
+        },
+        onError: (error: any) => {
+          toast.error(handleApiError(error, 'Failed to login with Google'));
+        },
+      },
     );
   };
 
@@ -104,7 +152,7 @@ export default function Login() {
           variant="primary"
           containerStyle="mb-10"
           onPress={handleLogin}
-          disabled={loginMutation.isPending}
+          disabled={loginMutation.isPending || googleLoginMutation.isPending}
         />
 
         <View className="flex-row items-center mb-8">
@@ -114,7 +162,11 @@ export default function Login() {
         </View>
 
         <View className="flex-row justify-center space-x-6  gap-4">
-          <Pressable className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80">
+          <Pressable
+            className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80"
+            onPress={handleGoogleLogin}
+            disabled={!googleRequest || googleLoginMutation.isPending || loginMutation.isPending}
+          >
             <GoogleIcon width={24} height={24} />
           </Pressable>
           <Pressable className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80">

@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import {
   forgotPassword,
+  googleLogin,
   login,
   logout,
   resendOtp,
@@ -11,6 +12,7 @@ import {
 } from './auth.api';
 import {
   ForgotPasswordRequest,
+  GoogleLoginRequest,
   LoginRequest,
   ResendOtpRequest,
   ResetPasswordRequest,
@@ -22,6 +24,12 @@ import {
 export const useLoginMutation = () => {
   return useMutation({
     mutationFn: (data: LoginRequest) => login(data),
+  });
+};
+
+export const useGoogleLoginMutation = () => {
+  return useMutation({
+    mutationFn: (data: GoogleLoginRequest) => googleLogin(data),
   });
 };
 

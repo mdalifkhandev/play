@@ -21,6 +21,7 @@
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
+        "POST_NOTIFICATIONS",
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE"
       ]
@@ -42,6 +43,7 @@
       ],
       "expo-web-browser",
       "expo-font",
+      "expo-notifications",
       "expo-video",
       "expo-audio",
       "expo-asset",

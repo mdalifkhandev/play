@@ -17,6 +17,7 @@ import "../../global.css";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAppStore } from "../store";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { useRegisterPushNotifications } from "../hooks/notifications/useRegisterPushNotifications";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -50,6 +51,10 @@ export default function RootLayout() {
   const isKidsModeActive = useAppStore((state) => state.isKidsModeActive);
   const kidsModeExpireTimestamp = useAppStore((state) => state.kidsModeExpireTimestamp);
   const hasHydrated = useAppStore((state) => state.hasHydrated);
+  const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const token = useAppStore((state) => state.token);
+
+  useRegisterPushNotifications(hasHydrated && isAuthenticated && Boolean(token));
 
   const [loaded, error] = useFonts({
     Inter_100Thin,
