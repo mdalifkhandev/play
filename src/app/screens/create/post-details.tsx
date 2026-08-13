@@ -58,6 +58,7 @@ const mapEffect = (value?: string): ReelVideoEditInput['effect'] => {
   if (normalized === 'glitch') return 'glitch';
   if (normalized === 'flash') return 'flash';
   if (normalized === 'vhs') return 'vhs';
+  if (normalized === 'sparkle') return 'sparkle';
   return 'none';
 };
 
@@ -113,6 +114,16 @@ export default function PostDetailsScreen() {
   const captionInputRef = React.useRef<TextInput>(null);
 
   const mockImage = uri || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
+  const activeFilterKey = (parsedVideoEdit?.filter || activeFilter || '').toLowerCase();
+  const activeEffectKey = (parsedVideoEdit?.effect || activeEffect || '').toLowerCase();
+  const activeFilterOverlay =
+    activeFilterKey === 'vivid' ? 'rgba(255, 50, 50, 0.15)' :
+    activeFilterKey === 'mono' || activeFilterKey === 'grayscale' ? 'rgba(0, 0, 0, 0.7)' :
+    activeFilterKey === 'vintage' ? 'rgba(112, 66, 20, 0.3)' :
+    activeFilterKey === 'warm' ? 'rgba(255, 165, 0, 0.2)' :
+    activeFilterKey === 'cool' ? 'rgba(40, 140, 255, 0.18)' :
+    activeFilterKey === 'sepia' ? 'rgba(112, 66, 20, 0.35)' :
+    'transparent';
 
   const appendToCaption = (text: string) => {
     setCaption(prev => {
@@ -395,10 +406,10 @@ export default function PostDetailsScreen() {
         
         {/* Top Thumbnail */}
         <View className="w-full h-40 rounded-2xl overflow-hidden mb-6 relative bg-black items-center justify-center">
-          <Image source={{ uri: mockImage }} className="absolute inset-0 w-full h-full" contentFit="cover" style={{ transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }] }} />
+          <Image source={{ uri: mockImage }} className="absolute inset-0 w-full h-full" contentFit="cover" style={{ transform: activeEffectKey === 'zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }] }} />
 
           {/* Simulate Glitch Effect */}
-          {activeEffect === 'Glitch' && (
+          {activeEffectKey === 'glitch' && (
             <>
               <View className="absolute inset-0 bg-red-500/20" style={{ transform: [{ translateX: -2 }] }} pointerEvents="none" />
               <View className="absolute inset-0 bg-blue-500/20" style={{ transform: [{ translateX: 2 }] }} pointerEvents="none" />
@@ -406,12 +417,12 @@ export default function PostDetailsScreen() {
           )}
 
           {/* Simulate Flash Effect */}
-          {activeEffect === 'Flash' && (
+          {activeEffectKey === 'flash' && (
             <View className="absolute inset-0 bg-white/40" pointerEvents="none" />
           )}
 
           {/* Simulate VHS Effect */}
-          {activeEffect === 'VHS' && (
+          {activeEffectKey === 'vhs' && (
             <View className="absolute inset-0 bg-green-500/10 border-t-2 border-black/20" pointerEvents="none" style={{ top: 0, bottom: 0 }} />
           )}
 
@@ -427,16 +438,10 @@ export default function PostDetailsScreen() {
           )}
 
           {/* Simulate Filter Effect Overlay */}
-          {activeFilter && activeFilter !== 'Normal' && (
+          {activeFilterKey && activeFilterKey !== 'normal' && activeFilterKey !== 'none' && (
             <View 
               className="absolute inset-0 pointer-events-none" 
-              style={{ 
-                backgroundColor: 
-                  activeFilter === 'Vivid' ? 'rgba(255, 50, 50, 0.15)' :
-                  activeFilter === 'Mono' ? 'rgba(0, 0, 0, 0.7)' :
-                  activeFilter === 'Vintage' ? 'rgba(112, 66, 20, 0.3)' :
-                  activeFilter === 'Warm' ? 'rgba(255, 165, 0, 0.2)' : 'transparent',
-              }} 
+              style={{ backgroundColor: activeFilterOverlay }} 
             />
           )}
 

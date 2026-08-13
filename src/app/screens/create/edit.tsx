@@ -173,6 +173,16 @@ export default function EditMediaScreen() {
   const photoLoadFailed = !isVideo && photoFailedUri === mockImage;
   const showLoadingOverlay = isVideo && !isMediaReady;
   const showPreviewBar = isVideo || !!selectedSoundUrl;
+  const activeFilterKey = (activeFilter || '').toLowerCase();
+  const activeEffectKey = (activeEffect || '').toLowerCase();
+  const activeFilterOverlay =
+    activeFilterKey === 'vivid' ? 'rgba(255, 50, 50, 0.15)' :
+    activeFilterKey === 'mono' || activeFilterKey === 'grayscale' ? 'rgba(0, 0, 0, 0.7)' :
+    activeFilterKey === 'vintage' ? 'rgba(112, 66, 20, 0.3)' :
+    activeFilterKey === 'warm' ? 'rgba(255, 165, 0, 0.2)' :
+    activeFilterKey === 'cool' ? 'rgba(40, 140, 255, 0.18)' :
+    activeFilterKey === 'sepia' ? 'rgba(112, 66, 20, 0.35)' :
+    'transparent';
 
   const formatSeconds = (seconds: number) => {
     const safeSeconds = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
@@ -308,7 +318,7 @@ export default function EditMediaScreen() {
         <View className="flex-1 relative">
           <View className="flex-1 bg-black overflow-hidden relative items-center justify-center">
             {isVideo ? (
-              <View className="w-full h-full absolute inset-0" style={{ transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }] }}>
+              <View className="w-full h-full absolute inset-0" style={{ transform: activeEffectKey === 'zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }] }}>
                 <MediaVideoPreview player={videoPlayer} hasFirstFrame={hasVideoFrame} onFirstFrameRender={() => setHasVideoFrame(true)} />
               </View>
             ) : (
@@ -327,7 +337,7 @@ export default function EditMediaScreen() {
                   left: 0,
                   width: '100%',
                   height: '100%',
-                  transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }],
+                  transform: activeEffectKey === 'zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }],
                 }}
               />
             )}
@@ -345,18 +355,18 @@ export default function EditMediaScreen() {
               </View>
             )}
 
-            {activeEffect === 'Glitch' && (
+            {activeEffectKey === 'glitch' && (
               <>
                 <View className="absolute inset-0 bg-red-500/20" style={{ transform: [{ translateX: -4 }] }} pointerEvents="none" />
                 <View className="absolute inset-0 bg-blue-500/20" style={{ transform: [{ translateX: 4 }] }} pointerEvents="none" />
               </>
             )}
 
-            {activeEffect === 'Flash' && <View className="absolute inset-0 bg-white/40" pointerEvents="none" />}
+            {activeEffectKey === 'flash' && <View className="absolute inset-0 bg-white/40" pointerEvents="none" />}
 
-            {activeEffect === 'VHS' && <View className="absolute inset-0 bg-green-500/10 border-t-2 border-black/20" pointerEvents="none" style={{ top: 0, bottom: 0 }} />}
+            {activeEffectKey === 'vhs' && <View className="absolute inset-0 bg-green-500/10 border-t-2 border-black/20" pointerEvents="none" style={{ top: 0, bottom: 0 }} />}
 
-            {activeEffect === 'Sparkle' && (
+            {activeEffectKey === 'sparkle' && (
               <View className="absolute inset-0" pointerEvents="none">
                 <View className="absolute top-1/4 left-1/4"><Ionicons name="sparkles" size={24} color="white" /></View>
                 <View className="absolute top-1/2 right-1/4"><Ionicons name="sparkles" size={32} color="white" /></View>
@@ -368,8 +378,8 @@ export default function EditMediaScreen() {
               <View className="absolute inset-0 pointer-events-none" style={{ backgroundColor: exposure > 50 ? 'white' : 'black', opacity: Math.abs(exposure - 50) / 100 }} />
             )}
 
-            {activeFilter !== 'Normal' && (
-              <View className="absolute inset-0 pointer-events-none" style={{ backgroundColor: activeFilter === 'Vivid' ? 'rgba(255, 50, 50, 0.15)' : activeFilter === 'Mono' ? 'rgba(0, 0, 0, 0.7)' : activeFilter === 'Vintage' ? 'rgba(112, 66, 20, 0.3)' : activeFilter === 'Warm' ? 'rgba(255, 165, 0, 0.2)' : 'transparent' }} />
+            {activeFilterKey && activeFilterKey !== 'normal' && activeFilterKey !== 'none' && (
+              <View className="absolute inset-0 pointer-events-none" style={{ backgroundColor: activeFilterOverlay }} />
             )}
 
             {isTextMode && <View className="absolute inset-0 bg-black/40" />}
@@ -418,7 +428,20 @@ export default function EditMediaScreen() {
           <View className="bg-[#222] flex-row items-center px-4 py-3" style={{ paddingBottom: Math.max(insets.bottom + 12, 12) }}>
             <Ionicons name="add" size={28} color="#98FF2F" />
             {/* @ts-ignore - React Native TextInput accepts ref, but @types/react is mismatched */}
-            <TextInput ref={inputRef} className="flex-1 text-white font-inter-regular text-base ml-2 bg-[#333] px-4 py-2 rounded-lg" placeholder="Type something..." placeholderTextColor="#888" value={overlayText} onChangeText={setOverlayText} returnKeyType="done" onSubmitEditing={handleDoneText} autoFocus />
+            <TextInput
+              ref={inputRef}
+              className="flex-1 text-white font-inter-bold text-base ml-2 bg-[#333] px-4 py-2 rounded-lg"
+              placeholder="Type something..."
+              placeholderTextColor="#888"
+              value={overlayText}
+              onChangeText={setOverlayText}
+              returnKeyType="default"
+              blurOnSubmit={false}
+              multiline
+              textAlignVertical="center"
+              style={{ maxHeight: 110 }}
+              autoFocus
+            />
             <Pressable onPress={handleDoneText} className="ml-3"><Ionicons name="send" size={24} color="#98FF2F" /></Pressable>
           </View>
         ) : !activePanel ? (

@@ -3,6 +3,13 @@ import { searchMusicTracks } from '../../api/music/music.api';
 import type { MusicTrack } from '../../api/music/music.types';
 import { handleApiError } from '../../api/client';
 
+const MUSIC_PAGE_SIZE = 8;
+const musicSearchCache = new Map<string, {
+  tracks: MusicTrack[];
+  page: number;
+  hasNextPage: boolean;
+}>();
+
 export function useMusicSearch(activeTab: string, initialQuery: string = '') {
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
@@ -15,8 +22,21 @@ export function useMusicSearch(activeTab: string, initialQuery: string = '') {
   const lastRequestRef = useRef('');
 
   const fetchTracks = useCallback(async (nextPage = 1, query = searchQuery) => {
-    const requestKey = `${activeTab}:${query.trim().toLowerCase()}:${nextPage}`;
+    const normalizedQuery = query.trim().toLowerCase();
+    const cacheKey = `${activeTab}:${normalizedQuery}`;
+    const requestKey = `${cacheKey}:${nextPage}`;
     
+    if (nextPage === 1) {
+      const cached = musicSearchCache.get(cacheKey);
+      if (cached) {
+        setTracks(cached.tracks);
+        setPage(cached.page);
+        setHasNextPage(cached.hasNextPage);
+        setError(null);
+        return;
+      }
+    }
+
     // Prevent duplicate concurrent requests
     if (nextPage === 1 && lastRequestRef.current === requestKey && (isLoading || error)) {
       return;
@@ -31,15 +51,21 @@ export function useMusicSearch(activeTab: string, initialQuery: string = '') {
       const result = await searchMusicTracks({
         search: query,
         page: nextPage,
-        limit: 20,
+        limit: MUSIC_PAGE_SIZE,
         order: activeTab === 'Trending' ? 'popularity_total' : activeTab === 'Mood' ? 'popularity_week' : 'releasedate',
       });
       
       const playableTracks = result.tracks.filter(track => track.downloadAllowed);
       
-      setTracks(prev => isFirstPage ? playableTracks : [...prev, ...playableTracks]);
+      const nextTracks = isFirstPage ? playableTracks : [...tracks, ...playableTracks];
+      setTracks(nextTracks);
       setPage(result.pagination.page);
       setHasNextPage(result.pagination.hasNextPage);
+      musicSearchCache.set(cacheKey, {
+        tracks: nextTracks,
+        page: result.pagination.page,
+        hasNextPage: result.pagination.hasNextPage,
+      });
     } catch (err: any) {
       console.log('Music fetch error:', err);
       const message = handleApiError(err, 'Could not load music.');
@@ -55,7 +81,7 @@ export function useMusicSearch(activeTab: string, initialQuery: string = '') {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [activeTab, isLoading, error, searchQuery]);
+  }, [activeTab, isLoading, error, searchQuery, tracks]);
 
   // Debounced search effect
   useEffect(() => {

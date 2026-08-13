@@ -90,6 +90,16 @@ export default function PostSuccessScreen() {
   const exposure = expParam ? parseInt(expParam) : 50;
 
   const mockImage = uri || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
+  const activeFilterKey = (activeFilter || '').toLowerCase();
+  const activeEffectKey = (activeEffect || '').toLowerCase();
+  const activeFilterOverlay =
+    activeFilterKey === 'vivid' ? 'rgba(255, 50, 50, 0.15)' :
+    activeFilterKey === 'mono' || activeFilterKey === 'grayscale' ? 'rgba(0, 0, 0, 0.7)' :
+    activeFilterKey === 'vintage' ? 'rgba(112, 66, 20, 0.3)' :
+    activeFilterKey === 'warm' ? 'rgba(255, 165, 0, 0.2)' :
+    activeFilterKey === 'cool' ? 'rgba(40, 140, 255, 0.18)' :
+    activeFilterKey === 'sepia' ? 'rgba(112, 66, 20, 0.35)' :
+    'transparent';
   const [reel, setReel] = useState<ReelStatusResult | null>(
     reelId
       ? {
@@ -293,12 +303,12 @@ export default function PostSuccessScreen() {
             className="w-full h-full absolute inset-0"
             contentFit="cover"
             style={{
-              transform: activeEffect === 'Zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }]
+              transform: activeEffectKey === 'zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }]
             }}
           />
 
           {/* Simulate Glitch Effect */}
-          {activeEffect === 'Glitch' && (
+          {activeEffectKey === 'glitch' && (
             <>
               <View className="absolute inset-0 bg-red-500/20" style={{ transform: [{ translateX: -3 }] }} pointerEvents="none" />
               <View className="absolute inset-0 bg-blue-500/20" style={{ transform: [{ translateX: 3 }] }} pointerEvents="none" />
@@ -306,12 +316,12 @@ export default function PostSuccessScreen() {
           )}
 
           {/* Simulate Flash Effect */}
-          {activeEffect === 'Flash' && (
+          {activeEffectKey === 'flash' && (
             <View className="absolute inset-0 bg-white/40" pointerEvents="none" />
           )}
 
           {/* Simulate VHS Effect */}
-          {activeEffect === 'VHS' && (
+          {activeEffectKey === 'vhs' && (
             <View className="absolute inset-0 bg-green-500/10 border-t-[3px] border-black/20" pointerEvents="none" style={{ top: 0, bottom: 0 }} />
           )}
 
@@ -327,16 +337,10 @@ export default function PostSuccessScreen() {
           )}
 
           {/* Simulate Filter Effect Overlay */}
-          {activeFilter && activeFilter !== 'Normal' && (
+          {activeFilterKey && activeFilterKey !== 'normal' && activeFilterKey !== 'none' && (
             <View
               className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundColor:
-                  activeFilter === 'Vivid' ? 'rgba(255, 50, 50, 0.15)' :
-                    activeFilter === 'Mono' ? 'rgba(0, 0, 0, 0.7)' :
-                      activeFilter === 'Vintage' ? 'rgba(112, 66, 20, 0.3)' :
-                        activeFilter === 'Warm' ? 'rgba(255, 165, 0, 0.2)' : 'transparent',
-              }}
+              style={{ backgroundColor: activeFilterOverlay }}
             />
           )}
 

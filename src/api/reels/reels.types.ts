@@ -17,7 +17,7 @@ export type ReelVideoEditInput = {
     endMs: number;
   };
   filter: 'none' | 'vivid' | 'warm' | 'cool' | 'grayscale' | 'sepia';
-  effect: 'none' | 'zoom' | 'glitch' | 'flash' | 'vhs';
+  effect: 'none' | 'zoom' | 'glitch' | 'flash' | 'vhs' | 'sparkle';
   exposure: number;
   contrast: number;
   overlayText?: {
