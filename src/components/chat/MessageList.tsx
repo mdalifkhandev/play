@@ -8,15 +8,16 @@ interface MessageListProps {
 }
 
 export function MessageList({ messages, isTyping }: MessageListProps) {
-  const animValues = React.useRef<Animated.Value[]>([
+  const scrollRef = React.useRef<ScrollView>(null);
+  const animValues = React.useMemo(() => [
     new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
-  ]);
+  ], []);
 
   React.useEffect(() => {
     if (isTyping) {
-      animValues.current.forEach((anim, i) => {
+      animValues.forEach((anim, i) => {
         Animated.sequence([
           Animated.delay(i * 150),
           Animated.timing(anim, { duration: 400, useNativeDriver: true, toValue: 1 }),
@@ -24,13 +25,25 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
         ]).start();
       });
     }
-  }, [isTyping]);
+  }, [animValues, isTyping]);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: messages.length > 1 });
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [messages.length, isTyping]);
 
   return (
     <ScrollView
+      ref={scrollRef}
       className="flex-1 px-4 pt-4"
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 20 }}
+      onContentSizeChange={() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }}
     >
       {messages.map((msg) => (
         <MessageBubble key={msg.id} msg={msg} />
@@ -38,9 +51,9 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
       {isTyping && (
         <View className="flex-row items-center py-2">
           <View className="flex-row items-center bg-[#1a1a1a] rounded-2xl px-4 py-3">
-            <Animated.View className="w-2 h-2 rounded-full mx-0.5 bg-white/70" style={{ opacity: animValues.current[0] }} />
-            <Animated.View className="w-2 h-2 rounded-full mx-0.5 bg-white/70" style={{ opacity: animValues.current[1] }} />
-            <Animated.View className="w-2 h-2 rounded-full mx-0.5 bg-white/70" style={{ opacity: animValues.current[2] }} />
+            <Animated.View className="w-2 h-2 rounded-full mx-0.5 bg-white/70" style={{ opacity: animValues[0] }} />
+            <Animated.View className="w-2 h-2 rounded-full mx-0.5 bg-white/70" style={{ opacity: animValues[1] }} />
+            <Animated.View className="w-2 h-2 rounded-full mx-0.5 bg-white/70" style={{ opacity: animValues[2] }} />
           </View>
         </View>
       )}

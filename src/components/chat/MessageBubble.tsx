@@ -3,6 +3,7 @@ import { Linking, Pressable, View, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { avatarSource } from '../../utils/avatar';
 
 export interface MessageType {
@@ -22,19 +23,134 @@ function VideoMessage({ uri }: { uri: string }) {
     player.muted = true;
   });
   return (
-    <VideoView
-      player={player}
-      nativeControls
-      style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 8 }}
-    />
+    <View style={{ width: 238, height: 318, borderRadius: 10, overflow: 'hidden', backgroundColor: '#000' }}>
+      <VideoView
+        player={player}
+        nativeControls
+        style={{ width: 238, height: 318 }}
+      />
+    </View>
+  );
+}
+
+function AudioMessage({ uri, isMe }: { uri: string; isMe: boolean }) {
+  const playerRef = React.useRef<AudioPlayer | null>(null);
+  const subscriptionRef = React.useRef<{ remove: () => void } | null>(null);
+  const [isPlaying, setIsPlaying] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [currentTime, setCurrentTime] = React.useState(0);
+  const [duration, setDuration] = React.useState(0);
+
+  React.useEffect(() => {
+    const progressTimer = setInterval(() => {
+      const player = playerRef.current as any;
+      if (!player) return;
+
+      const nextCurrent = Number(player.currentTime ?? 0);
+      const nextDuration = Number(player.duration ?? 0);
+      if (Number.isFinite(nextCurrent)) setCurrentTime(Math.max(0, nextCurrent));
+      if (Number.isFinite(nextDuration) && nextDuration > 0) setDuration(nextDuration);
+    }, 350);
+
+    return () => {
+      clearInterval(progressTimer);
+      const player = playerRef.current;
+      playerRef.current = null;
+      subscriptionRef.current?.remove();
+      subscriptionRef.current = null;
+      if (!player) return;
+
+      try { player.pause(); } catch {}
+      try { player.remove(); } catch {
+        try { (player as any).release?.(); } catch {}
+      }
+    };
+  }, []);
+
+  const toggleAudio = () => {
+    const currentPlayer = playerRef.current;
+
+    if (currentPlayer && isPlaying) {
+      try { currentPlayer.pause(); } catch {}
+      setIsPlaying(false);
+      return;
+    }
+
+    if (currentPlayer) {
+      try {
+        currentPlayer.play();
+        setIsPlaying(true);
+      } catch {}
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const player = createAudioPlayer(uri, { updateInterval: 250 });
+      playerRef.current = player;
+      subscriptionRef.current = player.addListener('playbackStatusUpdate', (status: any) => {
+        if (playerRef.current !== player) return;
+
+        if (status.isLoaded && status.playing) {
+          setIsLoading(false);
+          setIsPlaying(true);
+        }
+
+        if (status.didJustFinish) {
+          setIsPlaying(false);
+          setCurrentTime(0);
+        }
+      });
+      player.play();
+    } catch {
+      setIsLoading(false);
+      void Linking.openURL(uri);
+    }
+  };
+  const progress = duration > 0 ? Math.min(1, currentTime / duration) : isPlaying ? 0.2 : 0;
+  const playedWidth = `${Math.max(3, progress * 100)}%` as const;
+
+  return (
+    <Pressable
+      className="flex-row items-center rounded-xl px-3 py-2"
+      style={{ width: 278, backgroundColor: isMe ? '#075E54' : '#A3E635' }}
+      onPress={toggleAudio}
+    >
+      <View className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: '#FDB52A' }}>
+        <Ionicons
+          name={isLoading ? 'hourglass-outline' : isPlaying ? 'pause' : 'play'}
+          size={22}
+          color="#fff"
+        />
+      </View>
+      <View className="ml-3 flex-1">
+        <View className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: isMe ? '#62a99c' : '#5d8f18' }}>
+          <View className="h-full rounded-full" style={{ width: playedWidth, backgroundColor: isMe ? '#d5fff7' : '#111' }} />
+        </View>
+        <View className="flex-row items-center justify-between mt-2">
+          <Text className="text-xs" style={{ color: isMe ? '#d8fff7' : '#1b1b1b' }}>
+            {formatDuration(currentTime)}
+          </Text>
+          <Text className="text-xs" style={{ color: isMe ? '#d8fff7' : '#1b1b1b' }}>
+            {duration > 0 ? formatDuration(duration) : ''}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
 export function MessageBubble({ msg }: { msg: MessageType }) {
   const isMe = msg.sender === 'me';
+  const hasAttachment = Boolean(msg.attachmentType && msg.attachmentUrl);
+  const text = shouldRenderText(msg.text, msg.attachmentType) ? msg.text : '';
+  const bubbleColor = isMe ? '#075E54' : '#A3E635';
+  const textColor = isMe ? '#fff' : '#111';
+  const timeColor = isMe ? '#c9ded9' : 'rgba(0,0,0,0.55)';
+  const attachmentBubbleClass = msg.attachmentType === 'audio' || msg.attachmentType === 'file' ? 'p-0' : 'p-1';
 
   return (
-    <View className={`flex-row mb-6 ${isMe ? 'justify-end' : 'justify-start'}`}>
+    <View className={`flex-row mb-3 ${isMe ? 'justify-end' : 'justify-start'}`}>
       {!isMe && (
         <View className="mr-2 justify-end pb-1 relative">
           <Image
@@ -47,45 +163,78 @@ export function MessageBubble({ msg }: { msg: MessageType }) {
       )}
 
       <View
-        className={`max-w-[75%] px-4 py-3 rounded-2xl ${
-          isMe ? 'bg-[#1C1C1E] rounded-br-sm' : 'bg-[#A3E635] rounded-bl-sm'
-        }`}
+        className={`${hasAttachment ? attachmentBubbleClass : 'px-3 py-2'} rounded-2xl ${isMe ? 'rounded-br-sm' : 'rounded-bl-sm'}`}
+        style={{ maxWidth: hasAttachment ? 292 : '75%', backgroundColor: bubbleColor }}
       >
-        {msg.attachmentType === 'image' && (
-          <Image
-            source={{ uri: msg.attachmentUrl }}
-            style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 8 }}
-            contentFit="cover"
-          />
+        {msg.attachmentType === 'image' && msg.attachmentUrl && (
+          <View style={{ width: 238, height: 300, borderRadius: 10, overflow: 'hidden' }}>
+            <Image
+              source={{ uri: msg.attachmentUrl }}
+              style={{ width: 238, height: 300 }}
+              contentFit="cover"
+            />
+          </View>
         )}
         {msg.attachmentType === 'video' && msg.attachmentUrl && (
           <VideoMessage uri={msg.attachmentUrl} />
         )}
         {msg.attachmentType === 'audio' && (
-          <Pressable
-            className="flex-row items-center mb-2 bg-[#333] p-2 rounded-lg"
-            onPress={() => msg.attachmentUrl && Linking.openURL(msg.attachmentUrl)}
-          >
-            <Ionicons name="musical-notes" size={24} color="#FFF" />
-            <Text className="text-white ml-2">Audio File</Text>
-          </Pressable>
+          msg.attachmentUrl ? <AudioMessage uri={msg.attachmentUrl} isMe={isMe} /> : null
         )}
         {msg.attachmentType === 'file' && (
           <Pressable
-            className="flex-row items-center mb-2 bg-[#333] p-2 rounded-lg"
+            className="flex-row items-center rounded-xl px-3 py-3"
+            style={{ width: 238, backgroundColor: isMe ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)' }}
             onPress={() => msg.attachmentUrl && Linking.openURL(msg.attachmentUrl)}
           >
-            <Ionicons name="document" size={24} color="#FFF" />
-            <Text className="text-white ml-2">Document</Text>
+            <View className="w-10 h-10 rounded-lg items-center justify-center" style={{ backgroundColor: isPdf(msg.attachmentUrl) ? '#E53935' : '#2b2b2b' }}>
+              <Ionicons name={isPdf(msg.attachmentUrl) ? 'document-text' : 'document'} size={22} color="#FFF" />
+            </View>
+            <View className="ml-3 flex-1">
+              <Text className="font-semibold" style={{ color: textColor }} numberOfLines={1}>
+                {fileLabel(msg.attachmentUrl)}
+              </Text>
+              <Text className="text-xs mt-0.5" style={{ color: timeColor }}>
+                Tap to open
+              </Text>
+            </View>
           </Pressable>
         )}
-        <Text className={`text-base ${isMe ? 'text-white' : 'text-black'}`}>
-          {msg.text}
-        </Text>
-        <Text className={`text-[10px] mt-1 ${isMe ? 'text-[#888]' : 'text-black/60'}`}>
+        {text ? (
+          <Text className={`${hasAttachment ? 'mt-2 px-1' : ''} text-base`} style={{ color: textColor }}>
+            {text}
+          </Text>
+        ) : null}
+        <Text className={`text-[10px] ${hasAttachment ? 'px-1 mt-1' : 'mt-1'}`} style={{ color: timeColor, alignSelf: 'flex-end' }}>
           {msg.time}
         </Text>
       </View>
     </View>
   );
+}
+
+function shouldRenderText(text: string, attachmentType?: MessageType['attachmentType']) {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (attachmentType && /^\[(image|video|audio|file)\]$/i.test(trimmed)) return false;
+  return true;
+}
+
+function formatDuration(value: number) {
+  const seconds = Math.max(0, Math.floor(value || 0));
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return `${minutes}:${String(rest).padStart(2, '0')}`;
+}
+
+function isPdf(url?: string) {
+  return /\.pdf(\?|$)/i.test(url || '');
+}
+
+function fileLabel(url?: string) {
+  if (!url) return 'Document';
+  const raw = decodeURIComponent(url.split('/').pop()?.split('?')[0] || '');
+  if (!raw) return isPdf(url) ? 'PDF document' : 'Document';
+  if (raw.length > 28) return `${raw.slice(0, 24)}...`;
+  return raw;
 }

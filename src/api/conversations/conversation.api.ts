@@ -1,3 +1,5 @@
+import * as FileSystem from 'expo-file-system/legacy';
+
 import { apiClient } from '../client';
 import type {
   Conversation,
@@ -72,26 +74,61 @@ export async function uploadChatAttachment(input: {
   uri: string;
   name: string;
   mimeType: string;
+  attachmentType: 'image' | 'video' | 'audio' | 'file';
 }): Promise<ChatAttachmentUploadResult> {
-  const formData = new FormData();
-  formData.append('file', {
-    uri: input.uri,
-    name: input.name,
-    type: input.mimeType,
-  } as any);
+  const prepareResponse = await apiClient.post<{
+    data: {
+      uploadUrl: string;
+      apiKey: string;
+      timestamp: number;
+      signature: string;
+      publicId: string;
+      resourceType: 'image' | 'video' | 'raw';
+      attachmentType: 'image' | 'video' | 'audio' | 'file';
+    };
+  }>('/conversations/attachments/prepare', {
+    fileName: input.name,
+    mimeType: input.mimeType,
+    attachmentType: input.attachmentType,
+  });
+  const uploadData = prepareResponse.data.data;
+  const params = {
+    api_key: uploadData.apiKey,
+    timestamp: String(uploadData.timestamp),
+    signature: uploadData.signature,
+    public_id: uploadData.publicId,
+    overwrite: 'false',
+  };
 
-  const response = await apiClient.post<{ data: ChatAttachmentUploadResult }>(
-    '/conversations/attachments',
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      timeout: 120000,
-    },
-  );
+  const uploadResult = await FileSystem.uploadAsync(uploadData.uploadUrl, input.uri, {
+    httpMethod: 'POST',
+    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    fieldName: 'file',
+    mimeType: input.mimeType,
+    parameters: params,
+  });
 
-  return response.data.data;
+  if (uploadResult.status < 200 || uploadResult.status >= 300) {
+    throw new Error(`Attachment upload failed with status ${uploadResult.status}`);
+  }
+
+  const body = JSON.parse(uploadResult.body || '{}') as {
+    secure_url?: string;
+    original_filename?: string;
+    bytes?: number;
+  };
+
+  if (!body.secure_url) {
+    throw new Error('Attachment upload completed without a URL.');
+  }
+
+  return {
+    url: body.secure_url,
+    attachmentType: uploadData.attachmentType,
+    mimeType: input.mimeType,
+    fileName: body.original_filename || input.name,
+    size: body.bytes || 0,
+  };
 }
 
 interface RecommendedUser {

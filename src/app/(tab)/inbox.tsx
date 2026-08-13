@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Link, useRouter } from 'expo-router';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
@@ -8,9 +8,10 @@ import { useAppStore } from '../../store';
 import {
   createConversation,
   fetchConversations,
-  fetchRecommendedUsers,
   searchConversationUsers,
 } from '../../api/conversations/conversation.api';
+import { useChatSocket } from '../../hooks/chat/useChatSocket';
+import type { Message as SocketMessage } from '../../api/conversations/conversation.types';
 import { avatarSource } from '../../utils/avatar';
 
 export default function InboxScreen() {
@@ -19,7 +20,6 @@ export default function InboxScreen() {
   const currentUserId = useAppStore((s) => s.user?.id);
   
   const [conversations, setConversations] = useState<any[]>([]);
-  const [recommended, setRecommended] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
@@ -41,7 +41,7 @@ export default function InboxScreen() {
           userId: other?.id,
           name: other?.displayName || other?.username || 'User',
           username: other?.username,
-          lastMessage: c.lastMessage?.text || 'No messages yet',
+          lastMessage: formatLastMessage(c.lastMessage),
           time: formatTimeAgo(c.updatedAt || c.lastMessage?.createdAt || c.createdAt),
           unread: c.unreadCount || 0,
           avatar: other?.avatarUrl,
@@ -50,10 +50,6 @@ export default function InboxScreen() {
       });
       
       setConversations(transformed);
-      
-      // Load recommended users
-      const recData = await fetchRecommendedUsers();
-      setRecommended(recData);
     } catch (err) {
       console.error('Failed to load inbox:', err);
     } finally {
@@ -61,6 +57,43 @@ export default function InboxScreen() {
       setIsRefreshing(false);
     }
   }, [currentUserId]);
+
+  const handleInboxMessage = useCallback((socketMessage: SocketMessage) => {
+    console.log('Inbox live message received:', {
+      conversationId: socketMessage.conversationId,
+      messageId: socketMessage.id,
+    });
+
+    setConversations((prev) => {
+      const index = prev.findIndex((chat) => chat.id === socketMessage.conversationId);
+
+      if (index === -1) {
+        void loadData();
+        return prev;
+      }
+
+      const existing = prev[index];
+      const isFromOtherUser = socketMessage.sender.id !== currentUserId;
+      const updated = {
+        ...existing,
+        name: existing.name || socketMessage.sender.displayName || socketMessage.sender.username || 'User',
+        username: existing.username || socketMessage.sender.username,
+        avatar: existing.avatar || socketMessage.sender.avatarUrl,
+        lastMessage: formatLastMessage(socketMessage),
+        time: 'Just now',
+        unread: isFromOtherUser ? (existing.unread || 0) + 1 : existing.unread || 0,
+      };
+
+      return [updated, ...prev.filter((_, itemIndex) => itemIndex !== index)];
+    });
+  }, [currentUserId, loadData]);
+
+  useChatSocket({
+    onNewMessage: handleInboxMessage,
+    onError: (error) => {
+      console.log('Inbox socket status:', error.message);
+    },
+  });
 
   const openRecommendedChat = async (targetUserId: string) => {
     try {
@@ -81,10 +114,11 @@ export default function InboxScreen() {
     }
   };
 
-  useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      void loadData();
+    }, [loadData]),
+  );
 
   useEffect(() => {
     if (!isSearchOpen || searchQuery.trim().length < 2) {
@@ -272,35 +306,33 @@ export default function InboxScreen() {
                 </Link>
               ))
             ) : null}
-
-            {/* Recommended for you */}
-            {!isSearchOpen && recommended.length > 0 && (
-              <>
-                <Text className="text-white font-semibold text-lg px-4 mt-6 mb-2">Recommended for you</Text>
-                
-                {recommended.map((user) => (
-                  <Pressable key={user.id} className="flex-row items-center justify-between px-4 py-3" onPress={() => openRecommendedChat(user.id)}>
-                    <View className="flex-row items-center flex-1">
-                      <Image
-                        source={avatarSource(user.avatarUrl)}
-                        style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12 }}
-                        contentFit="cover"
-                      />
-                      <View className="flex-1 pr-4">
-                        <Text className="text-white font-bold text-base mb-1">{user.displayName}</Text>
-                        <Text className="text-[#888] text-sm" numberOfLines={1}>{user.reason}</Text>
-                      </View>
-                    </View>
-                    <Pressable className="bg-[#A3E635] px-4 py-1.5 rounded-full" onPress={() => openRecommendedChat(user.id)}>
-                      <Text className="text-black font-semibold text-sm">Message</Text>
-                    </Pressable>
-                  </Pressable>
-                ))}
-              </>
-            )}
           </View>
         </ScrollView>
       )}
     </View>
   );
+}
+
+function formatLastMessage(lastMessage?: {
+  text?: string;
+  mediaUrl?: string;
+  attachmentType?: 'image' | 'video' | 'audio' | 'file';
+}) {
+  const text = lastMessage?.text?.trim();
+  if (text) return text;
+
+  const type = lastMessage?.attachmentType || inferAttachmentType(lastMessage?.mediaUrl);
+  if (type === 'image') return 'Photo';
+  if (type === 'video') return 'Video';
+  if (type === 'audio') return 'Audio';
+  if (type === 'file') return 'Document';
+  return 'No messages yet';
+}
+
+function inferAttachmentType(url?: string): 'image' | 'video' | 'audio' | 'file' | undefined {
+  if (!url) return undefined;
+  if (/\.(jpg|jpeg|png|webp|gif|heic)(\?|$)/i.test(url)) return 'image';
+  if (/\.(mp4|mov|m4v|webm)(\?|$)/i.test(url)) return 'video';
+  if (/\.(mp3|m4a|wav|aac|ogg)(\?|$)/i.test(url)) return 'audio';
+  return 'file';
 }

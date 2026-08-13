@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { KeyboardAvoidingView, Platform, View, Keyboard, Text, Pressable, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, View, Keyboard, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -67,6 +67,16 @@ export default function ChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const currentUserId = useAppStore((s) => s.user?.id);
+  const routeChatUser = useMemo<ChatUser | null>(() => {
+    if (!userId && !name && !username && !avatar) return null;
+
+    return {
+      id: userId || '',
+      username: username || name || 'user',
+      displayName: name || username || 'User',
+      ...(avatar ? { avatarUrl: avatar } : {}),
+    };
+  }, [avatar, name, userId, username]);
   
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<MessageType[]>([]);
@@ -80,17 +90,6 @@ export default function ChatScreen() {
   const [confirmAction, setConfirmAction] = useState<'delete' | 'block' | null>(null);
   
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!userId && !name && !username && !avatar) return;
-
-    setChatUser({
-      id: userId || '',
-      username: username || name || 'user',
-      displayName: name || username || 'User',
-      ...(avatar ? { avatarUrl: avatar } : {}),
-    });
-  }, [avatar, name, userId, username]);
 
   // Socket callbacks
   const handleNewMessage = useCallback((socketMsg: SocketMessage) => {
@@ -248,11 +247,9 @@ export default function ChatScreen() {
     type: 'image' | 'video' | 'audio' | 'file',
     file?: { name?: string | null; mimeType?: string | null },
   ) => {
-    const text = type === 'image' ? '[Image]' : type === 'video' ? '[Video]' : type === 'audio' ? '[Audio]' : '[File]';
-    
     const optimisticMessage: MessageType = {
       id: `optimistic-${Date.now()}`,
-      text,
+      text: '',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       sender: 'me',
       attachmentType: type,
@@ -267,10 +264,11 @@ export default function ChatScreen() {
         uri,
         name: file?.name || fileNameFromUri(uri, type),
         mimeType: file?.mimeType || mimeTypeFromUri(uri, type),
+        attachmentType: type,
       });
       const socketResult = await socketSendMessage(
         id,
-        text,
+        undefined,
         uploaded.url,
         uploaded.attachmentType,
       );
@@ -348,10 +346,16 @@ export default function ChatScreen() {
 
   const handleDocumentPick = async (type: 'audio' | 'video' | 'file') => {
     const result = await DocumentPicker.getDocumentAsync({
-      type: type === 'audio' ? 'audio/*' : type === 'video' ? 'video/*' : '*/*',
+      type: documentPickerMimeTypes(type),
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
+
+      if (type === 'file' && isMediaDocument(asset.name, asset.mimeType)) {
+        Alert.alert('Select document only', 'Audio, video, and image files should be sent from Audio, Video, or Gallery.');
+        return;
+      }
+
       sendAttachment(asset.uri, type, { name: asset.name, mimeType: asset.mimeType });
     }
   };
@@ -381,8 +385,8 @@ export default function ChatScreen() {
             setConfirmAction(null);
             setShowOptionsSheet(true);
           }}
-          userName={chatUser?.displayName ?? chatUser?.username ?? 'User'}
-          avatarUrl={chatUser?.avatarUrl ?? ''}
+          userName={chatUser?.displayName ?? routeChatUser?.displayName ?? chatUser?.username ?? routeChatUser?.username ?? 'User'}
+          avatarUrl={chatUser?.avatarUrl ?? routeChatUser?.avatarUrl ?? ''}
           status={isTypingOther ? 'Typing...' : 'Online'}
         />
 
@@ -534,4 +538,33 @@ function mimeTypeFromUri(uri: string, type: 'image' | 'video' | 'audio' | 'file'
   if (type === 'video') return 'video/mp4';
   if (type === 'audio') return 'audio/mp4';
   return 'application/octet-stream';
+}
+
+function documentPickerMimeTypes(type: 'audio' | 'video' | 'file') {
+  if (type === 'audio') return 'audio/*';
+  if (type === 'video') return 'video/*';
+
+  return [
+    'application/pdf',
+    'text/plain',
+    'text/csv',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/json',
+  ];
+}
+
+function isMediaDocument(name?: string | null, mimeType?: string | null) {
+  const mime = (mimeType || '').toLowerCase();
+  if (mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/')) {
+    return true;
+  }
+
+  return /\.(jpg|jpeg|png|webp|gif|heic|mp4|mov|m4v|webm|mp3|m4a|wav|aac|ogg)$/i.test(name || '');
 }
