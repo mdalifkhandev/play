@@ -14,6 +14,8 @@ import { MessageType } from '../../../components/chat/MessageBubble';
 import { BottomSheetModal } from '../../../components/ui/BottomSheetModal';
 import { useAppStore } from '../../../store';
 import {
+  deleteConversation,
+  fetchConversationBlockStatus,
   fetchMessages,
   sendTextMessage,
   sendMessageWithMedia,
@@ -26,6 +28,8 @@ import {
   socketSendMessage,
   socketTyping,
   socketMarkRead,
+  socketBlockUser,
+  socketUnblockUser,
 } from '../../../hooks/chat/useChatSocket';
 import type { Message as SocketMessage } from '../../../api/conversations/conversation.types';
 
@@ -35,6 +39,8 @@ interface ChatUser {
   displayName: string;
   avatarUrl?: string;
 }
+
+const MESSAGE_PAGE_SIZE = 10;
 
 // Convert socket message to MessageType for the list
 const convertMessage = (msg: SocketMessage): MessageType => ({
@@ -83,13 +89,36 @@ export default function ChatScreen() {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [messagePage, setMessagePage] = useState(1);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isTypingOther, setIsTypingOther] = useState(false);
   const [chatUser, setChatUser] = useState<ChatUser | null>(null);
   const [showOptionsSheet, setShowOptionsSheet] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'delete' | 'block' | null>(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [blockStatus, setBlockStatus] = useState({
+    blockedByMe: false,
+    blockedMe: false,
+    canUnblock: false,
+  });
   
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const targetUserId = chatUser?.id || routeChatUser?.id || userId || '';
+  const isChatBlocked = blockStatus.blockedByMe || blockStatus.blockedMe;
+
+  const refreshBlockStatus = useCallback(async () => {
+    if (!targetUserId) return;
+
+    try {
+      const status = await fetchConversationBlockStatus(targetUserId);
+      setBlockStatus(status);
+      console.log('Conversation block status:', status);
+    } catch (error) {
+      console.log('Block status check failed:', error);
+    }
+  }, [targetUserId]);
 
   // Socket callbacks
   const handleNewMessage = useCallback((socketMsg: SocketMessage) => {
@@ -113,11 +142,68 @@ export default function ChatScreen() {
     console.log('Chat socket status:', error.message);
   }, []);
 
+  const handleBlockStatusChanged = useCallback((event: {
+    conversationId?: string;
+    userId: string;
+    blockedByMe: boolean;
+    blockedMe: boolean;
+    canUnblock: boolean;
+  }) => {
+    if (event.conversationId && event.conversationId !== id) return;
+
+    const possiblePartnerIds = [targetUserId, chatUser?.id, routeChatUser?.id, userId].filter(Boolean);
+    if (!possiblePartnerIds.includes(event.userId)) {
+      void refreshBlockStatus();
+      return;
+    }
+
+    setBlockStatus({
+      blockedByMe: event.blockedByMe,
+      blockedMe: event.blockedMe,
+      canUnblock: event.canUnblock,
+    });
+    setShowAttachMenu(false);
+    console.log('Live block status changed:', event);
+  }, [chatUser?.id, id, refreshBlockStatus, routeChatUser?.id, targetUserId, userId]);
+
   const { connect } = useChatSocket({
     onNewMessage: handleNewMessage,
     onTyping: handleTyping,
+    onBlockStatusChanged: handleBlockStatusChanged,
     onError: handleError,
   });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void refreshBlockStatus();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [refreshBlockStatus]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!id || isLoadingOlder || !hasOlderMessages) return;
+
+    const nextPage = messagePage + 1;
+    try {
+      setIsLoadingOlder(true);
+      const data = await fetchMessages(id, nextPage, MESSAGE_PAGE_SIZE);
+      const loadedMessages = data.items || data.messages || [];
+      const olderMessages = [...loadedMessages].reverse().map(convertMessage);
+
+      setMessages((prev) => {
+        const existingIds = new Set(prev.map((item) => item.id));
+        const uniqueOlder = olderMessages.filter((item) => !existingIds.has(item.id));
+        return [...uniqueOlder, ...prev];
+      });
+      setMessagePage(nextPage);
+      setHasOlderMessages(Boolean(data.hasMore));
+    } catch (err) {
+      console.error('Failed to load older messages:', err);
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  }, [hasOlderMessages, id, isLoadingOlder, messagePage]);
 
   // Load messages on mount
   useEffect(() => {
@@ -128,11 +214,15 @@ export default function ChatScreen() {
       
       try {
         setIsLoading(true);
-        const data = await fetchMessages(id);
+        setMessagePage(1);
+        setHasOlderMessages(false);
+        const data = await fetchMessages(id, 1, MESSAGE_PAGE_SIZE);
         if (!cancelled) {
           const loadedMessages = data.items || data.messages || [];
           const converted = [...loadedMessages].reverse().map(convertMessage);
           setMessages(converted);
+          setMessagePage(1);
+          setHasOlderMessages(Boolean(data.hasMore));
           
           // Get user info from first message
           if (loadedMessages.length > 0) {
@@ -193,7 +283,7 @@ export default function ChatScreen() {
   }, []);
 
   const handleSend = async () => {
-    if (!message.trim() || isSending) return;
+    if (!message.trim() || isSending || isChatBlocked) return;
     
     const text = message.trim();
     setMessage('');
@@ -227,6 +317,11 @@ export default function ChatScreen() {
       }
     } catch (err) {
       console.error('Failed to send message:', err);
+      const status = (err as any)?.response?.status;
+      const code = (err as any)?.response?.data?.code;
+      if (status === 403 || code === 'USER_BLOCKED') {
+        void refreshBlockStatus();
+      }
       // Show error on optimistic message
       setMessages((prev) => 
         prev.map((m) => 
@@ -247,6 +342,8 @@ export default function ChatScreen() {
     type: 'image' | 'video' | 'audio' | 'file',
     file?: { name?: string | null; mimeType?: string | null },
   ) => {
+    if (isChatBlocked) return;
+
     const optimisticMessage: MessageType = {
       id: `optimistic-${Date.now()}`,
       text: '',
@@ -281,6 +378,11 @@ export default function ChatScreen() {
       }
     } catch (err) {
       console.error('Failed to send attachment:', err);
+      const status = (err as any)?.response?.status;
+      const code = (err as any)?.response?.data?.code;
+      if (status === 403 || code === 'USER_BLOCKED') {
+        void refreshBlockStatus();
+      }
       setMessages((prev) => prev.filter(m => m.id !== optimisticMessage.id));
     }
   };
@@ -360,15 +462,62 @@ export default function ChatScreen() {
     }
   };
 
-  const handleConfirmAction = () => {
-    if (confirmAction === 'delete') {
-      alert('Conversation deleted');
+  const handleConfirmAction = async () => {
+    if (isActionLoading || !confirmAction) return;
+
+    try {
+      setIsActionLoading(true);
+
+      if (confirmAction === 'delete') {
+        await deleteConversation(id);
+        console.log('Conversation deleted:', id);
+      } else {
+        if (!targetUserId) {
+          Alert.alert('Unable to block', 'User information is not available.');
+          return;
+        }
+
+        const blockResult = await socketBlockUser(targetUserId, id);
+        if (!blockResult.success) {
+          throw new Error(blockResult.error.message);
+        }
+        setBlockStatus(blockResult.data);
+        setShowAttachMenu(false);
+        console.log('User blocked:', targetUserId);
+      }
+
       setShowOptionsSheet(false);
-      setTimeout(() => router.back(), 300);
-    } else if (confirmAction === 'block') {
-      alert('User blocked');
-      setShowOptionsSheet(false);
-      setTimeout(() => router.back(), 300);
+      setConfirmAction(null);
+      if (confirmAction === 'delete') {
+        setTimeout(() => router.back(), 200);
+      }
+    } catch (error) {
+      console.error(`Failed to ${confirmAction} conversation action:`, error);
+      Alert.alert(
+        confirmAction === 'delete' ? 'Delete failed' : 'Block failed',
+        'Please try again.',
+      );
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleUnblock = async () => {
+    if (!targetUserId || isActionLoading || !blockStatus.canUnblock) return;
+
+    try {
+      setIsActionLoading(true);
+      const unblockResult = await socketUnblockUser(targetUserId, id);
+      if (!unblockResult.success) {
+        throw new Error(unblockResult.error.message);
+      }
+      setBlockStatus(unblockResult.data);
+      console.log('User unblocked:', targetUserId);
+    } catch (error) {
+      console.error('Failed to unblock user:', error);
+      Alert.alert('Unblock failed', 'Please try again.');
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -396,9 +545,15 @@ export default function ChatScreen() {
           </View>
         ) : (
           <>
-            <MessageList messages={messages} isTyping={isTypingOther} />
+            <MessageList
+              messages={messages}
+              isTyping={isTypingOther}
+              hasMore={hasOlderMessages}
+              isLoadingOlder={isLoadingOlder}
+              onLoadOlder={loadOlderMessages}
+            />
 
-            {showAttachMenu && (
+            {showAttachMenu && !isChatBlocked && (
               <AttachmentMenu 
                 onCamera={handleCamera}
                 onGallery={handleGallery}
@@ -408,14 +563,23 @@ export default function ChatScreen() {
               />
             )}
 
-            <ChatInputArea 
-              message={message}
-              onChangeMessage={handleMessageChange}
-              onFocus={() => setShowAttachMenu(false)}
-              onSend={handleSend}
-              onToggleAttachMenu={() => setShowAttachMenu(!showAttachMenu)}
-              showAttachMenu={showAttachMenu}
-            />
+            {isChatBlocked ? (
+              <BlockedChatNotice
+                blockedByMe={blockStatus.blockedByMe}
+                blockedMe={blockStatus.blockedMe}
+                isLoading={isActionLoading}
+                onUnblock={handleUnblock}
+              />
+            ) : (
+              <ChatInputArea 
+                message={message}
+                onChangeMessage={handleMessageChange}
+                onFocus={() => setShowAttachMenu(false)}
+                onSend={handleSend}
+                onToggleAttachMenu={() => setShowAttachMenu(!showAttachMenu)}
+                showAttachMenu={showAttachMenu}
+              />
+            )}
             
             {isSending && (
               <View className="absolute bottom-20 left-0 right-0 items-center">
@@ -469,21 +633,69 @@ export default function ChatScreen() {
             <View className="flex-row justify-between">
               <Pressable 
                 className="flex-1 bg-[#333] py-3 rounded-xl mr-2 items-center"
+                disabled={isActionLoading}
                 onPress={() => setConfirmAction(null)}
               >
                 <Text className="text-white font-semibold">Cancel</Text>
               </Pressable>
               <Pressable 
                 className="flex-1 bg-red-500 py-3 rounded-xl ml-2 items-center"
+                disabled={isActionLoading}
                 onPress={handleConfirmAction}
               >
-                <Text className="text-white font-semibold">Confirm</Text>
+                {isActionLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text className="text-white font-semibold">Confirm</Text>
+                )}
               </Pressable>
             </View>
           </View>
         )}
       </BottomSheetModal>
     </KeyboardAvoidingView>
+  );
+}
+
+function BlockedChatNotice({
+  blockedByMe,
+  blockedMe,
+  isLoading,
+  onUnblock,
+}: {
+  blockedByMe: boolean;
+  blockedMe: boolean;
+  isLoading: boolean;
+  onUnblock: () => void;
+}) {
+  return (
+    <View className="px-4 py-3 bg-[#0A0A0A] border-t border-[#1C1C1E]">
+      <View className="rounded-2xl bg-[#1C1C1E] px-4 py-3">
+        <Text className="text-white font-semibold text-sm text-center">
+          {blockedByMe ? 'You blocked this user.' : 'You cannot message this user.'}
+        </Text>
+        <Text className="text-[#888] text-xs text-center mt-1">
+          {blockedByMe
+            ? 'Unblock to send messages again.'
+            : blockedMe
+              ? 'Only the user who blocked can unblock this chat.'
+              : 'Messaging is unavailable.'}
+        </Text>
+        {blockedByMe && (
+          <Pressable
+            className="mt-3 rounded-full bg-[#A3E635] py-2 items-center"
+            disabled={isLoading}
+            onPress={onUnblock}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#000" />
+            ) : (
+              <Text className="text-black font-bold">Unblock</Text>
+            )}
+          </Pressable>
+        )}
+      </View>
+    </View>
   );
 }
 

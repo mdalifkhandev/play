@@ -1,14 +1,27 @@
 import React from 'react';
-import { ScrollView, View, Animated } from 'react-native';
+import { ActivityIndicator, NativeScrollEvent, NativeSyntheticEvent, ScrollView, View, Animated } from 'react-native';
 import { MessageBubble, MessageType } from './MessageBubble';
+
+const LOAD_OLDER_THRESHOLD = 360;
 
 interface MessageListProps {
   messages: MessageType[];
   isTyping?: boolean;
+  hasMore?: boolean;
+  isLoadingOlder?: boolean;
+  onLoadOlder?: () => void;
 }
 
-export function MessageList({ messages, isTyping }: MessageListProps) {
+export function MessageList({
+  messages,
+  isTyping,
+  hasMore,
+  isLoadingOlder,
+  onLoadOlder,
+}: MessageListProps) {
   const scrollRef = React.useRef<ScrollView>(null);
+  const idsRef = React.useRef<{ first?: string; last?: string; didMount: boolean }>({ didMount: false });
+  const loadOlderLockRef = React.useRef(false);
   const animValues = React.useMemo(() => [
     new Animated.Value(0),
     new Animated.Value(0),
@@ -28,23 +41,55 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
   }, [animValues, isTyping]);
 
   React.useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollRef.current?.scrollToEnd({ animated: messages.length > 1 });
-    }, 50);
+    const first = messages[0]?.id;
+    const last = messages[messages.length - 1]?.id;
+    const previous = idsRef.current;
+    const shouldScrollToEnd =
+      !previous.didMount ||
+      previous.last !== last ||
+      isTyping;
 
+    idsRef.current = { first, last, didMount: true };
+
+    if (!shouldScrollToEnd) return;
+
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: previous.didMount });
+    }, 50);
     return () => clearTimeout(timer);
-  }, [messages.length, isTyping]);
+  }, [isTyping, messages]);
+
+  React.useEffect(() => {
+    if (!isLoadingOlder) {
+      loadOlderLockRef.current = false;
+    }
+  }, [isLoadingOlder]);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!hasMore || isLoadingOlder || loadOlderLockRef.current) return;
+
+    const offsetY = event.nativeEvent.contentOffset.y;
+    if (offsetY <= LOAD_OLDER_THRESHOLD) {
+      loadOlderLockRef.current = true;
+      onLoadOlder?.();
+    }
+  };
 
   return (
     <ScrollView
       ref={scrollRef}
       className="flex-1 px-4 pt-4"
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 20 }}
-      onContentSizeChange={() => {
-        scrollRef.current?.scrollToEnd({ animated: true });
-      }}
+      contentContainerStyle={{ paddingBottom: 20, paddingTop: hasMore ? 8 : 0 }}
+      maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+      scrollEventThrottle={16}
+      onScroll={handleScroll}
     >
+      {isLoadingOlder && (
+        <View className="items-center py-3">
+          <ActivityIndicator size="small" color="#A3E635" />
+        </View>
+      )}
       {messages.map((msg) => (
         <MessageBubble key={msg.id} msg={msg} />
       ))}

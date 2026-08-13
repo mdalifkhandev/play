@@ -70,6 +70,33 @@ export async function sendMessageWithMedia(
   return response.data.data;
 }
 
+export async function deleteConversation(conversationId: string): Promise<void> {
+  await apiClient.delete(`/conversations/${conversationId}`);
+}
+
+export async function blockConversationUser(targetUserId: string): Promise<void> {
+  await apiClient.post(`/conversations/block/${targetUserId}`);
+}
+
+export async function unblockConversationUser(targetUserId: string): Promise<void> {
+  await apiClient.delete(`/conversations/block/${targetUserId}`);
+}
+
+export async function fetchConversationBlockStatus(targetUserId: string): Promise<{
+  blockedByMe: boolean;
+  blockedMe: boolean;
+  canUnblock: boolean;
+}> {
+  const response = await apiClient.get<{
+    data: {
+      blockedByMe: boolean;
+      blockedMe: boolean;
+      canUnblock: boolean;
+    };
+  }>(`/conversations/block/${targetUserId}`);
+  return response.data.data;
+}
+
 export async function uploadChatAttachment(input: {
   uri: string;
   name: string;

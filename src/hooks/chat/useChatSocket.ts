@@ -15,7 +15,10 @@ import { useAppStore } from '../../store';
 export function useChatSocket(callbacks: ChatSocketCallbacks = {}) {
   const token = useAppStore((state) => state.token);
   const callbacksRef = useRef(callbacks);
-  callbacksRef.current = callbacks;
+
+  useEffect(() => {
+    callbacksRef.current = callbacks;
+  }, [callbacks]);
 
   useEffect(() => {
     const unsubscribe = subscribeChatSocket({
@@ -23,6 +26,7 @@ export function useChatSocket(callbacks: ChatSocketCallbacks = {}) {
       onMessageDelivered: (data) => callbacksRef.current.onMessageDelivered?.(data),
       onTyping: (event) => callbacksRef.current.onTyping?.(event),
       onReadReceipt: (event) => callbacksRef.current.onReadReceipt?.(event),
+      onBlockStatusChanged: (event) => callbacksRef.current.onBlockStatusChanged?.(event),
       onUserOnline: (data) => callbacksRef.current.onUserOnline?.(data),
       onUserOffline: (data) => callbacksRef.current.onUserOffline?.(data),
       onError: (error) => callbacksRef.current.onError?.(error),
@@ -84,4 +88,30 @@ export function socketTyping(conversationId: string, isTyping: boolean) {
 
 export function socketMarkRead(conversationId: string) {
   return emitChatEvent(CHAT_SOCKET_EVENTS.READ, { conversationId }, 5000);
+}
+
+export function socketBlockUser(targetUserId: string, conversationId?: string) {
+  return emitChatEvent<{
+    conversationId?: string;
+    userId: string;
+    blockedByMe: boolean;
+    blockedMe: boolean;
+    canUnblock: boolean;
+  }>(CHAT_SOCKET_EVENTS.BLOCK_USER, {
+    targetUserId,
+    ...(conversationId ? { conversationId } : {}),
+  }, 5000);
+}
+
+export function socketUnblockUser(targetUserId: string, conversationId?: string) {
+  return emitChatEvent<{
+    conversationId?: string;
+    userId: string;
+    blockedByMe: boolean;
+    blockedMe: boolean;
+    canUnblock: boolean;
+  }>(CHAT_SOCKET_EVENTS.UNBLOCK_USER, {
+    targetUserId,
+    ...(conversationId ? { conversationId } : {}),
+  }, 5000);
 }

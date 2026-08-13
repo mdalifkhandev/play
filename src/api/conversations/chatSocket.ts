@@ -21,6 +21,9 @@ export const CHAT_SOCKET_EVENTS = {
   USER_TYPING: 'chat:user_typing',
   READ: 'chat:read',
   READ_RECEIPT: 'chat:read_receipt',
+  BLOCK_USER: 'chat:block_user',
+  UNBLOCK_USER: 'chat:unblock_user',
+  BLOCK_STATUS_CHANGED: 'chat:block_status_changed',
   ERROR: 'chat:error',
   USER_ONLINE: 'user:online',
   USER_OFFLINE: 'user:offline',
@@ -31,6 +34,13 @@ export type ChatSocketCallbacks = {
   onMessageDelivered?: (data: { conversationId: string; messageIds: string[]; deliveredAt?: string; deliveredBy?: string }) => void;
   onTyping?: (event: TypingEvent) => void;
   onReadReceipt?: (event: ReadReceiptEvent) => void;
+  onBlockStatusChanged?: (event: {
+    conversationId?: string;
+    userId: string;
+    blockedByMe: boolean;
+    blockedMe: boolean;
+    canUnblock: boolean;
+  }) => void;
   onUserOnline?: (data: { userId: string; username?: string; online?: boolean }) => void;
   onUserOffline?: (data: { userId: string; username?: string; online?: boolean }) => void;
   onError?: (error: SocketErrorPayload) => void;
@@ -107,6 +117,10 @@ export function ensureChatSocket(token: string): Socket | null {
 
   socket.on(CHAT_SOCKET_EVENTS.READ_RECEIPT, (event: ReadReceiptEvent) => {
     callbackSets.forEach((callbacks) => callbacks.onReadReceipt?.(event));
+  });
+
+  socket.on(CHAT_SOCKET_EVENTS.BLOCK_STATUS_CHANGED, (event) => {
+    callbackSets.forEach((callbacks) => callbacks.onBlockStatusChanged?.(event));
   });
 
   socket.on(CHAT_SOCKET_EVENTS.USER_ONLINE, (data) => {
