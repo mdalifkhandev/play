@@ -25,7 +25,24 @@ export async function publishReel(input: PublishReelInput): Promise<ReelPublishR
   const uploadMediaType = mediaType === 'photo' ? 'image' : 'video';
   const file = await createUploadFile(input.videoUri, mediaType);
 
+  console.log('[PUBLISH_REEL] start', {
+    mediaType,
+    uploadMediaType,
+    file,
+    hasAudio: Boolean(input.audio),
+    audio: input.audio,
+    videoEdit: input.videoEdit,
+  });
+
   await refreshAccessTokenIfPossible();
+
+  console.log('[PUBLISH_REEL] prepare upload request', {
+    fileName: file.name,
+    mediaType: uploadMediaType,
+    mimeType: file.type,
+    fileSizeBytes: file.size,
+    purpose: 'reel',
+  });
 
   const uploadUrlResponse = await apiClient.post<{ data: UploadUrlResponse }>('/uploads/prepare', {
     fileName: file.name,
@@ -35,6 +52,10 @@ export async function publishReel(input: PublishReelInput): Promise<ReelPublishR
     purpose: 'reel',
   });
   const uploadData = uploadUrlResponse.data.data;
+  console.log('[PUBLISH_REEL] upload prepared', {
+    uploadId: uploadData.uploadId,
+    publicId: uploadData.publicId,
+  });
 
   const params = {
     api_key: uploadData.apiKey,
@@ -45,29 +66,39 @@ export async function publishReel(input: PublishReelInput): Promise<ReelPublishR
   };
 
   await uploadToCloudinary(uploadData.uploadUrl, input.videoUri, file.type, params, input.onProgress);
+  console.log('[PUBLISH_REEL] cloudinary upload complete', { uploadId: uploadData.uploadId });
 
   await refreshAccessTokenIfPossible();
 
   const completeResponse = await completeUploadWithRetry(uploadData.uploadId);
   const completed = completeResponse.data.data;
   const mediaAssetId = completed.mediaAssetId || completed.id;
+  console.log('[PUBLISH_REEL] upload complete response', {
+    uploadId: uploadData.uploadId,
+    mediaAssetId,
+    mediaKey: completed.mediaKey,
+  });
 
   if (!mediaAssetId) {
     throw new Error('Upload completed but media asset id was missing.');
   }
 
+  const createPayload = {
+    mediaAssetId,
+    ...(completed.mediaKey ? { rawMediaKey: completed.mediaKey } : {}),
+    caption: input.caption,
+    mediaType,
+    visibility: 'public',
+    forKids: input.forKids ?? false,
+    audio: input.audio,
+    videoEdit: input.videoEdit,
+  };
+
+  console.log('[PUBLISH_REEL] create reel request', createPayload);
+
   const reelResponse = await apiClient.post<{ data: ReelPublishResult }>(
     '/reels',
-    {
-      mediaAssetId,
-      ...(completed.mediaKey ? { rawMediaKey: completed.mediaKey } : {}),
-      caption: input.caption,
-      mediaType,
-      visibility: 'public',
-      forKids: input.forKids ?? false,
-      audio: input.audio,
-      videoEdit: input.videoEdit,
-    },
+    createPayload,
     {
       headers: {
         'Idempotency-Key': `reel-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -75,6 +106,7 @@ export async function publishReel(input: PublishReelInput): Promise<ReelPublishR
     },
   );
 
+  console.log('[PUBLISH_REEL] create reel response', reelResponse.data.data);
   return reelResponse.data.data;
 }
 

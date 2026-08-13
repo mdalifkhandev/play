@@ -100,7 +100,15 @@ export default function EditMediaScreen() {
     normalizedParamMediaType === 'video' || normalizedParamMediaType === 'photo' ? normalizedParamMediaType : undefined;
   const mockImage = normalizeMediaUri(uri) || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800';
   const isVideo = normalizedMediaType === 'video';
-  const audioDurationSec = parseDurationSeconds(soundDuration, title);
+  const [selectedSoundUrl, setSelectedSoundUrl] = useState(firstParam(soundUrl) || '');
+  const [selectedTitle, setSelectedTitle] = useState(firstParam(title) || '');
+  const [selectedMusicId, setSelectedMusicId] = useState(firstParam(musicId) || '');
+  const [selectedMusicArtist, setSelectedMusicArtist] = useState(firstParam(musicArtist) || '');
+  const [selectedMusicCoverUrl, setSelectedMusicCoverUrl] = useState(firstParam(musicCoverUrl) || '');
+  const [selectedSoundDuration, setSelectedSoundDuration] = useState(firstParam(soundDuration) || '');
+  const [selectedOriginalVolume, setSelectedOriginalVolume] = useState(firstParam(originalVolume) || '');
+  const [selectedAddedVolume, setSelectedAddedVolume] = useState(firstParam(addedVolume) || '');
+  const audioDurationSec = parseDurationSeconds(selectedSoundDuration, selectedTitle);
   const [videoDurationSec, setVideoDurationSec] = useState(videoDuration ? Number(videoDuration) : 0);
   const isLowEndDevice = (Device.totalMemory ?? 0) < 3 * 1024 * 1024 * 1024;
   
@@ -114,7 +122,7 @@ export default function EditMediaScreen() {
   const { videoPlayer, sound, getTrimTime, seekSound, isMediaReady } = useVideoEditorPlayer({
     uri: mockImage,
     isVideo,
-    soundUrl,
+    soundUrl: selectedSoundUrl,
     trimLeft,
     isPreviewPlayingRef,
     audioDurationSec
@@ -164,7 +172,7 @@ export default function EditMediaScreen() {
 
   const photoLoadFailed = !isVideo && photoFailedUri === mockImage;
   const showLoadingOverlay = isVideo && !isMediaReady;
-  const showPreviewBar = isVideo || !!soundUrl;
+  const showPreviewBar = isVideo || !!selectedSoundUrl;
 
   const formatSeconds = (seconds: number) => {
     const safeSeconds = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
@@ -187,10 +195,25 @@ export default function EditMediaScreen() {
 
   // Apply volume changes to existing audio player
   useEffect(() => {
-    if (sound && addedVolume !== undefined) {
-      sound.volume = Number(addedVolume) / 100;
+    if (sound && selectedAddedVolume !== undefined) {
+      sound.volume = Number(selectedAddedVolume || 100) / 100;
     }
-  }, [sound, addedVolume]);
+  }, [sound, selectedAddedVolume]);
+
+  const removeMusic = () => {
+    try { sound?.pause(); } catch {}
+    try { sound?.release?.(); } catch {}
+    try { if (videoPlayer) videoPlayer.muted = true; } catch {}
+    setShowMusicCard(false);
+    setSelectedSoundUrl('');
+    setSelectedTitle('');
+    setSelectedMusicId('');
+    setSelectedMusicArtist('');
+    setSelectedMusicCoverUrl('');
+    setSelectedSoundDuration('');
+    setSelectedOriginalVolume('0');
+    setSelectedAddedVolume('0');
+  };
 
   // Drag logic for Music Card
   const pan = useRef(new Animated.ValueXY({
@@ -250,10 +273,10 @@ export default function EditMediaScreen() {
   };
 
   const { isExporting, navigateToPostDetails } = useMediaExport({
-    mockImage, mediaType: normalizedMediaType, soundUrl, overlayText, originalVolume, addedVolume,
+    mockImage, mediaType: normalizedMediaType, soundUrl: selectedSoundUrl, overlayText, originalVolume: selectedOriginalVolume, addedVolume: selectedAddedVolume,
     trimLeft, trimRight, audioDurationSec, videoTrimStartSec, videoTrimEndSec,
-    activeFilter, activeEffect, textPan, title, soundDuration, musicId, musicArtist,
-    musicCoverUrl, videoTrimLeft, videoTrimRight, videoTrimStart, videoTrimEnd,
+    activeFilter, activeEffect, textPan, title: selectedTitle, soundDuration: selectedSoundDuration, musicId: selectedMusicId, musicArtist: selectedMusicArtist,
+    musicCoverUrl: selectedMusicCoverUrl, videoTrimLeft, videoTrimRight, videoTrimStart, videoTrimEnd,
     videoDurationSec, exposure, contrast, videoPlayer, sound
   });
 
@@ -360,13 +383,13 @@ export default function EditMediaScreen() {
 
             <TextOverlay overlayText={overlayText} isTextMode={isTextMode} activePanel={activePanel} textPanResponder={textPanResponder} textPan={textPan} />
 
-            <MusicCard soundUrl={soundUrl} title={title} musicCoverUrl={musicCoverUrl} musicArtist={musicArtist} showMusicCard={showMusicCard} isTextMode={isTextMode} activePanel={activePanel} panResponder={panResponder} pan={pan} onClose={() => setShowMusicCard(false)} />
+            <MusicCard soundUrl={selectedSoundUrl} title={selectedTitle} musicCoverUrl={selectedMusicCoverUrl} musicArtist={selectedMusicArtist} showMusicCard={showMusicCard} isTextMode={isTextMode} activePanel={activePanel} panResponder={panResponder} pan={pan} onClose={removeMusic} />
 
             {showPreviewBar && (
               <BottomPreviewBar isTextMode={isTextMode} activePanel={activePanel} togglePreviewPlayback={togglePreviewPlayback} isPreviewPlaying={isPreviewPlaying} previewCurrentTime={previewCurrentTime} previewDurationSec={previewDurationSec} previewProgressPercent={previewProgressPercent} formatSeconds={formatSeconds} />
             )}
 
-            <EditorRightActions isTextMode={isTextMode} activePanel={activePanel} router={router} mockImage={mockImage} mediaType={normalizedMediaType} soundUrl={soundUrl} title={title} soundDuration={soundDuration} musicId={musicId} musicArtist={musicArtist} musicCoverUrl={musicCoverUrl} originalVolume={originalVolume} addedVolume={addedVolume} trimLeft={trimLeft} trimRight={trimRight} videoTrimLeft={videoTrimLeft} videoTrimRight={videoTrimRight} videoTrimStart={videoTrimStart} videoTrimEnd={videoTrimEnd} videoDurationSec={videoDurationSec} overlayText={overlayText} textOffsetX={(textPan.x as any)._value} textOffsetY={(textPan.y as any)._value} musicOffsetX={(pan.x as any)._value} musicOffsetY={(pan.y as any)._value} showMusicCard={showMusicCard} exposure={exposure} contrast={contrast} activeFilter={activeFilter} activeEffect={activeEffect} setIsTextMode={setIsTextMode} setActivePanel={setActivePanel} isLowEndDevice={isLowEndDevice} />
+            <EditorRightActions isTextMode={isTextMode} activePanel={activePanel} router={router} mockImage={mockImage} mediaType={normalizedMediaType} soundUrl={selectedSoundUrl} title={selectedTitle} soundDuration={selectedSoundDuration} musicId={selectedMusicId} musicArtist={selectedMusicArtist} musicCoverUrl={selectedMusicCoverUrl} originalVolume={selectedOriginalVolume} addedVolume={selectedAddedVolume} trimLeft={trimLeft} trimRight={trimRight} videoTrimLeft={videoTrimLeft} videoTrimRight={videoTrimRight} videoTrimStart={videoTrimStart} videoTrimEnd={videoTrimEnd} videoDurationSec={videoDurationSec} overlayText={overlayText} textOffsetX={(textPan.x as any)._value} textOffsetY={(textPan.y as any)._value} musicOffsetX={(pan.x as any)._value} musicOffsetY={(pan.y as any)._value} showMusicCard={showMusicCard} exposure={exposure} contrast={contrast} activeFilter={activeFilter} activeEffect={activeEffect} setIsTextMode={setIsTextMode} setActivePanel={setActivePanel} isLowEndDevice={isLowEndDevice} />
           </View>
         </View>
 

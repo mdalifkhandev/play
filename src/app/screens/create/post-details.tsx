@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -52,6 +52,15 @@ const mapFilter = (value?: string): ReelVideoEditInput['filter'] => {
   return 'none';
 };
 
+const mapEffect = (value?: string): ReelVideoEditInput['effect'] => {
+  const normalized = (value || '').trim().toLowerCase();
+  if (normalized === 'zoom') return 'zoom';
+  if (normalized === 'glitch') return 'glitch';
+  if (normalized === 'flash') return 'flash';
+  if (normalized === 'vhs') return 'vhs';
+  return 'none';
+};
+
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const firstParam = (value?: string | string[]) => Array.isArray(value) ? value[0] : value;
 
@@ -98,6 +107,7 @@ export default function PostDetailsScreen() {
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const isPostingRef = useRef(false);
 
   // Ref for caption input to auto-focus
   const captionInputRef = React.useRef<TextInput>(null);
@@ -150,6 +160,26 @@ export default function PostDetailsScreen() {
   };
 
   const buildVideoEditPayload = (): ReelVideoEditInput => {
+    if (normalizedMediaType === 'photo') {
+      return {
+        trim: { startMs: 0, endMs: 10_000 },
+        filter: mapFilter(parsedVideoEdit?.filter || activeFilter),
+        effect: mapEffect(parsedVideoEdit?.effect || activeEffect),
+        exposure: exposure,
+        contrast: contParam ? parseInt(contParam, 10) : 50,
+        ...(overlayText?.trim()
+          ? {
+              overlayText: {
+                text: overlayText.trim(),
+                x: clamp01(0.5 + (Number(textOffsetX || 0) || 0) / 360),
+                y: clamp01(0.5 + (Number(textOffsetY || 0) || 0) / 640),
+                fontSize: 42,
+              },
+            }
+          : {}),
+      };
+    }
+
     const parsedVideoDuration = videoDuration ? Number(videoDuration) : 0;
     const fallbackEndSeconds = parsedVideoDuration > 0 ? parsedVideoDuration : 10;
     const startSeconds = videoTrimStart !== undefined && videoTrimStart !== ''
@@ -163,8 +193,8 @@ export default function PostDetailsScreen() {
 
     return {
       trim: { startMs, endMs },
-      filter: mapFilter(activeFilter),
-      effect: 'none',
+      filter: mapFilter(parsedVideoEdit?.filter || activeFilter),
+      effect: mapEffect(parsedVideoEdit?.effect || activeEffect),
       exposure: exposure,
       contrast: contParam ? parseInt(contParam, 10) : 50,
       ...(overlayText?.trim()
@@ -212,8 +242,9 @@ export default function PostDetailsScreen() {
   };
 
   const handlePost = async () => {
-    if (isPosting) return;
+    if (isPostingRef.current) return;
 
+    isPostingRef.current = true;
     setIsPosting(true);
 
     try {
@@ -253,6 +284,7 @@ export default function PostDetailsScreen() {
       const message = handleApiError(error, 'Could not upload this reel.');
       alert(message.toLowerCase().includes('access token') ? 'Please login again, then upload your reel.' : message);
     } finally {
+      isPostingRef.current = false;
       setIsPosting(false);
       setUploadProgress(null);
     }

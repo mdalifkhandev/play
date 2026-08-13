@@ -100,8 +100,6 @@ export default function CreateScreen() {
   const flipCamera = () => {
     if (isRecording) return;
 
-    setIsCameraReady(false);
-    isCameraReadyRef.current = false;
     setFacing(current => (current === 'back' ? 'front' : 'back'));
   };
 
@@ -120,12 +118,17 @@ export default function CreateScreen() {
           skipProcessing: false,
         });
         if (photo?.uri && isMountedRef.current) {
+          console.log('Photo captured, opening edit screen:', photo.uri);
           router.push({
             pathname: '/screens/create/edit',
             params: { uri: photo.uri, mediaType: 'photo', ...selectedSoundParams },
           });
+        } else {
+          console.warn('Photo capture returned no uri:', photo);
+          Alert.alert('Photo failed', 'Photo data was missing. Please try again.');
         }
       } catch (error) {
+        Alert.alert('Photo failed', 'Could not capture photo. Please try again.');
         console.error('Failed to take picture:', error);
       }
     } else if (isRecordingRef.current) {
@@ -360,8 +363,6 @@ export default function CreateScreen() {
               key={m}
               onPress={() => {
                 if (isRecording) return;
-                setIsCameraReady(false);
-                isCameraReadyRef.current = false;
                 setMainMode(m as any);
               }}
             >

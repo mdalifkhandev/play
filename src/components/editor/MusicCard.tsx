@@ -33,7 +33,7 @@ export function MusicCard({
   return (
     <Animated.View
       {...panResponder.panHandlers}
-      className="absolute right-4 top-1/3 bg-black/60 rounded-xl p-2 flex-row items-center z-20 shadow-lg"
+      className="absolute left-20 top-12 bg-black/60 rounded-xl p-2 flex-row items-center z-20 shadow-lg"
       style={{
         transform: [{ translateX: pan.x }, { translateY: pan.y }],
         maxWidth: 200
