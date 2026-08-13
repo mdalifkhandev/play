@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CreatorCard } from '../../components/profile/CreatorCard';
 import { CreatorTools } from '../../components/profile/CreatorTools';
@@ -9,12 +9,47 @@ import { ProfileTabs } from '../../components/profile/ProfileTabs';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { getMyProfileData } from '../../api/profile/profile.api';
+import type { MyProfileData } from '../../api/profile/profile.types';
+import { handleApiError } from '../../api/client';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
   const isCreator = params.creatorMode === 'true';
+  const [profileData, setProfileData] = useState<MyProfileData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadProfile = useCallback(async (refresh = false) => {
+    try {
+      if (refresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+
+      const data = await getMyProfileData();
+      setProfileData(data);
+      setError(null);
+    } catch (profileError) {
+      setError(handleApiError(profileError, 'Could not load profile.'));
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
+  const user = profileData?.user;
+  const profile = user?.profile;
+  const displayName = profile?.displayName || profile?.username || user?.email?.split('@')[0] || 'User';
+  const username = profile?.username || user?.email?.split('@')[0] || 'user';
 
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
@@ -22,8 +57,34 @@ export default function ProfileScreen() {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => loadProfile(true)}
+            tintColor="#98FF2F"
+            colors={["#98FF2F"]}
+          />
+        }
       >
-        <ProfileInfo />
+        {isLoading && !profileData ? (
+          <View className="py-20 items-center justify-center">
+            <ActivityIndicator size="large" color="#98FF2F" />
+          </View>
+        ) : (
+          <ProfileInfo
+            avatarUrl={profile?.photoUrl}
+            displayName={displayName}
+            username={username}
+            bio={profile?.bio}
+            followingCount={profileData?.stats.followingCount}
+            followersCount={profileData?.stats.followersCount}
+            likesCount={profileData?.stats.likesCount}
+          />
+        )}
+
+        {error && (
+          <Text className="text-red-400 text-center text-sm mt-4 px-4">{error}</Text>
+        )}
 
         {isCreator ? (
           <Pressable
@@ -43,7 +104,7 @@ export default function ProfileScreen() {
           </>
         )}
 
-        <ProfileTabs />
+        <ProfileTabs posts={profileData?.reels || []} />
       </ScrollView>
     </View>
   );

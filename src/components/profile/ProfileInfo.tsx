@@ -2,13 +2,33 @@ import { Image } from 'expo-image';
 import React from 'react';
 import { Text, View } from 'react-native';
 
-export function ProfileInfo() {
+const fallbackAvatar = 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80';
+
+type ProfileInfoProps = {
+  avatarUrl?: string;
+  displayName?: string;
+  username?: string;
+  bio?: string;
+  followingCount?: number;
+  followersCount?: number;
+  likesCount?: number;
+};
+
+export function ProfileInfo({
+  avatarUrl,
+  displayName = 'User',
+  username = 'user',
+  bio = '',
+  followingCount = 0,
+  followersCount = 0,
+  likesCount = 0,
+}: ProfileInfoProps) {
   return (
     <View className="items-center mt-2 px-4">
       {/* Avatar */}
       <View className="relative">
         <Image
-          source={{ uri: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80" }}
+          source={{ uri: avatarUrl || fallbackAvatar }}
           style={{ width: 88, height: 88, borderRadius: 44 }}
           contentFit="cover"
         />
@@ -18,28 +38,28 @@ export function ProfileInfo() {
       </View>
 
       {/* Name and Handle */}
-      <Text className="text-white text-[16px] font-bold mt-4">Jodu miyaa</Text>
-      <Text className="text-[#888] text-[14px] mt-1">@Jodumiyaa</Text>
+      <Text className="text-white text-[16px] font-bold mt-4">{displayName}</Text>
+      <Text className="text-[#888] text-[14px] mt-1">@{username}</Text>
 
       {/* Stats */}
       <View className="flex-row items-center mt-6 w-full px-4">
         <View className="flex-1 items-center border-r border-[#333]">
-          <Text className="text-white text-[16px] font-bold">5</Text>
+          <Text className="text-white text-[16px] font-bold">{followingCount}</Text>
           <Text className="text-[#888] text-[14px] mt-1">Following</Text>
         </View>
         <View className="flex-1 items-center border-r border-[#333]">
-          <Text className="text-white text-[16px] font-bold">12</Text>
+          <Text className="text-white text-[16px] font-bold">{followersCount}</Text>
           <Text className="text-[#888] text-[14px] mt-1">Followers</Text>
         </View>
         <View className="flex-1 items-center">
-          <Text className="text-white text-[16px] font-bold">123</Text>
+          <Text className="text-white text-[16px] font-bold">{likesCount}</Text>
           <Text className="text-[#888] text-[14px] mt-1">Likes</Text>
         </View>
       </View>
 
       {/* Bio */}
       <Text className="text-[#888] text-[16px] text-center mt-6 px-4 leading-5">
-        Creating short anime and movie edits, reviews, and fandom mom..
+        {bio || 'No bio yet.'}
       </Text>
     </View>
   );

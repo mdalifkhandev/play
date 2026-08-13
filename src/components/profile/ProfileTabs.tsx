@@ -4,11 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { PostsTab } from './PostsTab';
 import { CollectionsTab } from './CollectionsTab';
 import { SoundsTab } from './SoundsTab';
+import type { ReelFeedItem } from '../../api/reels/reels.types';
 
 type MainTabType = 'grid' | 'bookmark' | 'heart';
 type SavedTabType = 'posts' | 'collections' | 'sounds';
 
-export function ProfileTabs() {
+export function ProfileTabs({ posts = [] }: { posts?: ReelFeedItem[] }) {
   const [activeMainTab, setActiveMainTab] = useState<MainTabType>('grid');
   const [activeSavedTab, setActiveSavedTab] = useState<SavedTabType>('posts');
 
@@ -78,9 +79,9 @@ export function ProfileTabs() {
 
       {/* Tab Content */}
       <View className="flex-1 min-h-[300px]">
-        {activeMainTab === 'grid' && <PostsTab />}
-        {activeMainTab === 'heart' && <PostsTab />}
-        {activeMainTab === 'bookmark' && activeSavedTab === 'posts' && <PostsTab />}
+        {activeMainTab === 'grid' && <PostsTab posts={posts} />}
+        {activeMainTab === 'heart' && <PostsTab posts={posts} />}
+        {activeMainTab === 'bookmark' && activeSavedTab === 'posts' && <PostsTab posts={posts} />}
         {activeMainTab === 'bookmark' && activeSavedTab === 'collections' && <CollectionsTab />}
         {activeMainTab === 'bookmark' && activeSavedTab === 'sounds' && <SoundsTab />}
       </View>

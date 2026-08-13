@@ -17,6 +17,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.play",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
