@@ -132,7 +132,7 @@ export default function UserProfileScreen() {
               </Text>
             </Pressable>
 
-            <ProfileTabs posts={profileData?.reels || []} />
+            <ProfileTabs posts={profileData?.reels || []} showPrivateTabs={false} />
           </>
         )}
 

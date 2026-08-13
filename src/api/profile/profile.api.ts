@@ -29,6 +29,16 @@ export async function getMyReels(): Promise<ReelFeedResponse> {
   return dataOf<ReelFeedResponse>(response);
 }
 
+export async function getMySavedReels(): Promise<ReelFeedResponse> {
+  const response = await apiClient.get<{ data: ReelFeedResponse }>('/me/saved-reels');
+  return dataOf<ReelFeedResponse>(response);
+}
+
+export async function getMyLikedReels(): Promise<ReelFeedResponse> {
+  const response = await apiClient.get<{ data: ReelFeedResponse }>('/me/liked-reels');
+  return dataOf<ReelFeedResponse>(response);
+}
+
 export async function getUserProfile(userId: string): Promise<{ user: ProfileUser }> {
   const response = await apiClient.get<{ data: { user: ProfileUser } }>(`/users/${userId}/profile`);
   return dataOf<{ user: ProfileUser }>(response);
@@ -41,11 +51,15 @@ export async function getUserReels(userId: string): Promise<ReelFeedResponse> {
 
 export async function getMyProfileData(): Promise<MyProfileData> {
   const { user } = await getMe();
-  const [followState, reelsResponse] = await Promise.all([
+  const [followState, reelsResponse, savedResponse, likedResponse] = await Promise.all([
     getFollowState(user.id),
     getMyReels(),
+    getMySavedReels(),
+    getMyLikedReels(),
   ]);
   const reels = reelsResponse.items || [];
+  const savedReels = savedResponse.items || [];
+  const likedReels = likedResponse.items || [];
 
   return {
     user,
@@ -56,6 +70,8 @@ export async function getMyProfileData(): Promise<MyProfileData> {
       reelsCount: reels.length,
     },
     reels,
+    savedReels,
+    likedReels,
   };
 }
 
@@ -77,5 +93,7 @@ export async function getPublicProfileData(userId: string): Promise<PublicProfil
       reelsCount: reels.length,
     },
     reels,
+    savedReels: [],
+    likedReels: [],
   };
 }

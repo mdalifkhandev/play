@@ -97,6 +97,14 @@ export default function CreateScreen() {
     setIsCameraReady(true);
   };
 
+  const flipCamera = () => {
+    if (isRecording) return;
+
+    setIsCameraReady(false);
+    isCameraReadyRef.current = false;
+    setFacing(current => (current === 'back' ? 'front' : 'back'));
+  };
+
   const handleRecordAction = async () => {
     if (!cameraRef.current || isStoppingRecordingRef.current) return;
 
@@ -319,8 +327,16 @@ export default function CreateScreen() {
             >
               <View
                 className={`${isRecording ? 'w-8 h-8 rounded-lg bg-red-500' : 'w-[60px] h-[60px] bg-red-500 rounded-full'
-                  }`}
+                }`}
               />
+            </Pressable>
+
+            <Pressable
+              onPress={flipCamera}
+              disabled={isRecording}
+              className={`absolute right-8 w-12 h-12 rounded-full bg-black/45 items-center justify-center ${isRecording ? 'opacity-40' : ''}`}
+            >
+              <Ionicons name="camera-reverse-outline" size={26} color="#FFF" />
             </Pressable>
           </View>
         </View>

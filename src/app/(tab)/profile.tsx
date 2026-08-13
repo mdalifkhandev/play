@@ -104,7 +104,11 @@ export default function ProfileScreen() {
           </>
         )}
 
-        <ProfileTabs posts={profileData?.reels || []} />
+        <ProfileTabs
+          posts={profileData?.reels || []}
+          savedPosts={profileData?.savedReels || []}
+          likedPosts={profileData?.likedReels || []}
+        />
       </ScrollView>
     </View>
   );

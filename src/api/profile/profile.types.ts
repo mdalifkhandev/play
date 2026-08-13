@@ -32,6 +32,8 @@ export type MyProfileData = {
     reelsCount: number;
   };
   reels: ReelFeedItem[];
+  savedReels: ReelFeedItem[];
+  likedReels: ReelFeedItem[];
 };
 
 export type PublicProfileData = MyProfileData & {
