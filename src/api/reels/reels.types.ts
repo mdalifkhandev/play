@@ -69,6 +69,7 @@ export type ReelFeedItem = {
   caption: string | null;
   user: {
     id: string;
+    email: string | null;
     username: string | null;
     avatarUrl: string | null;
   };

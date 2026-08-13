@@ -33,3 +33,7 @@ export type MyProfileData = {
   };
   reels: ReelFeedItem[];
 };
+
+export type PublicProfileData = MyProfileData & {
+  followState: FollowState;
+};

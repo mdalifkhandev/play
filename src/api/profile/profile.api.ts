@@ -1,6 +1,6 @@
 import { apiClient } from '../client';
 import type { ReelFeedResponse } from '../reels/reels.types';
-import type { FollowState, MyProfileData, ProfileUser } from './profile.types';
+import type { FollowState, MyProfileData, ProfileUser, PublicProfileData } from './profile.types';
 
 const dataOf = <T>(response: { data?: { data?: T } }) => response.data?.data as T;
 
@@ -14,8 +14,28 @@ export async function getFollowState(userId: string): Promise<FollowState> {
   return dataOf<FollowState>(response);
 }
 
+export async function followUser(userId: string): Promise<FollowState> {
+  const response = await apiClient.put<{ data: FollowState }>(`/users/${userId}/follow`);
+  return dataOf<FollowState>(response);
+}
+
+export async function unfollowUser(userId: string): Promise<FollowState> {
+  const response = await apiClient.delete<{ data: FollowState }>(`/users/${userId}/follow`);
+  return dataOf<FollowState>(response);
+}
+
 export async function getMyReels(): Promise<ReelFeedResponse> {
   const response = await apiClient.get<{ data: ReelFeedResponse }>('/reels/me');
+  return dataOf<ReelFeedResponse>(response);
+}
+
+export async function getUserProfile(userId: string): Promise<{ user: ProfileUser }> {
+  const response = await apiClient.get<{ data: { user: ProfileUser } }>(`/users/${userId}/profile`);
+  return dataOf<{ user: ProfileUser }>(response);
+}
+
+export async function getUserReels(userId: string): Promise<ReelFeedResponse> {
+  const response = await apiClient.get<{ data: ReelFeedResponse }>(`/reels/users/${userId}`);
   return dataOf<ReelFeedResponse>(response);
 }
 
@@ -29,6 +49,27 @@ export async function getMyProfileData(): Promise<MyProfileData> {
 
   return {
     user,
+    stats: {
+      followersCount: followState.followersCount,
+      followingCount: followState.followingCount,
+      likesCount: reels.reduce((total, reel) => total + (reel.stats?.likes || 0), 0),
+      reelsCount: reels.length,
+    },
+    reels,
+  };
+}
+
+export async function getPublicProfileData(userId: string): Promise<PublicProfileData> {
+  const [{ user }, followState, reelsResponse] = await Promise.all([
+    getUserProfile(userId),
+    getFollowState(userId),
+    getUserReels(userId),
+  ]);
+  const reels = reelsResponse.items || [];
+
+  return {
+    user,
+    followState,
     stats: {
       followersCount: followState.followersCount,
       followingCount: followState.followingCount,

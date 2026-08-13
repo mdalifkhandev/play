@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, InteractionManager, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
-import { getFeed } from "../../api/reels/reels.api";
+import { getFeed, getForYouFeed } from "../../api/reels/reels.api";
 import { ReelFeedItem } from "../../api/reels/reels.types";
 import { useFeedSection } from "../../hooks/feed/useFeedSection";
 
@@ -22,7 +22,8 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
     source: reel.videoUrl,
     thumbnailUrl: isImageUrl(reel.thumbnailUrl) ? reel.thumbnailUrl : undefined,
     user: {
-      username: reel.user.username || 'Anonymous',
+      id: reel.user.id,
+      username: reel.user.username || reel.user.email || '',
       profileImage: reel.user.avatarUrl || '',
     },
     description: reel.caption || '',
@@ -41,7 +42,7 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
 export default function HomeScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('following');
+  const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('foryou');
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [isScreenActive, setIsScreenActive] = useState(false);
   const [fullscreenItemId, setFullscreenItemId] = useState<string | null>(null);
@@ -49,9 +50,21 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
 
   const fetchReelsData = useCallback(async () => {
-    const response = await getFeed();
+    if (activeTab === 'following') {
+      const response = await getFeed();
+      return response.items.map(mapBackendReelToFeedItem);
+    }
+
+    let response;
+    try {
+      response = await getForYouFeed();
+    } catch (error) {
+      console.log('For You feed failed; falling back to regular feed.', error);
+      response = await getFeed();
+    }
+
     return response.items.map(mapBackendReelToFeedItem);
-  }, []);
+  }, [activeTab]);
 
   const { data, isLoading, isRefreshing, error, refetch } = useFeedSection(fetchReelsData);
   const feedData = data || [];
@@ -127,6 +140,11 @@ export default function HomeScreen() {
     index,
   }), [windowHeight]);
 
+  const handleTabChange = useCallback((tab: 'foryou' | 'following') => {
+    setActiveTab(tab);
+    setActiveItemIndex(0);
+  }, []);
+
   return (
     <View className="flex-1 bg-black">
       {!fullscreenItemId && (
@@ -137,14 +155,14 @@ export default function HomeScreen() {
           <View style={{ width: 32 }} />
           <View className="flex-row gap-5 items-center">
             
-            <Pressable onPress={() => setActiveTab('foryou')} className="relative items-center">
+            <Pressable onPress={() => handleTabChange('foryou')} className="relative items-center">
               <Text className={`text-base font-semibold ${activeTab === 'foryou' ? 'text-white' : 'text-white/60'}`}>For You</Text>
               {activeTab === 'foryou' && (
                 <View className="absolute -bottom-1.5 w-6 h-[3px] bg-white rounded-full" />
               )}
             </Pressable>
 
-            <Pressable onPress={() => setActiveTab('following')} className="relative items-center">
+            <Pressable onPress={() => handleTabChange('following')} className="relative items-center">
               <Text className={`text-base font-semibold ${activeTab === 'following' ? 'text-white' : 'text-white/60'}`}>Following</Text>
               {activeTab === 'following' && (
                 <View className="absolute -bottom-1.5 w-6 h-[3px] bg-white rounded-full" />
@@ -185,6 +203,7 @@ export default function HomeScreen() {
         </View>
       ) : (
         <FlatList
+          key={activeTab}
           data={feedData}
           renderItem={({ item, index }) => (
             <FeedItem 

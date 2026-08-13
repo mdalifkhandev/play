@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -9,6 +10,7 @@ import { toast } from 'sonner-native';
 import { handleApiError } from '../../api/client';
 import { createReelComment, deleteComment, editComment, likeReel, listReelComments, saveReel, shareReel, unlikeReel, unsaveReel } from '../../api/engagement/engagement.api';
 import type { ReelComment } from '../../api/engagement/engagement.types';
+import { followUser, getFollowState, unfollowUser } from '../../api/profile/profile.api';
 import { recordReelView } from '../../api/reels/reels.api';
 import { useAppStore } from '../../store';
 import { avatarSource } from '../../utils/avatar';
@@ -19,6 +21,7 @@ export interface FeedItemProps {
   source: string;
   thumbnailUrl?: string;
   user: {
+    id: string;
     username: string;
     profileImage: string;
   };
@@ -45,6 +48,7 @@ const isRemoteUri = (source: string) => /^https?:\/\//i.test(source);
 const isImageThumbnail = (source?: string) => !!source && !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(source);
 const recordedViewIds = new Set<string>();
 let isReelViewEndpointAvailable = true;
+const DESCRIPTION_PREVIEW_LENGTH = 48;
 
 class FeedVideoBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -638,12 +642,17 @@ export const FeedItem = memo(({
   onFullscreenChange,
 }: FeedItemProps) => {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { height, width } = useWindowDimensions();
+  const currentUser = useAppStore(state => state.user);
+  const currentUserId = currentUser?.id || currentUser?._id;
+  const isOwnReel = Boolean(currentUserId && user.id === currentUserId);
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLiked, setIsLiked] = useState(viewerState?.isLiked ?? false);
   const [isSaved, setIsSaved] = useState(viewerState?.isSaved ?? false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowStateLoaded, setIsFollowStateLoaded] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [likeCount, setLikeCount] = useState(stats.likes);
   const [commentCount, setCommentCount] = useState(stats.comments);
@@ -651,9 +660,11 @@ export const FeedItem = memo(({
   const [shareCount, setShareCount] = useState(stats.shares);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
-  const [busyAction, setBusyAction] = useState<'like' | 'save' | 'share' | null>(null);
+  const [busyAction, setBusyAction] = useState<'like' | 'save' | 'share' | 'follow' | null>(null);
   const [shouldRenderVideo, setShouldRenderVideo] = useState(false);
   const lastTap = useRef(0);
+  const collapsedDescription = useMemo(() => description.replace(/\s+/g, ' ').trim(), [description]);
+  const shouldShowMore = collapsedDescription.length > DESCRIPTION_PREVIEW_LENGTH;
 
   const handleLike = useCallback(async () => {
     if (busyAction === 'like') return;
@@ -700,6 +711,26 @@ export const FeedItem = memo(({
     }
   }, [bookmarkCount, busyAction, id, isSaved]);
 
+  const handleFollowToggle = useCallback(async () => {
+    if (busyAction === 'follow' || !user.id || isOwnReel) return;
+
+    const nextFollowing = !isFollowing;
+    const previousFollowing = isFollowing;
+    setBusyAction('follow');
+    setIsFollowing(nextFollowing);
+
+    try {
+      const result = nextFollowing ? await followUser(user.id) : await unfollowUser(user.id);
+      setIsFollowing(result.isFollowing);
+      setIsFollowStateLoaded(true);
+    } catch (error) {
+      setIsFollowing(previousFollowing);
+      toast.error(handleApiError(error, nextFollowing ? 'Failed to follow user' : 'Failed to unfollow user'));
+    } finally {
+      setBusyAction(null);
+    }
+  }, [busyAction, isFollowing, isOwnReel, user.id]);
+
   const handleShare = useCallback(async (channel: ShareChannel) => {
     if (busyAction === 'share') return;
 
@@ -740,6 +771,51 @@ export const FeedItem = memo(({
     }
     lastTap.current = now;
   }, [handleLike, isLiked]);
+
+  const handleOpenUserProfile = useCallback(() => {
+    if (!user.id) return;
+    router.push({
+      pathname: '/screens/user/[id]',
+      params: { id: user.id },
+    } as never);
+  }, [router, user.id]);
+
+  useEffect(() => {
+    setIsExpanded(false);
+  }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setIsFollowing(false);
+    setIsFollowStateLoaded(false);
+
+    if (!user.id || isOwnReel) {
+      setIsFollowStateLoaded(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    getFollowState(user.id)
+      .then(result => {
+        if (cancelled) return;
+        setIsFollowing(result.isFollowing);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        console.log('Feed follow state failed:', handleApiError(error, 'Failed to load follow state'));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsFollowStateLoaded(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwnReel, user.id]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -868,53 +944,59 @@ export const FeedItem = memo(({
       )}
 
       {/* Centered Full Screen Button */}
-      {!isExpanded && (
-        <View className="absolute left-0 right-0 items-center pointer-events-auto" style={{ bottom: insets.bottom + 130 }}>
-          <Pressable className="flex-row items-center bg-black/50 px-3 py-1.5 rounded-2xl" onPress={() => onFullscreenChange?.(!isFullscreen)}>
-            <Ionicons name={isFullscreen ? "contract-outline" : "scan-outline"} size={16} color="#FFF" />
-            <Text className="text-white ml-1.5 text-xs font-medium">{isFullscreen ? 'Back' : 'Full screen'}</Text>
-          </Pressable>
-        </View>
-      )}
+      <View className="absolute left-0 right-0 items-center pointer-events-auto" style={{ bottom: insets.bottom + 155 }}>
+        <Pressable className="flex-row items-center bg-black/50 px-3 py-1.5 rounded-2xl" onPress={() => onFullscreenChange?.(!isFullscreen)}>
+          <Ionicons name={isFullscreen ? "contract-outline" : "scan-outline"} size={16} color="#FFF" />
+          <Text className="text-white ml-1.5 text-xs font-medium">{isFullscreen ? 'Back' : 'Full screen'}</Text>
+        </Pressable>
+      </View>
 
       {/* Bottom Text Details */}
       <View className={`absolute left-4 pb-2 ${isFullscreen ? 'right-4' : 'right-20'}`} style={{ bottom: insets.bottom + 60 }} pointerEvents="box-none">
 
         <View className="flex-row items-center mb-2">
-          <Image
-            source={avatarSource(user.profileImage)}
-            className="w-9 h-9 rounded-full border border-white"
-            style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: 'white' }}
-          />
-          <View className="flex-1 ml-2.5">
-            <View className="flex-row items-center flex-wrap">
+          <Pressable className="flex-1 flex-row items-center" onPress={handleOpenUserProfile}>
+            <Image
+              source={avatarSource(user.profileImage)}
+              className="w-9 h-9 rounded-full border border-white"
+              style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: 'white' }}
+            />
+            <View className="flex-1 ml-2.5">
               <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
                 className="text-white text-base font-bold"
                 style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
               >
                 {user.username}
               </Text>
-              <Text className="text-[#CCC] text-sm font-normal"> • {date}</Text>
+              <Text numberOfLines={1} className="text-[#CCC] text-sm font-normal">{date}</Text>
             </View>
-          </View>
-          <Pressable
-            className={`px-3 py-1.5 rounded-full border ${isFollowing ? 'bg-white/10 border-white/40' : 'bg-[#98FF2F] border-[#98FF2F]'}`}
-            onPress={() => setIsFollowing(!isFollowing)}
-          >
-            <Text className={`text-xs font-inter-bold ${isFollowing ? 'text-white' : 'text-black'}`}>
-              {isFollowing ? 'Following' : 'Follow'}
-            </Text>
           </Pressable>
+          {isFollowStateLoaded && !isOwnReel && (
+            <Pressable
+              className={`px-3 py-1.5 rounded-full border ${isFollowing ? 'bg-white/10 border-white/40' : 'bg-[#98FF2F] border-[#98FF2F]'}`}
+              onPress={handleFollowToggle}
+              disabled={busyAction === 'follow'}
+            >
+              <Text className={`text-xs font-inter-bold ${isFollowing ? 'text-white' : 'text-black'}`}>
+                {isFollowing ? 'Following' : 'Follow'}
+              </Text>
+            </Pressable>
+          )}
         </View>
 
-        <Pressable onPress={() => setIsExpanded(!isExpanded)}>
+        <Pressable onPress={() => description && setIsExpanded(current => !current)}>
           <Text
+            numberOfLines={isExpanded ? undefined : 2}
             className="text-white text-sm leading-5"
             style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
           >
-            {isExpanded || description.length <= 85 ? description : `${description.substring(0, 85)}...`}
-            {!isExpanded && description.length > 85 && (
-              <Text className="text-[#CCC] font-bold"> more</Text>
+            {isExpanded || !shouldShowMore
+              ? description
+              : `${collapsedDescription.slice(0, DESCRIPTION_PREVIEW_LENGTH).trimEnd()}... `}
+            {!isExpanded && shouldShowMore && (
+              <Text className="text-[#CCC] font-bold">more</Text>
             )}
           </Text>
         </Pressable>

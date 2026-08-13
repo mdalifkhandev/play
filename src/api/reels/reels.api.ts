@@ -193,6 +193,12 @@ export async function getFeed(cursor?: string): Promise<ReelFeedResponse> {
   return response.data.data;
 }
 
+export async function getForYouFeed(cursor?: string): Promise<ReelFeedResponse> {
+  const params = cursor ? { cursor } : {};
+  const response = await apiClient.get<{ data: ReelFeedResponse }>('/reels/for-you', { params });
+  return response.data.data;
+}
+
 export async function recordReelView(reelId: string): Promise<ReelViewResponse> {
   const response = await apiClient.post<{ data: ReelViewResponse }>(`/reels/${reelId}/views`);
   return response.data.data;
