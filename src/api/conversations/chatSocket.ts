@@ -40,6 +40,8 @@ export type ChatSocketCallbacks = {
 let socketInstance: Socket | null = null;
 let activeToken: string | null = null;
 const callbackSets = new Set<ChatSocketCallbacks>();
+let lastConnectErrorMessage: string | null = null;
+let lastConnectErrorAt = 0;
 
 export function ensureChatSocket(token: string): Socket | null {
   const baseUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -62,7 +64,8 @@ export function ensureChatSocket(token: string): Socket | null {
   const socket = io(baseUrl, {
     auth: { token },
     extraHeaders: { Authorization: `Bearer ${token}` },
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'],
+    upgrade: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 500,
@@ -73,10 +76,21 @@ export function ensureChatSocket(token: string): Socket | null {
   socket.on('disconnect', () => notifyConnection(false));
   socket.on('connect_error', (error: any) => {
     notifyConnection(false);
-    notifyError({
+    const payload = {
       code: error?.data?.code || 'SOCKET_CONNECT_ERROR',
       message: error?.message || 'Socket connection failed.',
-    });
+    };
+    const now = Date.now();
+    const shouldNotify =
+      payload.message !== lastConnectErrorMessage ||
+      now - lastConnectErrorAt > 10000;
+
+    lastConnectErrorMessage = payload.message;
+    lastConnectErrorAt = now;
+
+    if (shouldNotify) {
+      notifyError(payload);
+    }
   });
 
   socket.on(CHAT_SOCKET_EVENTS.NEW_MESSAGE, (message: Message) => {

@@ -43,6 +43,7 @@ export interface FeedItemProps {
 const isRemoteUri = (source: string) => /^https?:\/\//i.test(source);
 const isImageThumbnail = (source?: string) => !!source && !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(source);
 const recordedViewIds = new Set<string>();
+let isReelViewEndpointAvailable = true;
 
 class FeedVideoBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -756,7 +757,13 @@ export const FeedItem = memo(({
   }, [shouldMountVideo]);
 
   useEffect(() => {
-    if (type !== 'video' || !isActive || !shouldMountVideo || recordedViewIds.has(id)) return;
+    if (
+      type !== 'video' ||
+      !isActive ||
+      !shouldMountVideo ||
+      !isReelViewEndpointAvailable ||
+      recordedViewIds.has(id)
+    ) return;
 
     const timer = setTimeout(() => {
       if (recordedViewIds.has(id)) return;
@@ -764,6 +771,10 @@ export const FeedItem = memo(({
       recordedViewIds.add(id);
       void recordReelView(id)
         .catch(error => {
+          if (error?.response?.status === 404) {
+            isReelViewEndpointAvailable = false;
+            return;
+          }
           console.log('Record reel view failed:', handleApiError(error, 'Failed to record reel view'));
         });
     }, 3000);

@@ -110,7 +110,7 @@ export default function ChatScreen() {
   }, [id, currentUserId]);
 
   const handleError = useCallback((error: { code: string; message: string }) => {
-    console.error('Chat socket error:', error.message);
+    console.log('Chat socket status:', error.message);
   }, []);
 
   const { connect } = useChatSocket({
