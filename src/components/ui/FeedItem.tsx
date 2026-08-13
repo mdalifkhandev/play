@@ -38,6 +38,16 @@ export interface FeedItemProps {
     isLiked: boolean;
     isSaved: boolean;
   } | null;
+  edit?: {
+    filter?: string | null;
+    effect?: string | null;
+    overlayText?: {
+      text: string;
+      x: number;
+      y: number;
+      fontSize: number;
+    } | null;
+  } | null;
   isActive: boolean;
   shouldMountVideo?: boolean;
   isFullscreen?: boolean;
@@ -49,6 +59,17 @@ const isImageThumbnail = (source?: string) => !!source && !/\.(mp4|mov|m4v|webm)
 const recordedViewIds = new Set<string>();
 let isReelViewEndpointAvailable = true;
 const DESCRIPTION_PREVIEW_LENGTH = 48;
+
+function mediaFilterOverlay(filter?: string | null): string {
+  const key = (filter || '').toLowerCase();
+  if (key === 'vivid') return 'rgba(255, 50, 50, 0.15)';
+  if (key === 'mono' || key === 'grayscale') return 'rgba(0, 0, 0, 0.45)';
+  if (key === 'vintage') return 'rgba(112, 66, 20, 0.3)';
+  if (key === 'warm') return 'rgba(255, 165, 0, 0.2)';
+  if (key === 'cool') return 'rgba(40, 140, 255, 0.18)';
+  if (key === 'sepia') return 'rgba(112, 66, 20, 0.35)';
+  return 'transparent';
+}
 
 class FeedVideoBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -636,6 +657,7 @@ export const FeedItem = memo(({
   date,
   stats,
   viewerState,
+  edit,
   isActive,
   shouldMountVideo = true,
   isFullscreen = false,
@@ -665,6 +687,10 @@ export const FeedItem = memo(({
   const lastTap = useRef(0);
   const collapsedDescription = useMemo(() => description.replace(/\s+/g, ' ').trim(), [description]);
   const shouldShowMore = collapsedDescription.length > DESCRIPTION_PREVIEW_LENGTH;
+  const feedFilterOverlay = mediaFilterOverlay(edit?.filter);
+  const feedEffectKey = (edit?.effect || '').toLowerCase();
+  const feedOverlayText = edit?.overlayText;
+  const shouldHideDescription = Boolean(feedOverlayText?.text?.trim());
 
   const handleLike = useCallback(async () => {
     if (busyAction === 'like') return;
@@ -895,6 +921,63 @@ export const FeedItem = memo(({
         <View className="absolute inset-0 bg-black" />
       )}
 
+      {feedEffectKey === 'glitch' && (
+        <View className="absolute inset-0" pointerEvents="none">
+          <View className="absolute inset-0 bg-red-500/10" style={{ transform: [{ translateX: -3 }] }} />
+          <View className="absolute inset-0 bg-blue-500/10" style={{ transform: [{ translateX: 3 }] }} />
+        </View>
+      )}
+
+      {feedEffectKey === 'flash' && (
+        <View className="absolute inset-0 bg-white/35" pointerEvents="none" />
+      )}
+
+      {feedEffectKey === 'vhs' && (
+        <View className="absolute inset-0 bg-green-500/10 border-t-2 border-black/20" pointerEvents="none" />
+      )}
+
+      {feedEffectKey === 'sparkle' && (
+        <View className="absolute inset-0" pointerEvents="none">
+          <View className="absolute left-1/4 top-1/4">
+            <Ionicons name="sparkles" size={24} color="#FFF" />
+          </View>
+          <View className="absolute right-1/4 top-1/2">
+            <Ionicons name="sparkles" size={32} color="#FFF" />
+          </View>
+          <View className="absolute bottom-1/4 left-1/3">
+            <Ionicons name="sparkles" size={16} color="#FFF" />
+          </View>
+        </View>
+      )}
+
+      {feedFilterOverlay !== 'transparent' && (
+        <View className="absolute inset-0" pointerEvents="none" style={{ backgroundColor: feedFilterOverlay }} />
+      )}
+
+      {feedOverlayText?.text ? (
+        <View
+          className="absolute z-20 items-center"
+          pointerEvents="none"
+          style={{
+            left: 24,
+            right: 24,
+            top: `${Math.max(8, Math.min(82, feedOverlayText.y * 100))}%`,
+          }}
+        >
+          <Text
+            className="text-white text-center font-inter-bold"
+            style={{
+              fontSize: Math.max(20, Math.min(42, feedOverlayText.fontSize || 36)),
+              textShadowColor: 'rgba(0, 0, 0, 0.75)',
+              textShadowOffset: { width: -1, height: 1 },
+              textShadowRadius: 10,
+            }}
+          >
+            {feedOverlayText.text}
+          </Text>
+        </View>
+      ) : null}
+
       {!isFullscreen && (
         <LinearGradient
           colors={['rgba(0, 0, 0, 0.5)', 'transparent']}
@@ -986,20 +1069,22 @@ export const FeedItem = memo(({
           )}
         </View>
 
-        <Pressable onPress={() => description && setIsExpanded(current => !current)}>
-          <Text
-            numberOfLines={isExpanded ? undefined : 2}
-            className="text-white text-sm leading-5"
-            style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
-          >
-            {isExpanded || !shouldShowMore
-              ? description
-              : `${collapsedDescription.slice(0, DESCRIPTION_PREVIEW_LENGTH).trimEnd()}... `}
-            {!isExpanded && shouldShowMore && (
-              <Text className="text-[#CCC] font-bold">more</Text>
-            )}
-          </Text>
-        </Pressable>
+        {!shouldHideDescription && (
+          <Pressable onPress={() => description && setIsExpanded(current => !current)}>
+            <Text
+              numberOfLines={isExpanded ? undefined : 2}
+              className="text-white text-sm leading-5"
+              style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
+            >
+              {isExpanded || !shouldShowMore
+                ? description
+                : `${collapsedDescription.slice(0, DESCRIPTION_PREVIEW_LENGTH).trimEnd()}... `}
+              {!isExpanded && shouldShowMore && (
+                <Text className="text-[#CCC] font-bold">more</Text>
+              )}
+            </Text>
+          </Pressable>
+        )}
       </View>
       <CommentsModal
         reelId={id}

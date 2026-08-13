@@ -36,6 +36,7 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
       views: reel.stats.views,
     },
     viewerState: reel.viewerState,
+    edit: reel.edit,
   };
 }
 

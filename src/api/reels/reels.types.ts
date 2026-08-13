@@ -83,6 +83,16 @@ export type ReelFeedItem = {
     isLiked: boolean;
     isSaved: boolean;
   } | null;
+  edit?: {
+    filter?: string | null;
+    effect?: string | null;
+    overlayText?: {
+      text: string;
+      x: number;
+      y: number;
+      fontSize: number;
+    } | null;
+  } | null;
   createdAt: string;
   publishedAt: string;
 };
