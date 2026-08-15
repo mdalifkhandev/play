@@ -186,20 +186,11 @@ export function EditorRightActions({
         <Text className="text-white font-inter-semibold text-[10px]" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Filters</Text>
       </Pressable>
 
-      {!isLowEndDevice && (
-        <Pressable onPress={() => setActivePanel('effects')} className="items-center">
+      <Pressable onPress={() => setActivePanel('effects')} className="items-center">
           <View className="w-10 h-10 bg-black/60 rounded-full items-center justify-center mb-1">
             <Ionicons name="sparkles" size={20} color="white" />
           </View>
           <Text className="text-white font-inter-semibold text-[10px]" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Effects</Text>
-        </Pressable>
-      )}
-
-      <Pressable onPress={() => setActivePanel('options')} className="items-center">
-        <View className="w-10 h-10 bg-black/60 rounded-full items-center justify-center mb-1">
-          <Ionicons name="settings" size={20} color="white" />
-        </View>
-        <Text className="text-white font-inter-semibold text-[10px]" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>Adjust</Text>
       </Pressable>
     </View>
   );

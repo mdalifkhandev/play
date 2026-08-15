@@ -96,6 +96,13 @@ function formatCount(value: number): string {
   return String(Math.max(0, value));
 }
 
+function formatPlaybackTime(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
 function FeedFallback({
   showSpinner = false,
   showPlayIcon = true,
@@ -418,12 +425,14 @@ function FeedVideo({
   isActive,
   isMuted,
   onDoubleTap,
+  onPlaybackUpdate,
 }: {
   source: string;
   thumbnailUrl?: string;
   isActive: boolean;
   isMuted: boolean;
   onDoubleTap: () => void;
+  onPlaybackUpdate?: (currentTime: number, duration: number) => void;
 }) {
   const [isBuffering, setIsBuffering] = useState(true);
   const [hasFirstFrame, setHasFirstFrame] = useState(false);
@@ -461,6 +470,40 @@ function FeedVideo({
       console.log('Feed video mute toggle failed:', error);
     }
   }, [isMuted, player]);
+
+  useEffect(() => {
+    if (!player) return;
+
+    try {
+      // eslint-disable-next-line react-hooks/immutability
+      player.timeUpdateEventInterval = isActive ? 0.25 : 0;
+    } catch (error) {
+      console.log('Feed video progress interval failed:', error);
+    }
+
+    if (!isActive) {
+      onPlaybackUpdate?.(0, 0);
+    }
+
+    return () => {
+      try {
+        // eslint-disable-next-line react-hooks/immutability
+        player.timeUpdateEventInterval = 0;
+      } catch {
+        // Player may already be released while scrolling away.
+      }
+    };
+  }, [isActive, onPlaybackUpdate, player]);
+
+  useEffect(() => {
+    if (!player) return;
+
+    const subscription = player.addListener('timeUpdate', payload => {
+      onPlaybackUpdate?.(payload.currentTime, player.duration || 0);
+    });
+
+    return () => subscription.remove();
+  }, [onPlaybackUpdate, player]);
 
   const pauseSafely = useCallback(() => {
     if (!isMountedRef.current) return;
@@ -680,6 +723,7 @@ export const FeedItem = memo(({
   const [commentCount, setCommentCount] = useState(stats.comments);
   const [bookmarkCount, setBookmarkCount] = useState(stats.bookmarks);
   const [shareCount, setShareCount] = useState(stats.shares);
+  const [playbackTime, setPlaybackTime] = useState({ currentTime: 0, duration: 0 });
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<'like' | 'save' | 'share' | 'follow' | null>(null);
@@ -691,6 +735,16 @@ export const FeedItem = memo(({
   const feedEffectKey = (edit?.effect || '').toLowerCase();
   const feedOverlayText = edit?.overlayText;
   const shouldHideDescription = Boolean(feedOverlayText?.text?.trim());
+  const playbackProgress = playbackTime.duration > 0
+    ? Math.min(1, Math.max(0, playbackTime.currentTime / playbackTime.duration))
+    : 0;
+
+  const handlePlaybackUpdate = useCallback((currentTime: number, duration: number) => {
+    setPlaybackTime({
+      currentTime: Number.isFinite(currentTime) ? currentTime : 0,
+      duration: Number.isFinite(duration) ? duration : 0,
+    });
+  }, []);
 
   const handleLike = useCallback(async () => {
     if (busyAction === 'like') return;
@@ -897,6 +951,7 @@ export const FeedItem = memo(({
               isActive={isActive && shouldMountVideo}
               isMuted={isMuted}
               onDoubleTap={handleDoubleTap}
+              onPlaybackUpdate={handlePlaybackUpdate}
             />
           </FeedVideoBoundary>
         ) : (
@@ -993,6 +1048,27 @@ export const FeedItem = memo(({
         style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '35%' }}
         pointerEvents="none"
       />
+
+      {type === 'video' && (
+        <View
+          className="absolute left-4 right-4 flex-row items-center gap-2"
+          style={{ bottom: insets.bottom + 82 }}
+          pointerEvents="none"
+        >
+          <Text className="text-white text-[10px] font-inter-semibold">
+            {formatPlaybackTime(playbackTime.currentTime)}
+          </Text>
+          <View className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
+            <View
+              className="h-full rounded-full bg-[#98FF2F]"
+              style={{ width: `${playbackProgress * 100}%` }}
+            />
+          </View>
+          <Text className="text-white text-[10px] font-inter-semibold">
+            {formatPlaybackTime(playbackTime.duration)}
+          </Text>
+        </View>
+      )}
 
 
       {/* Right Action Buttons */}
