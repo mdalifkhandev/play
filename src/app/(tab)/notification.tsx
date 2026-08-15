@@ -1,47 +1,45 @@
-import React from 'react';
-import { View, Text, ScrollView, Image, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, Image, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { BottomSheetModal } from '../../components/ui/BottomSheetModal';
+import { useNotifications } from '../../hooks/notifications/useNotifications';
+import type { NotificationItem } from '../../api/notifications/notification.types';
 
-const MOCK_NOTIFICATIONS = [
-  {
-    id: '1',
-    user: 'Sarah Martinez',
-    action: 'liked your post',
-    time: '2 minute ago',
-    type: 'like',
-    avatar: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=200&h=200&fit=crop'
-  },
-  {
-    id: '2',
-    user: 'Sarah Martinez',
-    action: 'Comment your post',
-    time: '2 minute ago',
-    type: 'comment',
-    avatar: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=200&h=200&fit=crop'
-  },
-  {
-    id: '3',
-    user: 'Luna Voice',
-    action: 'started following you',
-    time: '1 day ago',
-    type: 'follow',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop'
-  },
-  {
-    id: '4',
-    user: 'Luna Voice',
-    action: "You've reached 10,000\nfollowers! 🎉",
-    time: '1 day ago',
-    type: 'milestone',
-    icon: 'musical-notes'
-  }
-];
+const formatTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  return `${Math.floor(diffInSeconds / 86400)}d ago`;
+};
 
 export default function NotificationScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
+  
+  const { 
+    data: notifications, 
+    isLoading, 
+    isRefreshing, 
+    fetchNextPage, 
+    refetch,
+    markAsRead,
+    deleteItem
+  } = useNotifications();
+
+  // Mark all as read when screen is opened
+  useEffect(() => {
+    const unreadIds = notifications.filter(n => !n.isRead).map(n => n._id);
+    if (unreadIds.length > 0) {
+      markAsRead(unreadIds);
+    }
+  }, [notifications, markAsRead]);
 
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
@@ -55,55 +53,125 @@ export default function NotificationScreen() {
         </View>
       </View>
 
-      <ScrollView className="flex-1 px-4 pt-4 pb-24" showsVerticalScrollIndicator={false}>
-        {MOCK_NOTIFICATIONS.map((item) => (
-          <View 
-            key={item.id} 
-            className="flex-row items-center bg-[#181818] border border-[#2A2A2A] rounded-2xl p-4 mb-4"
+      {isLoading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#98FF2F" />
+        </View>
+      ) : (
+        <ScrollView 
+          className="flex-1 px-4 pt-4 pb-24" 
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refetch} tintColor="#98FF2F" />}
+          onScroll={({ nativeEvent }) => {
+            const isCloseToBottom = nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y >= nativeEvent.contentSize.height - 20;
+            if (isCloseToBottom) fetchNextPage();
+          }}
+          scrollEventThrottle={400}
+        >
+          {notifications.length === 0 ? (
+            <View className="flex-1 items-center justify-center mt-20">
+              <Text className="text-gray-500 font-inter-medium text-base">No notifications yet</Text>
+            </View>
+          ) : (
+            notifications.map((item) => (
+              <View 
+                key={item._id} 
+                className={`flex-row items-center bg-[#181818] border border-[#2A2A2A] rounded-2xl p-4 mb-4 ${!item.isRead ? 'border-[#98FF2F]/30' : ''}`}
+              >
+                {/* Avatar / Icon Container */}
+                <View className="relative mr-4">
+                  {item.actorId?.profilePicture ? (
+                    <View className="w-12 h-12 rounded-full border-2 border-[#98FF2F]/20 overflow-hidden bg-yellow-500">
+                      <Image source={{ uri: item.actorId.profilePicture }} className="w-full h-full" resizeMode="cover" />
+                    </View>
+                  ) : (
+                    <View className="w-12 h-12 rounded-full bg-[#2A2A2A] items-center justify-center border-2 border-[#98FF2F]/20">
+                      <Ionicons 
+                        name={item.type === 'milestone' ? 'musical-notes' : 'person'} 
+                        size={24} 
+                        color="#D946EF" 
+                      />
+                    </View>
+                  )}
+
+                  {/* Action Overlays */}
+                  {item.type === 'like' && (
+                    <View className="absolute -bottom-1 -right-1 bg-black rounded-full p-0.5">
+                      <Ionicons name="heart" size={16} color="#EC4899" />
+                    </View>
+                  )}
+                  {item.type === 'comment' && (
+                    <View className="absolute -bottom-1 -right-1 bg-black rounded-full p-0.5">
+                      <Ionicons name="chatbubble" size={14} color="#3B82F6" />
+                    </View>
+                  )}
+                  {item.type === 'follow' && (
+                    <View className="absolute -bottom-1 -right-1 bg-black rounded-full p-0.5">
+                      <View className="bg-[#3B82F6] rounded-full p-1 border border-black">
+                        <Ionicons name="person-add" size={10} color="white" />
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Content */}
+                <View className="flex-1 mr-2">
+                  <Text className="text-white font-inter-medium text-base mb-0.5">
+                    {item.actorId ? (item.actorId.name || item.actorId.username) : (item.title || 'System')}
+                  </Text>
+                  <Text className="text-gray-400 font-inter-regular text-sm leading-5 mb-1">
+                    {item.body || (item.type === 'like' ? 'liked your post' : item.type === 'follow' ? 'started following you' : item.type === 'comment' ? 'commented on your post' : 'sent a notification')}
+                  </Text>
+                  <Text className="text-gray-500 font-inter-regular text-xs">{formatTimeAgo(item.createdAt)}</Text>
+                </View>
+
+                {/* Options Button */}
+                <Pressable className="p-2 -mr-2" onPress={() => setSelectedNotification(item)}>
+                  <Ionicons name="ellipsis-vertical" size={20} color="#888" />
+                </Pressable>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      )}
+
+      {/* Options Bottom Sheet */}
+      <BottomSheetModal 
+        visible={!!selectedNotification} 
+        onClose={() => setSelectedNotification(null)}
+      >
+        <View className="pb-4">
+          <Text className="text-white font-inter-semibold text-lg mb-6 text-center">
+            Notification Options
+          </Text>
+          
+          <Pressable 
+            className="flex-row items-center px-4 py-4 border-b border-[#333]"
+            onPress={() => {
+              if (selectedNotification) {
+                markAsRead([selectedNotification._id]);
+                setSelectedNotification(null);
+              }
+            }}
           >
-            {/* Avatar / Icon Container */}
-            <View className="relative mr-4">
-              {item.avatar ? (
-                <View className="w-12 h-12 rounded-full border-2 border-[#98FF2F]/20 overflow-hidden bg-yellow-500">
-                  <Image source={{ uri: item.avatar }} className="w-full h-full" resizeMode="cover" />
-                </View>
-              ) : (
-                <View className="w-12 h-12 rounded-full bg-pink-100 items-center justify-center">
-                  <Ionicons name={item.icon as any} size={24} color="#D946EF" />
-                </View>
-              )}
+            <Ionicons name="checkmark-circle-outline" size={24} color="#FFF" />
+            <Text className="text-white font-inter-medium text-base ml-4">Mark as read</Text>
+          </Pressable>
 
-              {/* Action Overlays */}
-              {item.type === 'like' && (
-                <View className="absolute -bottom-1 -right-1 bg-black rounded-full p-0.5">
-                  <Ionicons name="heart" size={16} color="#EC4899" />
-                </View>
-              )}
-              {item.type === 'follow' && (
-                <View className="absolute -bottom-1 -right-1 bg-black rounded-full p-0.5">
-                  <View className="bg-[#3B82F6] rounded-full p-1 border border-black">
-                    <Ionicons name="person-add" size={10} color="white" />
-                  </View>
-                </View>
-              )}
-            </View>
-
-            {/* Content */}
-            <View className="flex-1 mr-2">
-              <Text className="text-white font-inter-medium text-base mb-0.5">{item.user}</Text>
-              <Text className="text-gray-400 font-inter-regular text-sm leading-5 mb-1">
-                {item.action}
-              </Text>
-              <Text className="text-gray-500 font-inter-regular text-xs">{item.time}</Text>
-            </View>
-
-            {/* Options Button */}
-            <Pressable className="p-2 -mr-2">
-              <Ionicons name="ellipsis-vertical" size={20} color="#888" />
-            </Pressable>
-          </View>
-        ))}
-      </ScrollView>
+          <Pressable 
+            className="flex-row items-center px-4 py-4"
+            onPress={() => {
+              if (selectedNotification) {
+                deleteItem(selectedNotification._id);
+                setSelectedNotification(null);
+              }
+            }}
+          >
+            <Ionicons name="trash-outline" size={24} color="#EF4444" />
+            <Text className="text-red-500 font-inter-medium text-base ml-4">Delete notification</Text>
+          </Pressable>
+        </View>
+      </BottomSheetModal>
     </View>
   );
 }

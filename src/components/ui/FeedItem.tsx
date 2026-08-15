@@ -96,13 +96,6 @@ function formatCount(value: number): string {
   return String(Math.max(0, value));
 }
 
-function formatPlaybackTime(seconds: number): string {
-  const safeSeconds = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
-  const minutes = Math.floor(safeSeconds / 60);
-  const remainingSeconds = safeSeconds % 60;
-  return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
-}
-
 function FeedFallback({
   showSpinner = false,
   showPlayIcon = true,
@@ -1051,22 +1044,16 @@ export const FeedItem = memo(({
 
       {type === 'video' && (
         <View
-          className="absolute left-4 right-4 flex-row items-center gap-2"
-          style={{ bottom: insets.bottom + 82 }}
+          className="absolute left-0 right-0"
+          style={{ bottom: isFullscreen ? insets.bottom + 12 : insets.bottom + 63 }}
           pointerEvents="none"
         >
-          <Text className="text-white text-[10px] font-inter-semibold">
-            {formatPlaybackTime(playbackTime.currentTime)}
-          </Text>
-          <View className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
+          <View className="h-1 overflow-hidden bg-white/25">
             <View
-              className="h-full rounded-full bg-[#98FF2F]"
+              className="h-full bg-[#98FF2F]"
               style={{ width: `${playbackProgress * 100}%` }}
             />
           </View>
-          <Text className="text-white text-[10px] font-inter-semibold">
-            {formatPlaybackTime(playbackTime.duration)}
-          </Text>
         </View>
       )}
 

@@ -11,3 +11,34 @@ export interface RegisterPushTokenResponse {
   tokenId: string;
   activeDeviceCount: number;
 }
+
+export type NotificationType = 'like' | 'comment' | 'follow' | 'milestone' | 'system';
+
+export interface NotificationActor {
+  _id: string;
+  username: string;
+  name?: string;
+  profilePicture?: string;
+}
+
+export interface NotificationItem {
+  _id: string;
+  userId: string;
+  actorId?: NotificationActor;
+  type: NotificationType;
+  title?: string;
+  body?: string;
+  relatedEntityId?: string;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetNotificationsResponse {
+  items: NotificationItem[];
+  nextCursor: string | null;
+}
+
+export interface MarkNotificationsAsReadRequest {
+  notificationIds?: string[];
+}
