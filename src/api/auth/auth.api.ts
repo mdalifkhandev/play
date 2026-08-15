@@ -10,6 +10,14 @@ import {
   VerifyResetCodeRequest,
 } from './auth.types';
 
+export const setupProfile = async (data: any) => {
+  return apiClient.patch('/auth/setup-profile', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
+
 export const login = async (data: LoginRequest) => {
   return apiClient.post('/auth/login', data);
 };
