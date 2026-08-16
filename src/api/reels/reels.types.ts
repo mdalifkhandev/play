@@ -71,6 +71,7 @@ export type ReelFeedItem = {
     id: string;
     email: string | null;
     username: string | null;
+    displayName: string | null;
     avatarUrl: string | null;
   };
   stats: {

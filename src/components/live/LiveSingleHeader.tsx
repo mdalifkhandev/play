@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Link } from 'expo-router';
 import { useState } from 'react';
 
-export function LiveSingleHeader({ hostAvatar, hostName, viewers, hostId = '1' }: { hostAvatar: string, hostName: string, viewers: string, hostId?: string }) {
+export function LiveSingleHeader({ hostAvatar, hostName, viewers, hostId = '1' }: { hostAvatar: any, hostName: string, viewers: string, hostId?: string }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [isFollowing, setIsFollowing] = useState(false);
@@ -20,7 +20,7 @@ export function LiveSingleHeader({ hostAvatar, hostName, viewers, hostId = '1' }
         <Link href={{ pathname: '/screens/user/[id]', params: { id: hostId } }} asChild>
           <Pressable className="flex-row items-center bg-black/40 rounded-full pr-4 py-1">
             <View className="relative ml-1">
-              <Image source={{ uri: hostAvatar }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+              <Image source={hostAvatar} style={{ width: 36, height: 36, borderRadius: 18 }} />
               <View className="absolute -bottom-1 self-center bg-[#FF3B30] px-1 rounded-sm">
                 <Text className="text-[8px] text-white font-bold">LIVE</Text>
               </View>

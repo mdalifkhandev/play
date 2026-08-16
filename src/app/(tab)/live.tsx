@@ -25,7 +25,7 @@ export default function LiveAllScreen() {
         id: s.id,
         thumbnail: s.coverImage || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400',
         hostName: s.hostId?.displayName || s.hostId?.username || 'Unknown',
-        hostAvatar: s.hostId?.avatar || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
+        hostAvatar: s.hostId?.avatarUrl || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
         viewers: s.viewerCount ? `${s.viewerCount}` : '0',
         badge: 'Live',
         isVideo: false,

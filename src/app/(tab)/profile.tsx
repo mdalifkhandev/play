@@ -32,6 +32,7 @@ export default function ProfileScreen() {
       }
 
       const data = await getMyProfileData();
+
       setProfileData(data);
       setError(null);
     } catch (profileError) {

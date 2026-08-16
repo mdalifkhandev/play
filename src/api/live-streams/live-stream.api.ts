@@ -13,7 +13,7 @@ export interface LiveStreamResponseDTO {
     id: string;
     username: string;
     displayName: string;
-    avatar?: string;
+    avatarUrl?: string;
   };
   title: string;
   description?: string;
@@ -59,6 +59,21 @@ export const liveStreamApi = {
     const res = await apiClient.get<{ data: { items: LiveStreamResponseDTO[], hasNextPage: boolean } }>('/live-streams', {
       params: { page, limit }
     });
+    return res.data.data;
+  },
+  
+  getStreamById: async (streamId: string): Promise<LiveStreamResponseDTO> => {
+    const res = await apiClient.get<{ data: LiveStreamResponseDTO }>(`/live-streams/${streamId}`);
+    return res.data.data;
+  },
+
+  joinStream: async (streamId: string): Promise<LiveStreamResponseDTO> => {
+    const res = await apiClient.post<{ data: LiveStreamResponseDTO }>(`/live-streams/${streamId}/join`);
+    return res.data.data;
+  },
+
+  leaveStream: async (streamId: string): Promise<LiveStreamResponseDTO> => {
+    const res = await apiClient.post<{ data: LiveStreamResponseDTO }>(`/live-streams/${streamId}/leave`);
     return res.data.data;
   }
 };

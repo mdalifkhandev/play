@@ -3,16 +3,16 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { KeyboardAvoidingView, Platform, StatusBar, StyleSheet, View, ActivityIndicator } from 'react-native';
 import { FloatingReactions, FloatingReactionsHandle } from '../../../components/live/FloatingReactions';
 import { LiveBottomActions } from '../../../components/live/LiveBottomActions';
-import { LiveChatStream } from '../../../components/live/LiveChatStream';
+import { LiveChatStream, ChatMessage, MOCK_CHAT } from '../../../components/live/LiveChatStream';
 import { LiveSingleHeader } from '../../../components/live/LiveSingleHeader';
 import { LiveGiftModal } from '../../../components/live/LiveGiftModal';
 
 import { useRef, useState, useEffect } from 'react';
 
-import { ChatMessage, MOCK_CHAT } from '../../../components/live/LiveChatStream';
 import { useAppStore } from '../../../store';
 import { toast } from 'sonner-native';
 import { liveStreamApi } from '../../../api/live-streams/live-stream.api';
+import { avatarSource } from '../../../utils/avatar';
 import {
   createAgoraRtcEngine,
   ChannelProfileType,
@@ -25,28 +25,46 @@ export default function LiveSingleScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
 
-  const player = useVideoPlayer('https://vjs.zencdn.net/v/oceans.mp4', player => {
-    player.loop = true;
-    player.play();
-  });
-
   const [isJoined, setIsJoined] = useState(false);
   const [remoteUid, setRemoteUid] = useState<number>(0);
   const agoraEngineRef = useRef<IRtcEngine | null>(null);
-  
-  const [streamInfo, setStreamInfo] = useState<{ hostAvatar: string; hostName: string; viewers: string } | null>(null);
+
+  const [streamInfo, setStreamInfo] = useState<{ hostAvatar?: string; hostName: string; viewers: string, duration: number } | null>(null);
 
   useEffect(() => {
-    // Fetch stream info and join via Agora
+    let timer: ReturnType<typeof setInterval>;
+    if (isJoined && streamInfo) {
+      timer = setInterval(() => {
+        setStreamInfo(prev => prev ? { ...prev, duration: prev.duration + 1 } : prev);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isJoined, streamInfo !== null]);
+
+  const formatDuration = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
     const joinStream = async () => {
       try {
+        const streamDetails = await liveStreamApi.joinStream(id as string);
         const tokenData = await liveStreamApi.getStreamToken(id as string);
-        
-        // Also we could fetch stream details if we had a getStreamById endpoint, but for now we rely on the list view or generic data
+
+
+        let initialDuration = 0;
+        if (streamDetails.startedAt) {
+          initialDuration = Math.floor((Date.now() - new Date(streamDetails.startedAt).getTime()) / 1000);
+          if (initialDuration < 0) initialDuration = 0;
+        }
+
         setStreamInfo({
-          hostAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', // Default
-          hostName: 'Live Host',
-          viewers: '1',
+          hostAvatar: streamDetails.hostId.avatarUrl,
+          hostName: streamDetails.hostId.displayName || streamDetails.hostId.username || 'Live Host',
+          viewers: streamDetails.viewerCount.toString(),
+          duration: initialDuration,
         });
 
         const appId = process.env.EXPO_PUBLIC_AGORA_APP_ID;
@@ -54,10 +72,10 @@ export default function LiveSingleScreen() {
 
         const engine = createAgoraRtcEngine();
         agoraEngineRef.current = engine;
-        
+
         engine.initialize({ appId, channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting });
         engine.enableVideo();
-        
+
         engine.registerEventHandler({
           onJoinChannelSuccess: () => setIsJoined(true),
           onUserJoined: (_conn, uid) => setRemoteUid(uid),
@@ -75,28 +93,38 @@ export default function LiveSingleScreen() {
           autoSubscribeAudio: true,
           autoSubscribeVideo: true,
         });
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to join live stream', e);
-        toast.error('Failed to join live stream');
+        if (e?.response?.status === 409) {
+          toast.error('This live stream is no longer active.');
+        } else {
+          toast.error('Failed to join live stream');
+        }
+        if (router.canGoBack()) router.back();
+        else router.replace('/');
       }
     };
-    
+
     joinStream();
-    
-    return () => {
-      if (agoraEngineRef.current) {
-        agoraEngineRef.current.leaveChannel();
-        agoraEngineRef.current.release();
-        agoraEngineRef.current = null;
+
+    // Poll for viewer count updates
+    const pollTimer = setInterval(async () => {
+      try {
+        const stream = await liveStreamApi.getStreamById(id as string);
+        setStreamInfo(prev => prev ? { ...prev, viewers: stream.viewerCount.toString() } : prev);
+      } catch (e) {
+        // Ignore poll errors
       }
+    }, 5000);
+
+    return () => {
+      clearInterval(pollTimer);
+      agoraEngineRef.current?.leaveChannel();
+      agoraEngineRef.current?.release();
+      liveStreamApi.leaveStream(id as string).catch(() => { });
+      agoraEngineRef.current = null;
     };
   }, [id]);
-
-  const streamData = streamInfo || {
-    hostAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
-    hostName: 'Dianne Wilson',
-    viewers: '41.3K',
-  };
 
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_CHAT);
   const [inputText, setInputText] = useState('');
@@ -120,12 +148,11 @@ export default function LiveSingleScreen() {
     floatingReactionsRef.current?.addReaction();
   };
 
-  const handleSelectGift = (gift: { id: string, name: string, icon: string, price: number }) => {
+  const handleSelectGift = (gift: any) => {
     const success = useAppStore.getState().deductCoins(gift.price);
-    
+
     if (success) {
       setGiftModalVisible(false);
-      // Add message to chat
       const newMessage: ChatMessage = {
         id: Date.now().toString(),
         userAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
@@ -164,11 +191,13 @@ export default function LiveSingleScreen() {
 
       <View className="absolute inset-0 bg-black/20" />
 
-      <LiveSingleHeader
-        hostAvatar={streamData.hostAvatar}
-        hostName={streamData.hostName}
-        viewers={streamData.viewers}
-      />
+      {streamInfo && (
+        <LiveSingleHeader
+          hostAvatar={avatarSource(streamInfo.hostAvatar)}
+          hostName={streamInfo.hostName}
+          viewers={`${streamInfo.viewers} (${formatDuration(streamInfo.duration)})`}
+        />
+      )}
 
       <LiveChatStream messages={messages} />
 
@@ -182,10 +211,10 @@ export default function LiveSingleScreen() {
         onGiftPress={() => setGiftModalVisible(true)}
       />
 
-      <LiveGiftModal 
-        visible={giftModalVisible} 
-        onClose={() => setGiftModalVisible(false)} 
-        onSelectGift={handleSelectGift} 
+      <LiveGiftModal
+        visible={giftModalVisible}
+        onClose={() => setGiftModalVisible(false)}
+        onSelectGift={handleSelectGift}
       />
     </KeyboardAvoidingView>
   );

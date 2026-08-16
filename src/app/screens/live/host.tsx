@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { liveStreamApi } from '../../../api/live-streams/live-stream.api';
+import { getMyProfileData } from '../../../api/profile/profile.api';
 import {
   createAgoraRtcEngine,
   ChannelProfileType,
@@ -37,15 +38,31 @@ export default function LiveHostScreen() {
   const [inputText, setInputText] = useState('');
   const [duration, setDuration] = useState(0);
   const [viewerCount, setViewerCount] = useState(0);
+  const [hostName, setHostName] = useState(displayName);
+  const [hostAvatar, setHostAvatar] = useState<string | undefined>(profile?.photoUrl);
   const floatingReactionsRef = useRef<FloatingReactionsHandle>(null);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setInterval>;
+    let pollTimer: ReturnType<typeof setInterval>;
+
     if (isJoined) {
       timer = setInterval(() => setDuration((prev) => prev + 1), 1000);
+
+      // Poll for viewer count
+      pollTimer = setInterval(async () => {
+        try {
+          const stream = await liveStreamApi.getStreamById(streamId as string);
+          setViewerCount(stream.viewerCount);
+        } catch (e) {}
+      }, 5000);
     }
-    return () => clearInterval(timer);
-  }, [isJoined]);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(pollTimer);
+    };
+  }, [isJoined, streamId]);
 
   const formatDuration = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -57,8 +74,8 @@ export default function LiveHostScreen() {
     if (!inputText.trim()) return;
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
-      userAvatar: profile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-      userName: displayName,
+      userAvatar: hostAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+      userName: hostName,
       message: inputText.trim(),
     };
     setMessages([...messages, newMessage]);
@@ -113,6 +130,21 @@ export default function LiveHostScreen() {
       // 1. Tell backend to start stream
       await liveStreamApi.startStream(streamId as string);
 
+      // Fetch latest profile info for the local host UI
+      try {
+        const myProfile = await getMyProfileData();
+        const p = myProfile.user.profile;
+        setHostName(p?.displayName || p?.username || displayName);
+        setHostAvatar(p?.photoUrl || profile?.photoUrl);
+      } catch (e) {
+        // Fallback to stream details if profile fetch fails
+        const streamDetails = await liveStreamApi.getStreamById(streamId as string);
+        if (streamDetails.hostId) {
+          setHostName(streamDetails.hostId.displayName || streamDetails.hostId.username || displayName);
+          setHostAvatar(streamDetails.hostId.avatarUrl || profile?.photoUrl);
+        }
+      }
+
       // 2. Fetch token
       const tokenData = await liveStreamApi.getStreamToken(streamId as string);
       setTokenInfo(tokenData);
@@ -140,10 +172,10 @@ export default function LiveHostScreen() {
           setIsJoined(true);
         },
         onUserJoined: (_connection, uid) => {
-          setViewerCount((prev) => prev + 1);
+          // Audience joining doesn't trigger this in Agora, relying on backend polling
         },
         onUserOffline: (_connection, uid) => {
-          setViewerCount((prev) => Math.max(0, prev - 1));
+          // Audience leaving doesn't trigger this in Agora
         },
         onError: (err, msg) => {
           console.error('Agora Error:', err, msg);
@@ -221,29 +253,36 @@ export default function LiveHostScreen() {
 
       {/* UI Overlay Layer */}
       <View style={styles.uiOverlay}>
-        {/* Top Header */}
-        <View style={[styles.header, { marginTop: insets.top + 10 }]}>
-          <View style={styles.hostInfo}>
-            <Image 
-              source={avatarSource(profile?.avatar)} 
-              style={styles.hostAvatar} 
-            />
-            <View>
-              <Text style={styles.hostName}>{displayName}</Text>
-              <View style={styles.viewersContainer}>
-                <Ionicons name="eye-outline" size={12} color="#FFF" />
-                <Text style={styles.viewersText}>{viewerCount} Watching</Text>
+        <View className="flex-row justify-between items-center px-4" style={{ marginTop: insets.top + 10, zIndex: 20 }}>
+          <View className="flex-row items-center bg-black/40 rounded-full pr-4 py-1">
+            <View className="relative ml-1">
+              <Image 
+                source={avatarSource(hostAvatar)} 
+                style={{ width: 36, height: 36, borderRadius: 18 }} 
+              />
+              <View className="absolute -bottom-1 self-center bg-[#FF3B30] px-1 rounded-sm">
+                <Text className="text-[8px] text-white font-bold">LIVE</Text>
+              </View>
+            </View>
+            <View className="ml-3">
+              <View className="flex-row items-center">
+                <Text className="text-white text-sm font-bold mr-1">{hostName}</Text>
+                <Ionicons name="checkmark-circle" size={14} color="#FFF" />
+              </View>
+              <View className="flex-row items-center mt-0.5">
+                <Ionicons name="eye-outline" size={12} color="#CCC" />
+                <Text className="text-[#CCC] text-xs ml-1">{viewerCount} Watching</Text>
               </View>
             </View>
           </View>
 
-          <View style={styles.headerRight}>
-            <View style={styles.liveBadge}>
-              <Text style={styles.liveBadgeText}>LIVE {formatDuration(duration)}</Text>
+          <View className="flex-row items-center gap-3">
+            <View className="bg-[#FF3B30] px-2 py-1 rounded-sm">
+              <Text className="text-white font-bold text-xs">LIVE {formatDuration(duration)}</Text>
             </View>
             
-            <TouchableOpacity onPress={confirmEndLiveStream} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color="#fff" />
+            <TouchableOpacity onPress={confirmEndLiveStream} className="bg-black/40 w-8 h-8 rounded-full items-center justify-center">
+              <Ionicons name="close" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
@@ -272,77 +311,21 @@ export default function LiveHostScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   videoContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: '#000',
     zIndex: 0,
   },
   uiOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10,
     justifyContent: 'space-between',
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: '#fff', fontSize: 16, marginTop: 10 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    zIndex: 10,
-  },
-  hostInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingRight: 16,
-    paddingVertical: 4,
-    borderRadius: 24,
-  },
-  hostAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 8,
-    marginLeft: 2,
-  },
-  hostName: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  viewersContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  viewersText: {
-    color: '#FFF',
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  liveBadge: {
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginRight: 10,
-  },
-  liveBadgeText: { 
-    color: '#fff', 
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  closeBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center', justifyContent: 'center'
-  },
   commentsContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingBottom: 60,
-  }
+    height: 250,
+    marginHorizontal: 15,
+    marginBottom: 10,
+    marginTop: 'auto',
+  },
 });

@@ -23,7 +23,7 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
     thumbnailUrl: isImageUrl(reel.thumbnailUrl) ? reel.thumbnailUrl : undefined,
     user: {
       id: reel.user.id,
-      username: reel.user.username || reel.user.email || '',
+      username: reel.user.displayName || reel.user.username || reel.user.email || '',
       profileImage: reel.user.avatarUrl || '',
     },
     description: reel.caption || '',
