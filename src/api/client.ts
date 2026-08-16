@@ -122,6 +122,11 @@ export const refreshAccessToken = async () => {
       }
 
       useAppStore.getState().setAuth(newAccessToken, newRefreshToken, useAppStore.getState().user);
+      
+      if (__DEV__) {
+        console.log('✅ TOKEN REFRESH SUCCESSFUL: New access token generated!');
+      }
+      
       return newAccessToken;
     })
     .finally(() => {
@@ -178,11 +183,17 @@ apiClient.interceptors.response.use(
       const refreshToken = useAppStore.getState().refreshToken;
 
       if (!refreshToken) {
+        if (__DEV__) {
+          console.log('❌ TOKEN REFRESH FAILED: No refresh token found. Logging out...');
+        }
         logoutAndRedirectToLogin();
         return Promise.reject(error);
       }
 
       try {
+        if (__DEV__) {
+          console.log('🔄 ATTEMPTING TOKEN REFRESH...');
+        }
         const newAccessToken = await refreshAccessToken();
         originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
