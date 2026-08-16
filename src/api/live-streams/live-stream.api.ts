@@ -99,5 +99,9 @@ export const liveStreamApi = {
   postComment: async (streamId: string, text: string): Promise<LiveStreamCommentResponseDTO> => {
     const res = await apiClient.post<{ data: LiveStreamCommentResponseDTO }>(`/live-streams/${streamId}/comments`, { text });
     return res.data.data;
+  },
+
+  likeStream: async (streamId: string): Promise<void> => {
+    await apiClient.post(`/live-streams/${streamId}/like`);
   }
 };

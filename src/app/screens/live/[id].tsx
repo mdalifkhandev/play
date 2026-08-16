@@ -21,6 +21,7 @@ import {
   IRtcEngine,
   RtcSurfaceView,
 } from 'react-native-agora';
+import { ensureChatSocket } from '../../../api/conversations/chatSocket';
 
 export default function LiveSingleScreen() {
   const { id } = useLocalSearchParams();
@@ -29,7 +30,9 @@ export default function LiveSingleScreen() {
 
   const [isJoined, setIsJoined] = useState(false);
   const [remoteUid, setRemoteUid] = useState<number>(0);
+  
   const agoraEngineRef = useRef<IRtcEngine | null>(null);
+  const lastLikeTimeRef = useRef<number>(0);
 
   const [streamInfo, setStreamInfo] = useState<{ hostId: string; hostAvatar?: string; hostName: string; viewers: string, duration: number } | null>(null);
 
@@ -151,6 +154,27 @@ export default function LiveSingleScreen() {
 
     joinStream();
 
+    // Setup socket connection
+    const token = useAppStore.getState().token;
+    let socket: any = null;
+    if (token) {
+      socket = ensureChatSocket(token);
+      if (socket) {
+        socket.emit('live:join', { streamId: id });
+        socket.on('live:new_reaction', (data: any) => {
+          if (data.type === 'HEART' && data.userId !== user?.id) {
+            // Spawn 3 to 5 hearts for other users
+            const numHearts = Math.floor(Math.random() * 3) + 3; // 3, 4, or 5
+            for (let i = 0; i < numHearts; i++) {
+              setTimeout(() => {
+                floatingReactionsRef.current?.addReaction(data.avatarUrl);
+              }, i * 150); // slight delay between each spawn
+            }
+          }
+        });
+      }
+    }
+
     // Poll for viewer count updates
     const pollTimer = setInterval(async () => {
       try {
@@ -163,6 +187,10 @@ export default function LiveSingleScreen() {
 
     return () => {
       clearInterval(pollTimer);
+      if (socket) {
+        socket.emit('live:leave', { streamId: id });
+        socket.off('live:new_reaction');
+      }
       agoraEngineRef.current?.leaveChannel();
       agoraEngineRef.current?.release();
       liveStreamApi.leaveStream(id as string).catch(() => { });
@@ -192,7 +220,25 @@ export default function LiveSingleScreen() {
   };
 
   const handleHeartPress = () => {
-    floatingReactionsRef.current?.addReaction();
+    const avatarUrl = user?.profile?.photoUrl || undefined;
+    floatingReactionsRef.current?.addReaction(avatarUrl);
+    
+    // Throttle backend calls to max 1 per second to prevent 429 Rate Limit
+    const now = Date.now();
+    if (now - lastLikeTimeRef.current > 1000) {
+      lastLikeTimeRef.current = now;
+      const token = useAppStore.getState().token;
+      if (token) {
+        const socket = ensureChatSocket(token);
+        if (socket && socket.connected) {
+          socket.emit('live:like', { streamId: id });
+        } else {
+          liveStreamApi.likeStream(id as string).catch(() => {});
+        }
+      } else {
+        liveStreamApi.likeStream(id as string).catch(() => {});
+      }
+    }
   };
 
   const handleShare = async () => {

@@ -21,7 +21,7 @@ export const MOCK_CHAT: ChatMessage[] = [
   { id: '3', userAvatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100', userName: 'Jenny Wilson', isVerified: true, message: 'Wow, your aim so perfect!' },
 ];
 
-export function LiveChatStream({ messages = MOCK_CHAT, onCommentPress }: { messages?: ChatMessage[], onCommentPress?: (chat: ChatMessage) => void }) {
+export function LiveChatStream({ messages = [], onCommentPress }: { messages?: ChatMessage[], onCommentPress?: (chat: ChatMessage) => void }) {
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
