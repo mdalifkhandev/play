@@ -1,89 +1,68 @@
-import { useState } from 'react';
-import { FlatList, View } from 'react-native';
+import { useState, useEffect } from 'react';
+import { FlatList, View, ActivityIndicator } from 'react-native';
+import { liveStreamApi } from '../../api/live-streams/live-stream.api';
 import { LiveCategoryBar } from '../../components/live/LiveCategoryBar';
 import { LiveGridItem, LiveStreamData } from '../../components/live/LiveGridItem';
 import { LiveHeader } from '../../components/live/LiveHeader';
 
-export const MOCK_LIVES: LiveStreamData[] = [
-  {
-    id: '1',
-    thumbnail: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400',
-    hostName: 'Motin',
-    hostAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
-    viewers: '12k',
-    badge: 'Live',
-    isVideo: true,
-    videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4'
-  },
-  {
-    id: '2',
-    thumbnail: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400',
-    hostName: 'Motin',
-    hostAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
-    viewers: '12k',
-    badge: 'Live',
-    isVideo: true,
-    videoUrl: 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4'
-  },
-  {
-    id: '3',
-    thumbnail: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=400',
-    hostName: 'Tèvas',
-    hostAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-    viewers: '12k',
-    badge: 'Live',
-    isVideo: true,
-    videoUrl: 'https://media.w3.org/2010/05/sintel/trailer.mp4'
-  },
-  {
-    id: '4',
-    thumbnail: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400',
-    hostName: 'Tèvas',
-    hostAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-    viewers: '12k',
-    badge: 'Live',
-    isVideo: true,
-    videoUrl: 'https://media.w3.org/2010/05/bunny/trailer.mp4'
-  },
-  {
-    id: '5',
-    thumbnail: 'https://images.unsplash.com/photo-1616012480717-fd9867059ca0?w=400',
-    hostName: 'Justin',
-    hostAvatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=100',
-    viewers: '12k',
-    badge: 'Live',
-    isVideo: true,
-    videoUrl: require('../../../assets/videos/mov_bbb.mp4')
-  },
-  {
-    id: '6',
-    thumbnail: 'https://images.unsplash.com/photo-1546514714-df0ccc50d7bf?w=400',
-    hostName: 'Pickett',
-    hostAvatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=100',
-    viewers: '12k',
-    badge: 'Top like',
-    isVideo: true,
-    videoUrl: 'https://media.w3.org/2010/05/video/movie_300.mp4'
-  },
-];
+
 
 export default function LiveAllScreen() {
   const [activeCat, setActiveCat] = useState('All');
+  const [streams, setStreams] = useState<LiveStreamData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStreams();
+  }, []);
+
+  const fetchStreams = async () => {
+    try {
+      setIsLoading(true);
+      const data = await liveStreamApi.getActiveStreams();
+      
+      const realStreams: LiveStreamData[] = data.items.map(s => ({
+        id: s.id,
+        thumbnail: s.coverImage || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400',
+        hostName: s.hostId?.displayName || s.hostId?.username || 'Unknown',
+        hostAvatar: s.hostId?.avatar || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
+        viewers: s.viewerCount ? `${s.viewerCount}` : '0',
+        badge: 'Live',
+        isVideo: false,
+        title: s.title,
+      }));
+      
+      setStreams(realStreams);
+    } catch (e) {
+      console.error('Failed to load active streams', e);
+      setStreams([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-black">
       <LiveHeader />
       <LiveCategoryBar activeCategory={activeCat} onSelect={setActiveCat} />
 
-      <FlatList
-        data={MOCK_LIVES}
-        keyExtractor={item => item.id}
-        numColumns={2}
-        contentContainerStyle={{ padding: 8, paddingBottom: 20 }}
-        columnWrapperStyle={{ justifyContent: 'space-between' }}
-        renderItem={({ item }) => <LiveGridItem item={item} />}
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#FF3B30" />
+        </View>
+      ) : (
+        <FlatList
+          data={streams}
+          keyExtractor={item => item.id}
+          numColumns={2}
+          contentContainerStyle={{ padding: 8, paddingBottom: 20 }}
+          columnWrapperStyle={{ justifyContent: 'space-between' }}
+          renderItem={({ item }) => <LiveGridItem item={item} />}
+          showsVerticalScrollIndicator={false}
+          refreshing={isLoading}
+          onRefresh={fetchStreams}
+        />
+      )}
     </View>
   );
 }

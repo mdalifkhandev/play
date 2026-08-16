@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CustomButton } from '../../components/ui/CustomButton';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { liveStreamApi } from '../../api/live-streams/live-stream.api';
 
 export default function CreateScreen() {
   const { soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl } = useLocalSearchParams<{
@@ -131,6 +132,22 @@ export default function CreateScreen() {
         Alert.alert('Photo failed', 'Could not capture photo. Please try again.');
         console.error('Failed to take picture:', error);
       }
+    } else if (mainMode === 'Live') {
+      try {
+        const result = await liveStreamApi.createStream({
+          title: `Live Stream ${new Date().toLocaleTimeString()}`,
+          category: 'General',
+        });
+        
+        // Ensure router push matches the actual file path we are going to create
+        router.push({
+          pathname: '/screens/live/host',
+          params: { streamId: result.id },
+        });
+      } catch (error) {
+        Alert.alert('Failed to start Live', 'Could not create a live stream. Please try again.');
+        console.error('Failed to create stream:', error);
+      }
     } else if (isRecordingRef.current) {
       try {
         isStoppingRecordingRef.current = true;
@@ -148,21 +165,17 @@ export default function CreateScreen() {
         let maxDuration = 60;
         if (mainMode === 'Video') {
           maxDuration = recordingMode === '15s' ? 15 : recordingMode === '30s' ? 30 : 60;
-        } else {
-          maxDuration = 3600; // Live can be longer
         }
 
         const video = await cameraRef.current.recordAsync({
           maxDuration,
         });
 
-        if (video?.uri && mainMode !== 'Live' && isMountedRef.current) {
+        if (video?.uri && isMountedRef.current) {
           router.push({
             pathname: '/screens/create/edit',
             params: { uri: video.uri, mediaType: 'video', ...selectedSoundParams },
           });
-        } else if (mainMode === 'Live') {
-          Alert.alert('Live Session Ended');
         } else {
           Alert.alert('Recording Failed', `Video data missing. video=${JSON.stringify(video)}`);
         }
