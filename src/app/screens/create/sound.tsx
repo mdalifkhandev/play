@@ -8,6 +8,7 @@ import { createAudioPlayer } from 'expo-audio';
 import { SearchIcon } from '../../../components/icons/SearchIcon';
 import { useLocalSearchParams } from 'expo-router';
 import { useMusicSearch } from '../../../hooks/music/useMusicSearch';
+import { toggleSavedTrack, getSavedTracks } from '../../../api/music/music.api';
 import type { MusicTrack } from '../../../api/music/music.types';
 
 const formatDuration = (seconds: number) => {
@@ -83,6 +84,64 @@ export default function SoundScreen() {
   // Audio state
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+
+  // Saved Tracks state
+  const [savedTracks, setSavedTracks] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    // Load saved tracks on mount
+    getSavedTracks({ limit: 50 }).then(data => {
+      if (data && data.tracks) {
+        setSavedTracks(new Set(data.tracks.map(t => t.providerTrackId)));
+      }
+    }).catch(e => console.log('Failed to load saved tracks', e));
+  }, []);
+
+  const handleSave = async (track: MusicTrack) => {
+    // Optimistic update
+    setSavedTracks(prev => {
+      const next = new Set(prev);
+      if (next.has(track.providerTrackId)) {
+        next.delete(track.providerTrackId);
+      } else {
+        next.add(track.providerTrackId);
+      }
+      return next;
+    });
+
+    try {
+      const result = await toggleSavedTrack({
+        providerTrackId: track.providerTrackId,
+        title: track.title,
+        artistName: track.artistName,
+        coverImageUrl: track.coverImageUrl,
+        audioPreviewUrl: track.audioPreviewUrl,
+        durationSeconds: track.durationSeconds,
+      });
+      // Revert if the result doesn't match our optimistic update
+      setSavedTracks(prev => {
+        const next = new Set(prev);
+        if (result.saved) {
+          next.add(track.providerTrackId);
+        } else {
+          next.delete(track.providerTrackId);
+        }
+        return next;
+      });
+    } catch (e) {
+      console.log('Failed to toggle save track', e);
+      // Revert on error
+      setSavedTracks(prev => {
+        const next = new Set(prev);
+        if (next.has(track.providerTrackId)) {
+          next.delete(track.providerTrackId);
+        } else {
+          next.add(track.providerTrackId);
+        }
+        return next;
+      });
+    }
+  };
 
   // Use a ref to strictly track the active player and prevent overlapping sounds
   const activePlayerRef = useRef<any>(null);
@@ -270,9 +329,11 @@ export default function SoundScreen() {
           const isThisPlaying = playingId === track.providerTrackId;
           const isThisLoading = loadingId === track.providerTrackId;
 
+          const isSaved = savedTracks.has(track.providerTrackId);
+
           return (
             // @ts-ignore - React Native View accepts key, but @types/react is mismatched
-            <View key={track.providerTrackId} className="flex-row items-center bg-[#1A1A1A] rounded-xl p-2.5 mb-3 border border-[#333]">
+            <Pressable key={track.providerTrackId} onPress={() => handleUse(track)} className="flex-row items-center bg-[#1A1A1A] rounded-xl p-2.5 mb-3 border border-[#333]">
               <Pressable onPress={() => handleTogglePlay(track)} className="relative">
                 <View className="w-[60px] h-[60px] rounded-lg bg-[#333] items-center justify-center relative overflow-hidden">
                   {track.coverImageUrl ? (
@@ -293,7 +354,7 @@ export default function SoundScreen() {
                 </View>
               </Pressable>
 
-              <View className="flex-1 ml-3">
+              <View className="flex-1 ml-3 pointer-events-none">
                 <Text className="text-white font-inter-medium text-[16px] mb-0.5">{track.title}</Text>
                 <Text className="text-[#888] font-inter-regular text-[13px]">
                   {track.artistName} • {formatDuration(track.durationSeconds)}
@@ -301,13 +362,16 @@ export default function SoundScreen() {
               </View>
 
               <Pressable
-                onPress={() => handleUse(track)}
-                className="border border-[#98D83A] rounded-lg px-5 py-1.5 ml-2"
-                style={({ pressed }) => ({ backgroundColor: pressed ? 'rgba(152, 216, 58, 0.2)' : 'transparent' })}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleSave(track);
+                }}
+                className="p-2 ml-2"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text className="text-[#98D83A] font-inter-semibold text-[15px]">Use</Text>
+                <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={24} color={isSaved ? "#98D83A" : "#888"} />
               </Pressable>
-            </View>
+            </Pressable>
           );
         })}
         {!isLoadingTracks && hasNextPage && (

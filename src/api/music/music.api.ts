@@ -20,3 +20,25 @@ export async function searchMusicTracks(params: SearchMusicParams = {}) {
 
   return response.data.data;
 }
+
+export async function toggleSavedTrack(trackData: {
+  providerTrackId: string;
+  title: string;
+  artistName: string;
+  coverImageUrl?: string | null;
+  audioPreviewUrl: string;
+  durationSeconds: number;
+}) {
+  const response = await apiClient.post<{ data: { saved: boolean, trackId: string } }>('/music/saved/toggle', trackData);
+  return response.data.data;
+}
+
+export async function getSavedTracks(params: { page?: number; limit?: number } = {}) {
+  const response = await apiClient.get<{ data: MusicSearchResponse }>('/music/saved', {
+    params: {
+      page: params.page ?? 1,
+      limit: params.limit ?? 20,
+    },
+  });
+  return response.data.data;
+}
