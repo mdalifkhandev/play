@@ -29,7 +29,7 @@ export default function LiveSingleScreen() {
   const [remoteUid, setRemoteUid] = useState<number>(0);
   const agoraEngineRef = useRef<IRtcEngine | null>(null);
 
-  const [streamInfo, setStreamInfo] = useState<{ hostAvatar?: string; hostName: string; viewers: string, duration: number } | null>(null);
+  const [streamInfo, setStreamInfo] = useState<{ hostId: string; hostAvatar?: string; hostName: string; viewers: string, duration: number } | null>(null);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
@@ -61,6 +61,7 @@ export default function LiveSingleScreen() {
         }
 
         setStreamInfo({
+          hostId: streamDetails.hostId.id,
           hostAvatar: streamDetails.hostId.avatarUrl,
           hostName: streamDetails.hostId.displayName || streamDetails.hostId.username || 'Live Host',
           viewers: streamDetails.viewerCount.toString(),
@@ -193,6 +194,7 @@ export default function LiveSingleScreen() {
 
       {streamInfo && (
         <LiveSingleHeader
+          hostId={streamInfo.hostId}
           hostAvatar={avatarSource(streamInfo.hostAvatar)}
           hostName={streamInfo.hostName}
           viewers={`${streamInfo.viewers} (${formatDuration(streamInfo.duration)})`}
