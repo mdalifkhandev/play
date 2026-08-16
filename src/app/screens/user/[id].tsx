@@ -9,6 +9,7 @@ import { followUser, getPublicProfileData, unfollowUser } from '../../../api/pro
 import type { PublicProfileData } from '../../../api/profile/profile.types';
 import { ProfileInfo } from '../../../components/profile/ProfileInfo';
 import { ProfileTabs } from '../../../components/profile/ProfileTabs';
+import { useAppStore } from '../../../store';
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,6 +21,14 @@ export default function UserProfileScreen() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowBusy, setIsFollowBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const currentUser = useAppStore((state: any) => state.user);
+
+  useEffect(() => {
+    if (id && currentUser?.id && id === currentUser.id) {
+      router.replace('/(tab)/profile');
+    }
+  }, [id, currentUser?.id, router]);
 
   const loadProfile = useCallback(async (refresh = false) => {
     if (!id) return;

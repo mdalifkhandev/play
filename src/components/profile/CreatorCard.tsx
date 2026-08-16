@@ -6,10 +6,9 @@ export function CreatorCard() {
   const router = useRouter();
 
   return (
-    <Pressable onPress={() => router.push('/screens/creator/criteria')} className="mt-8 mx-4 bg-[#141414] p-4 rounded-2xl border border-[#222] border-l-4 border-l-[#A3E635] overflow-hidden">
-      <Text className="text-white text-[18px] font-inter-semibold w-[75%] leading-[22px]">
-        You're on your way to becoming a
-        Creator!
+    <Pressable onPress={() => router.push('/screens/creator/criteria')} className="mt-8 mx-4 bg-[#141414] p-4 rounded-2xl border border-[#222] border-l-4  overflow-hidden">
+      <Text className="text-white text-[16px] font-inter-semibold w-[75%] leading-[22px]">
+        You're on your creator path
       </Text>
 
       <View className="mt-5 flex-row items-center">

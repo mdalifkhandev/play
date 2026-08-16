@@ -33,7 +33,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      
+
       {/* Kids Mode Search Tab */}
       <Tabs.Screen
         name="search"
@@ -63,7 +63,7 @@ export default function TabLayout() {
           title: '',
           href: !isKidsModeActive ? '/(tab)/create' : null,
           tabBarIcon: () => (
-            <Image source={require('../../../assets/icon/create.svg')} style={{ width: 50, height: 50, marginTop: 2 }} contentFit="contain" />
+            <Image source={require('../../../assets/icon/create1.svg')} style={{ width: 50, height: 50, marginTop: 2 }} contentFit="contain" />
           ),
         }}
       />
@@ -87,7 +87,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      
+
       <Tabs.Screen
         name="live"
         options={{

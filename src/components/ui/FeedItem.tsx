@@ -419,6 +419,7 @@ function FeedVideo({
   isMuted,
   onDoubleTap,
   onPlaybackUpdate,
+  onBufferingChange,
 }: {
   source: string;
   thumbnailUrl?: string;
@@ -426,6 +427,7 @@ function FeedVideo({
   isMuted: boolean;
   onDoubleTap: () => void;
   onPlaybackUpdate?: (currentTime: number, duration: number) => void;
+  onBufferingChange?: (isBuffering: boolean, hasFirstFrame: boolean, hasError: boolean) => void;
 }) {
   const [isBuffering, setIsBuffering] = useState(true);
   const [hasFirstFrame, setHasFirstFrame] = useState(false);
@@ -452,7 +454,8 @@ function FeedVideo({
     setIsBuffering(true);
     setHasFirstFrame(false);
     setHasError(!source);
-  }, [source]);
+    onBufferingChange?.(true, false, !source);
+  }, [source, onBufferingChange]);
 
   useEffect(() => {
     try {
@@ -569,15 +572,22 @@ function FeedVideo({
             if (isMountedRef.current) {
               setHasFirstFrame(true);
               setIsBuffering(false);
+              onBufferingChange?.(false, true, hasError);
             }
           }, 350);
         }
         playSafely();
       }
+      
+      onBufferingChange?.(
+        status === 'loading' || status === 'idle', 
+        hasFirstFrame, 
+        status === 'error' ? true : hasError
+      );
     });
 
     return () => subscription.remove();
-  }, [hasError, isActive, playSafely, player]);
+  }, [hasError, isActive, playSafely, player, hasFirstFrame, onBufferingChange]);
 
   useEffect(() => {
     if (isActive && !hasError) {
@@ -661,13 +671,9 @@ function FeedVideo({
           }
           setHasFirstFrame(true);
           setIsBuffering(false);
+          onBufferingChange?.(false, true, hasError);
         }}
       />
-      {isBuffering && !hasError && !hasFirstFrame && isImageThumbnail(thumbnailUrl) && (
-        <View className="absolute inset-0 items-center justify-center bg-black/20">
-          <ActivityIndicator size="large" color="#98FF2F" />
-        </View>
-      )}
       {hasError && (
         <View className="absolute inset-0 items-center justify-center bg-black/70 px-8">
           <Ionicons name="alert-circle-outline" size={34} color="#98FF2F" />
@@ -721,6 +727,14 @@ export const FeedItem = memo(({
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<'like' | 'save' | 'share' | 'follow' | null>(null);
   const [shouldRenderVideo, setShouldRenderVideo] = useState(false);
+  
+  // State for bubbling up buffering to render spinner above everything
+  const [videoBufferingState, setVideoBufferingState] = useState({
+    isBuffering: true,
+    hasFirstFrame: false,
+    hasError: false
+  });
+
   const lastTap = useRef(0);
   const collapsedDescription = useMemo(() => description.replace(/\s+/g, ' ').trim(), [description]);
   const shouldShowMore = collapsedDescription.length > DESCRIPTION_PREVIEW_LENGTH;
@@ -733,9 +747,18 @@ export const FeedItem = memo(({
     : 0;
 
   const handlePlaybackUpdate = useCallback((currentTime: number, duration: number) => {
-    setPlaybackTime({
-      currentTime: Number.isFinite(currentTime) ? currentTime : 0,
-      duration: Number.isFinite(duration) ? duration : 0,
+    setPlaybackTime(prev => {
+      const newCurrentTime = Number.isFinite(currentTime) ? currentTime : 0;
+      const newDuration = Number.isFinite(duration) ? duration : 0;
+      if (prev.currentTime === newCurrentTime && prev.duration === newDuration) return prev;
+      return { currentTime: newCurrentTime, duration: newDuration };
+    });
+  }, []);
+
+  const handleBufferingChange = useCallback((isBuffering: boolean, hasFirstFrame: boolean, hasError: boolean) => {
+    setVideoBufferingState(prev => {
+      if (prev.isBuffering === isBuffering && prev.hasFirstFrame === hasFirstFrame && prev.hasError === hasError) return prev;
+      return { isBuffering, hasFirstFrame, hasError };
     });
   }, []);
 
@@ -945,6 +968,7 @@ export const FeedItem = memo(({
               isMuted={isMuted}
               onDoubleTap={handleDoubleTap}
               onPlaybackUpdate={handlePlaybackUpdate}
+              onBufferingChange={handleBufferingChange}
             />
           </FeedVideoBoundary>
         ) : (
@@ -1002,29 +1026,7 @@ export const FeedItem = memo(({
         <View className="absolute inset-0" pointerEvents="none" style={{ backgroundColor: feedFilterOverlay }} />
       )}
 
-      {feedOverlayText?.text ? (
-        <View
-          className="absolute z-20 items-center"
-          pointerEvents="none"
-          style={{
-            left: 24,
-            right: 24,
-            top: `${Math.max(8, Math.min(82, feedOverlayText.y * 100))}%`,
-          }}
-        >
-          <Text
-            className="text-white text-center font-inter-bold"
-            style={{
-              fontSize: Math.max(20, Math.min(42, feedOverlayText.fontSize || 36)),
-              textShadowColor: 'rgba(0, 0, 0, 0.75)',
-              textShadowOffset: { width: -1, height: 1 },
-              textShadowRadius: 10,
-            }}
-          >
-            {feedOverlayText.text}
-          </Text>
-        </View>
-      ) : null}
+
 
       {!isFullscreen && (
         <LinearGradient
@@ -1149,6 +1151,39 @@ export const FeedItem = memo(({
           </Pressable>
         )}
       </View>
+
+      {feedOverlayText?.text ? (
+        <View
+          className="absolute items-center"
+          pointerEvents="none"
+          style={{
+            left: 24,
+            right: 24,
+            top: `${Math.max(8, Math.min(82, feedOverlayText.y * 100))}%`,
+            zIndex: 20,
+          }}
+        >
+          <Text
+            className="text-white text-center font-inter-bold"
+            style={{
+              fontSize: Math.max(20, Math.min(42, feedOverlayText.fontSize || 36)),
+              textShadowColor: 'rgba(0, 0, 0, 0.75)',
+              textShadowOffset: { width: -1, height: 1 },
+              textShadowRadius: 10,
+            }}
+          >
+            {feedOverlayText.text}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Global Loading Spinner for the Video - Rendered on TOP of text */}
+      {type === 'video' && videoBufferingState.isBuffering && !videoBufferingState.hasError && !videoBufferingState.hasFirstFrame && isImageThumbnail(thumbnailUrl) && (
+        <View className="absolute inset-0 items-center justify-center bg-black/20" pointerEvents="none" style={{ zIndex: 9999, elevation: 100 }}>
+          <ActivityIndicator size="large" color="#98FF2F" />
+        </View>
+      )}
+
       <CommentsModal
         reelId={id}
         visible={isCommentsOpen}
