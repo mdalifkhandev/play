@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { createAudioPlayer } from 'expo-audio';
+import { useAudioPlayer } from 'expo-audio';
 import { useVideoPlayer } from 'expo-video';
 
 interface UseVideoEditorPlayerProps {
@@ -20,7 +20,6 @@ export function useVideoEditorPlayer({
   isPreviewPlayingRef,
   audioDurationSec,
 }: UseVideoEditorPlayerProps) {
-  const [sound, setSound] = useState<any>(null);
   const [isAudioReady, setIsAudioReady] = useState(!soundUrl);
   const [isVideoReady, setIsVideoReady] = useState(!isVideo);
 
@@ -34,6 +33,19 @@ export function useVideoEditorPlayer({
     player.muted = true;
   });
 
+  const soundSource = useMemo(() => {
+    if (!soundUrl) return null;
+    return /^\d+$/.test(soundUrl) ? parseInt(soundUrl, 10) : soundUrl;
+  }, [soundUrl]);
+
+  const sound = useAudioPlayer(soundSource);
+
+  useEffect(() => {
+    if (sound && soundSource) {
+      sound.loop = true;
+    }
+  }, [sound, soundSource]);
+
   // Track video readiness
   useEffect(() => {
     if (!videoPlayer) return;
@@ -43,7 +55,6 @@ export function useVideoEditorPlayer({
         setIsVideoReady(true);
       }
     });
-    // Check initial status
     if (videoPlayer.status === 'readyToPlay') {
       setIsVideoReady(true);
     }
@@ -68,71 +79,59 @@ export function useVideoEditorPlayer({
     try { player.currentTime = seconds; } catch (e) { }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      let player: any = null;
-      
-      // Reset audio readiness if soundUrl changes
-      setIsAudioReady(!soundUrl);
-
-      if (soundUrl) {
-        try {
-          const source = /^\d+$/.test(soundUrl) ? parseInt(soundUrl, 10) : soundUrl;
-          player = createAudioPlayer(source);
-          
-          let hasInitialized = false;
-          player.addListener('playbackStatusUpdate', (status: any) => {
-            if (status.isLoaded && !hasInitialized) {
-              hasInitialized = true;
-              const trimTime = getTrimTime(trimLeft);
-              if (typeof player.seekTo === 'function') {
-                const result = player.seekTo(trimTime);
-                if (result && typeof result.then === 'function') {
-                  result.then(() => {
-                    setIsAudioReady(true);
-                    if (isPreviewPlayingRef.current) {
-                      try { player.play(); } catch (e) {}
-                    }
-                  }).catch(() => {
-                    setIsAudioReady(true);
-                    if (isPreviewPlayingRef.current) {
-                      try { player.play(); } catch (e) {}
-                    }
-                  });
-                } else {
-                  setIsAudioReady(true);
-                  if (isPreviewPlayingRef.current) {
-                    try { player.play(); } catch (e) {}
-                  }
-                }
-              } else {
+  // Track audio readiness and seek to trimLeft
+  useEffect(() => {
+    setIsAudioReady(!soundUrl);
+    
+    if (soundUrl && sound) {
+      let hasInitialized = false;
+      const listener = sound.addListener('playbackStatusUpdate', (status: any) => {
+        if (status.isLoaded && !hasInitialized) {
+          hasInitialized = true;
+          const trimTime = getTrimTime(trimLeft);
+          if (typeof sound.seekTo === 'function') {
+            const result = sound.seekTo(trimTime);
+            if (result && typeof result.then === 'function') {
+              result.then(() => {
                 setIsAudioReady(true);
                 if (isPreviewPlayingRef.current) {
-                  try { player.play(); } catch (e) {}
+                  try { sound.play(); } catch (e) {}
                 }
+              }).catch(() => {
+                setIsAudioReady(true);
+                if (isPreviewPlayingRef.current) {
+                  try { sound.play(); } catch (e) {}
+                }
+              });
+            } else {
+              setIsAudioReady(true);
+              if (isPreviewPlayingRef.current) {
+                try { sound.play(); } catch (e) {}
               }
             }
-          });
-
-          player.loop = true;
-          setSound(player);
-        } catch (error) {
-          console.log("Preview audio error:", error);
-          setIsAudioReady(true); // Fallback so it doesn't hang
+          } else {
+            setIsAudioReady(true);
+            if (isPreviewPlayingRef.current) {
+              try { sound.play(); } catch (e) {}
+            }
+          }
         }
-      }
-      
+      });
+      return () => listener.remove();
+    }
+  }, [soundUrl, sound, trimLeft, getTrimTime, isPreviewPlayingRef]);
+
+  useFocusEffect(
+    useCallback(() => {
       return () => {
         if (videoPlayer) {
           try { videoPlayer.pause(); } catch(e) {}
         }
-        
-        if (player) {
-          try { player.pause(); } catch (e) { }
-          try { player.release(); } catch (e) {}
+        if (sound) {
+          try { sound.pause(); } catch (e) { }
         }
       };
-    }, [soundUrl, trimLeft, audioDurationSec, videoPlayer])
+    }, [sound, videoPlayer])
   );
 
   const isMediaReady = isVideoReady && isAudioReady;

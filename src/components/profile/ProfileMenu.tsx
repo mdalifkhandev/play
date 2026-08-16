@@ -29,7 +29,7 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
     setLogoutModalVisible(false);
     onClose();
 
-    InteractionManager.runAfterInteractions(() => {
+    setTimeout(() => {
       logoutAction();
       setIsLoggingOut(false);
       router.replace('/(auth)/login');

@@ -108,6 +108,19 @@ export default function EditMediaScreen() {
   const [selectedSoundDuration, setSelectedSoundDuration] = useState(firstParam(soundDuration) || '');
   const [selectedOriginalVolume, setSelectedOriginalVolume] = useState(firstParam(originalVolume) || '');
   const [selectedAddedVolume, setSelectedAddedVolume] = useState(firstParam(addedVolume) || '');
+
+  // Sync state when params update (e.g. returning from sound.tsx)
+  useEffect(() => {
+    if (soundUrl !== undefined) setSelectedSoundUrl(firstParam(soundUrl) || '');
+    if (title !== undefined) setSelectedTitle(firstParam(title) || '');
+    if (musicId !== undefined) setSelectedMusicId(firstParam(musicId) || '');
+    if (musicArtist !== undefined) setSelectedMusicArtist(firstParam(musicArtist) || '');
+    if (musicCoverUrl !== undefined) setSelectedMusicCoverUrl(firstParam(musicCoverUrl) || '');
+    if (soundDuration !== undefined) setSelectedSoundDuration(firstParam(soundDuration) || '');
+    if (originalVolume !== undefined) setSelectedOriginalVolume(firstParam(originalVolume) || '');
+    if (addedVolume !== undefined) setSelectedAddedVolume(firstParam(addedVolume) || '');
+  }, [soundUrl, title, musicId, musicArtist, musicCoverUrl, soundDuration, originalVolume, addedVolume]);
+
   const audioDurationSec = parseDurationSeconds(selectedSoundDuration, selectedTitle);
   const [videoDurationSec, setVideoDurationSec] = useState(videoDuration ? Number(videoDuration) : 0);
   const isLowEndDevice = (Device.totalMemory ?? 0) < 3 * 1024 * 1024 * 1024;

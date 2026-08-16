@@ -3,7 +3,7 @@ import { searchMusicTracks } from '../../api/music/music.api';
 import type { MusicTrack } from '../../api/music/music.types';
 import { handleApiError } from '../../api/client';
 
-const MUSIC_PAGE_SIZE = 8;
+const MUSIC_PAGE_SIZE = 50;
 const musicSearchCache = new Map<string, {
   tracks: MusicTrack[];
   page: number;

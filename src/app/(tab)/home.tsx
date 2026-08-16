@@ -88,11 +88,11 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       let isFocused = true;
-      const task = InteractionManager.runAfterInteractions(() => {
+      const taskId = setTimeout(() => {
         if (isFocused && AppState.currentState === 'active') {
           setIsScreenActive(true);
         }
-      });
+      }, 0);
 
       const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
         setIsScreenActive(isFocused && state === 'active');
@@ -100,7 +100,7 @@ export default function HomeScreen() {
 
       return () => {
         isFocused = false;
-        task.cancel();
+        clearTimeout(taskId);
         setIsScreenActive(false);
         subscription.remove();
       };

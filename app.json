@@ -67,7 +67,13 @@
         }
       ],
       "expo-image",
-      "@sentry/react-native",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "play-all",
+          "project": "play"
+        }
+      ],
       "@react-native-community/datetimepicker"
     ],
     "experiments": {

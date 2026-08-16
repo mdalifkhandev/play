@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, TextInput, FlatList, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { createAudioPlayer } from 'expo-audio';
+import { useAudioPlayer } from 'expo-audio';
 import { SearchIcon } from '../../../components/icons/SearchIcon';
 import { useLocalSearchParams } from 'expo-router';
 import { useMusicSearch } from '../../../hooks/music/useMusicSearch';
@@ -87,12 +87,14 @@ export default function SoundScreen() {
 
   // Saved Tracks state
   const [savedTracks, setSavedTracks] = useState<Set<string>>(new Set());
+  const [savedTrackObjects, setSavedTrackObjects] = useState<MusicTrack[]>([]);
 
   useEffect(() => {
     // Load saved tracks on mount
     getSavedTracks({ limit: 50 }).then(data => {
       if (data && data.tracks) {
         setSavedTracks(new Set(data.tracks.map(t => t.providerTrackId)));
+        setSavedTrackObjects(data.tracks as MusicTrack[]);
       }
     }).catch(e => console.log('Failed to load saved tracks', e));
   }, []);
@@ -103,8 +105,10 @@ export default function SoundScreen() {
       const next = new Set(prev);
       if (next.has(track.providerTrackId)) {
         next.delete(track.providerTrackId);
+        setSavedTrackObjects(current => current.filter(t => t.providerTrackId !== track.providerTrackId));
       } else {
         next.add(track.providerTrackId);
+        setSavedTrackObjects(current => [track, ...current]);
       }
       return next;
     });
@@ -125,6 +129,7 @@ export default function SoundScreen() {
           next.add(track.providerTrackId);
         } else {
           next.delete(track.providerTrackId);
+          setSavedTrackObjects(current => current.filter(t => t.providerTrackId !== track.providerTrackId));
         }
         return next;
       });
@@ -135,8 +140,10 @@ export default function SoundScreen() {
         const next = new Set(prev);
         if (next.has(track.providerTrackId)) {
           next.delete(track.providerTrackId);
+          setSavedTrackObjects(current => current.filter(t => t.providerTrackId !== track.providerTrackId));
         } else {
           next.add(track.providerTrackId);
+          setSavedTrackObjects(current => [track, ...current]);
         }
         return next;
       });
@@ -148,17 +155,14 @@ export default function SoundScreen() {
   const isPlayerReadyRef = useRef<boolean>(false);
   const lastTapRef = useRef<number>(0);
 
+  // SINGLE AUDIO PLAYER TO AVOID MEMORY LEAKS
+  const audioPlayer = useAudioPlayer();
+
   const stopActivePlayer = useCallback(() => {
-    const player = activePlayerRef.current;
-
-    activePlayerRef.current = null;
-    isPlayerReadyRef.current = false;
-
-    if (!player) return;
-
-    try { player.pause(); } catch (e) { }
-    try { player.release(); } catch (e) { }
-  }, []);
+    try { audioPlayer.pause(); } catch (e) { }
+    setPlayingId(null);
+    setLoadingId(null);
+  }, [audioPlayer]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -175,36 +179,28 @@ export default function SoundScreen() {
     // If clicking the currently playing/loading track, stop it
     if (playingId === track.providerTrackId || loadingId === track.providerTrackId) {
       stopActivePlayer();
-      setPlayingId(null);
-      setLoadingId(null);
       return;
     }
 
     // Stop current track if switching
     stopActivePlayer();
     setLoadingId(track.providerTrackId);
-    setPlayingId(null);
 
     try {
-      const newSound = createAudioPlayer(track.audioPreviewUrl);
-      newSound.play();
-      activePlayerRef.current = newSound;
-      isPlayerReadyRef.current = false;
+      audioPlayer.replace(track.audioPreviewUrl);
+      audioPlayer.play();
 
-      newSound.addListener('playbackStatusUpdate', (status: any) => {
-        if (activePlayerRef.current !== newSound) return;
-
-        if (status.isLoaded) {
-          isPlayerReadyRef.current = true;
+      let hasInitialized = false;
+      audioPlayer.addListener('playbackStatusUpdate', (status: any) => {
+        if (status.isLoaded && !hasInitialized) {
+          hasInitialized = true;
+          setLoadingId(null);
+          setPlayingId(track.providerTrackId);
         }
         if (status.error) {
           console.log('Audio playback error:', status.error);
           setLoadingId(null);
           setPlayingId(null);
-        }
-        if (status.isLoaded && status.playing) {
-          setLoadingId(null);
-          setPlayingId(track.providerTrackId);
         }
         if (status.didJustFinish) {
           setPlayingId(null);
@@ -222,7 +218,7 @@ export default function SoundScreen() {
 
     const targetPath = returnTo || '/(tab)/create';
 
-    router.push({
+    router.navigate({
       pathname: targetPath as any,
       params: {
         soundUrl: track.audioPreviewUrl,
@@ -272,7 +268,7 @@ export default function SoundScreen() {
       </View>
 
       {/* Search Bar */}
-      <View className="flex-row items-center px-4 mb-2 mt-2 gap-3">
+      <View className="flex-row items-center px-4 mb-2 mt-2">
         <View className="flex-1 flex-row items-center bg-[#2A2A2A] rounded-full px-4 py-2">
           <SearchIcon width={20} height={20} />
           <TextInput
@@ -283,14 +279,11 @@ export default function SoundScreen() {
             onChangeText={setSearchQuery}
           />
         </View>
-        <Pressable>
-          <Ionicons name="ellipsis-horizontal" size={24} color="#888" />
-        </Pressable>
       </View>
 
       {/* Tabs */}
       <View className="flex-row px-4 border-b border-[#333] mb-4 gap-6">
-        {['Trending', 'Mood', 'Genre'].map(tab => (
+        {['Trending', 'Mood', 'Genre', 'Saved'].map(tab => (
           <Pressable key={tab} onPress={() => setActiveTab(tab)} className={`pb-3 border-b-2 ${activeTab === tab ? 'border-[#98D83A]' : 'border-transparent'}`}>
             <Text className={`font-inter-semibold text-[15px] ${activeTab === tab ? 'text-white' : 'text-[#888]'}`}>
               {tab}
@@ -300,40 +293,58 @@ export default function SoundScreen() {
       </View>
 
       {/* List */}
-      <ScrollView className="flex-1 px-4">
-        {isLoadingTracks && (
-          <View className="items-center justify-center py-10">
-            <ActivityIndicator size="large" color="#98FF2F" />
-            <Text className="text-[#888] font-inter-medium mt-3">Loading music...</Text>
+      <FlatList
+        className="flex-1 px-4"
+        data={activeTab === 'Saved' ? savedTrackObjects : (!isLoadingTracks ? tracks : [])}
+        keyExtractor={(item, index) => item?.providerTrackId || index.toString()}
+        showsVerticalScrollIndicator={false}
+        onEndReached={() => {
+          if (activeTab !== 'Saved' && hasNextPage && !isLoadingMore && !isLoadingTracks) {
+            loadMore();
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListEmptyComponent={() => (
+          <View>
+            {activeTab !== 'Saved' && isLoadingTracks && (
+              <View className="items-center justify-center py-10">
+                <ActivityIndicator size="large" color="#98FF2F" />
+                <Text className="text-[#888] font-inter-medium mt-3">Loading music...</Text>
+              </View>
+            )}
+
+            {activeTab !== 'Saved' && !isLoadingTracks && loadError ? (
+              <View className="items-center justify-center py-10 px-4">
+                <Ionicons name="warning-outline" size={34} color="#98FF2F" />
+                <Text className="text-white font-inter-semibold text-base mt-3 text-center">{loadError}</Text>
+                <Pressable onPress={retry} className="border border-[#98D83A] rounded-lg px-5 py-2 mt-4">
+                  <Text className="text-[#98D83A] font-inter-semibold">Retry</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {activeTab !== 'Saved' && !isLoadingTracks && !loadError && tracks.length === 0 ? (
+              <View className="items-center justify-center py-10 px-4">
+                <Ionicons name="musical-notes-outline" size={34} color="#98FF2F" />
+                <Text className="text-white font-inter-semibold text-base mt-3 text-center">No downloadable music found</Text>
+              </View>
+            ) : null}
+
+            {activeTab === 'Saved' && savedTrackObjects.length === 0 ? (
+              <View className="items-center justify-center py-10 px-4">
+                <Ionicons name="bookmark-outline" size={34} color="#98FF2F" />
+                <Text className="text-white font-inter-semibold text-base mt-3 text-center">No saved music found</Text>
+              </View>
+            ) : null}
           </View>
         )}
-
-        {!isLoadingTracks && loadError ? (
-          <View className="items-center justify-center py-10 px-4">
-            <Ionicons name="warning-outline" size={34} color="#98FF2F" />
-            <Text className="text-white font-inter-semibold text-base mt-3 text-center">{loadError}</Text>
-            <Pressable onPress={retry} className="border border-[#98D83A] rounded-lg px-5 py-2 mt-4">
-              <Text className="text-[#98D83A] font-inter-semibold">Retry</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {!isLoadingTracks && !loadError && tracks.length === 0 ? (
-          <View className="items-center justify-center py-10 px-4">
-            <Ionicons name="musical-notes-outline" size={34} color="#98FF2F" />
-            <Text className="text-white font-inter-semibold text-base mt-3 text-center">No downloadable music found</Text>
-          </View>
-        ) : null}
-
-        {!isLoadingTracks && tracks.map(track => {
+        renderItem={({ item: track }) => {
           const isThisPlaying = playingId === track.providerTrackId;
           const isThisLoading = loadingId === track.providerTrackId;
-
           const isSaved = savedTracks.has(track.providerTrackId);
 
           return (
-            // @ts-ignore - React Native View accepts key, but @types/react is mismatched
-            <Pressable key={track.providerTrackId} onPress={() => handleUse(track)} className="flex-row items-center bg-[#1A1A1A] rounded-xl p-2.5 mb-3 border border-[#333]">
+            <Pressable onPress={() => handleUse(track)} className="flex-row items-center bg-[#1A1A1A] rounded-xl p-2.5 mb-3 border border-[#333]">
               <Pressable onPress={() => handleTogglePlay(track)} className="relative">
                 <View className="w-[60px] h-[60px] rounded-lg bg-[#333] items-center justify-center relative overflow-hidden">
                   {track.coverImageUrl ? (
@@ -373,22 +384,16 @@ export default function SoundScreen() {
               </Pressable>
             </Pressable>
           );
-        })}
-        {!isLoadingTracks && hasNextPage && (
-          <Pressable
-            onPress={loadMore}
-            disabled={isLoadingMore}
-            className="border border-[#98D83A] rounded-lg py-3 items-center mb-3"
-          >
-            {isLoadingMore ? (
+        }}
+        ListFooterComponent={() => (
+          <View className="py-4 items-center">
+            {activeTab !== 'Saved' && isLoadingMore && (
               <ActivityIndicator size="small" color="#98FF2F" />
-            ) : (
-              <Text className="text-[#98D83A] font-inter-semibold">Load more</Text>
             )}
-          </Pressable>
+            <View className="h-6" />
+          </View>
         )}
-        <View className="h-10" />
-      </ScrollView>
+      />
     </View>
   );
 }

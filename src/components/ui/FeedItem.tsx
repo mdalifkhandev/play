@@ -417,6 +417,7 @@ function FeedVideo({
   thumbnailUrl,
   isActive,
   isMuted,
+  shouldMountVideo,
   onDoubleTap,
   onPlaybackUpdate,
   onBufferingChange,
@@ -425,6 +426,7 @@ function FeedVideo({
   thumbnailUrl?: string;
   isActive: boolean;
   isMuted: boolean;
+  shouldMountVideo?: boolean;
   onDoubleTap: () => void;
   onPlaybackUpdate?: (currentTime: number, duration: number) => void;
   onBufferingChange?: (isBuffering: boolean, hasFirstFrame: boolean, hasError: boolean) => void;
@@ -441,11 +443,13 @@ function FeedVideo({
   const lastTapRef = useRef(0);
 
   const videoSource = useMemo(() => {
+    if (!shouldMountVideo) return null;
     if (!source) return null;
     return isRemoteUri(source) ? { uri: source, contentType: 'progressive' as const } : source;
-  }, [source]);
+  }, [source, shouldMountVideo]);
 
   const player = useVideoPlayer(videoSource, currentPlayer => {
+    if (!currentPlayer) return;
     currentPlayer.loop = true;
     currentPlayer.muted = isMuted;
   });
@@ -656,24 +660,26 @@ function FeedVideo({
       ) : (
         hasError ? <FeedFallback showSpinner={false} showPlayIcon /> : null
       )}
-      <VideoView
-        player={player}
-        className="absolute inset-0"
-        style={{ width: '100%', height: '100%', opacity: hasError ? 0 : 1 }}
-        nativeControls={false}
-        contentFit="cover"
-        surfaceType="textureView"
-        useExoShutter={false}
-        onFirstFrameRender={() => {
-          if (firstFrameFallbackTimerRef.current) {
-            clearTimeout(firstFrameFallbackTimerRef.current);
-            firstFrameFallbackTimerRef.current = null;
-          }
-          setHasFirstFrame(true);
-          setIsBuffering(false);
-          onBufferingChange?.(false, true, hasError);
-        }}
-      />
+      {shouldMountVideo && player ? (
+        <VideoView
+          player={player}
+          className="absolute inset-0"
+          style={{ width: '100%', height: '100%', opacity: hasError ? 0 : 1 }}
+          nativeControls={false}
+          contentFit="cover"
+          surfaceType="textureView"
+          useExoShutter={false}
+          onFirstFrameRender={() => {
+            if (firstFrameFallbackTimerRef.current) {
+              clearTimeout(firstFrameFallbackTimerRef.current);
+              firstFrameFallbackTimerRef.current = null;
+            }
+            setHasFirstFrame(true);
+            setIsBuffering(false);
+            onBufferingChange?.(false, true, hasError);
+          }}
+        />
+      ) : null}
       {hasError && (
         <View className="absolute inset-0 items-center justify-center bg-black/70 px-8">
           <Ionicons name="alert-circle-outline" size={34} color="#98FF2F" />
@@ -966,6 +972,7 @@ export const FeedItem = memo(({
               thumbnailUrl={thumbnailUrl}
               isActive={isActive && shouldMountVideo}
               isMuted={isMuted}
+              shouldMountVideo={shouldMountVideo}
               onDoubleTap={handleDoubleTap}
               onPlaybackUpdate={handlePlaybackUpdate}
               onBufferingChange={handleBufferingChange}
@@ -1134,8 +1141,8 @@ export const FeedItem = memo(({
           )}
         </View>
 
-        {!shouldHideDescription && (
-          <Pressable onPress={() => description && setIsExpanded(current => !current)}>
+        {description ? (
+          <Pressable onPress={() => setIsExpanded(current => !current)}>
             <Text
               numberOfLines={isExpanded ? undefined : 2}
               className="text-white text-sm leading-5"
@@ -1149,7 +1156,7 @@ export const FeedItem = memo(({
               )}
             </Text>
           </Pressable>
-        )}
+        ) : null}
       </View>
 
       {feedOverlayText?.text ? (

@@ -250,7 +250,7 @@ export default function CreateScreen() {
           <CameraView
             // @ts-ignore - React Native component accepts ref, but @types/react is mismatched
             ref={cameraRef}
-            style={StyleSheet.absoluteFill}
+            style={{ flex: 1, width: '100%', height: '100%' }}
             facing={facing}
             mode={cameraMode}
             mute={false}

@@ -5,6 +5,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer } from 'expo-audio';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import * as Location from 'expo-location';
 import { handleApiError } from '../../../api/client';
 import { publishReel } from '../../../api/reels/reels.api';
@@ -301,6 +302,20 @@ export default function PostDetailsScreen() {
     }
   };
 
+  // Video Player for final preview
+  const videoSource = React.useMemo(() => {
+    if (normalizedMediaType !== 'video' || !mockImage) return null;
+    return mockImage.startsWith('http') ? { uri: mockImage, contentType: 'progressive' as const } : mockImage;
+  }, [normalizedMediaType, mockImage]);
+
+  const videoPlayer = useVideoPlayer(videoSource, player => {
+    if (!player) return;
+    player.loop = true;
+    player.muted = Number(originalVolume || 100) === 0;
+    player.volume = Number(originalVolume || 100) / 100;
+    player.play();
+  });
+
   // Audio Player for final preview
   const [sound, setSound] = useState<any>(null);
   const audioDurationSec = parseDurationSeconds(soundDuration, title);
@@ -342,6 +357,11 @@ export default function PostDetailsScreen() {
           console.log("Post details audio error:", error);
         }
       }
+
+      if (videoPlayer) {
+        try { videoPlayer.play(); } catch(e) {}
+      }
+
       return () => {
         if (player) {
           if (!isReady) {
@@ -358,9 +378,12 @@ export default function PostDetailsScreen() {
             }
           }
         }
+        if (videoPlayer) {
+          try { videoPlayer.pause(); } catch(e) {}
+        }
         setSound(null);
       };
-    }, [soundUrl])
+    }, [soundUrl, videoPlayer])
   );
 
   useEffect(() => {
@@ -406,7 +429,17 @@ export default function PostDetailsScreen() {
         
         {/* Top Thumbnail */}
         <View className="w-full h-40 rounded-2xl overflow-hidden mb-6 relative bg-black items-center justify-center">
-          <Image source={{ uri: mockImage }} className="absolute inset-0 w-full h-full" contentFit="cover" style={{ transform: activeEffectKey === 'zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }] }} />
+          {normalizedMediaType === 'video' && videoPlayer ? (
+            <VideoView 
+              player={videoPlayer} 
+              className="absolute inset-0 w-full h-full"
+              contentFit="cover"
+              nativeControls={false}
+              style={{ transform: activeEffectKey === 'zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }] }}
+            />
+          ) : (
+            <Image source={{ uri: mockImage }} className="absolute inset-0 w-full h-full" contentFit="cover" style={{ transform: activeEffectKey === 'zoom' ? [{ scale: 1.15 }] : [{ scale: 1 }] }} />
+          )}
 
           {/* Simulate Glitch Effect */}
           {activeEffectKey === 'glitch' && (
