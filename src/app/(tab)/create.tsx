@@ -8,6 +8,7 @@ import { CustomButton } from '../../components/ui/CustomButton';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { liveStreamApi } from '../../api/live-streams/live-stream.api';
+import { uploadImage } from '../../utils/uploadMedia';
 
 export default function CreateScreen() {
   const { soundUrl, title, soundDuration, musicId, musicArtist, musicCoverUrl } = useLocalSearchParams<{
@@ -134,9 +135,23 @@ export default function CreateScreen() {
       }
     } else if (mainMode === 'Live') {
       try {
+        let coverImage;
+        try {
+          const photo = await cameraRef.current.takePictureAsync({
+            quality: 0.5,
+            skipProcessing: false,
+          });
+          if (photo?.uri) {
+            coverImage = await uploadImage(photo.uri);
+          }
+        } catch (captureErr) {
+          console.warn('Failed to capture or upload cover image', captureErr);
+        }
+
         const result = await liveStreamApi.createStream({
           title: `Live Stream ${new Date().toLocaleTimeString()}`,
           category: 'General',
+          coverImage,
         });
         
         // Ensure router push matches the actual file path we are going to create

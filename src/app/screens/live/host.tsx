@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity, Share } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { liveStreamApi } from '../../../api/live-streams/live-stream.api';
 import { getMyProfileData } from '../../../api/profile/profile.api';
@@ -40,6 +41,7 @@ export default function LiveHostScreen() {
   const [viewerCount, setViewerCount] = useState(0);
   const [hostName, setHostName] = useState(displayName);
   const [hostAvatar, setHostAvatar] = useState<string | undefined>(profile?.photoUrl);
+  const [replyToUser, setReplyToUser] = useState<string | null>(null);
   const floatingReactionsRef = useRef<FloatingReactionsHandle>(null);
 
   useEffect(() => {
@@ -49,13 +51,46 @@ export default function LiveHostScreen() {
     if (isJoined) {
       timer = setInterval(() => setDuration((prev) => prev + 1), 1000);
 
-      // Poll for viewer count
+      // Poll for viewer count and comments
       pollTimer = setInterval(async () => {
         try {
           const stream = await liveStreamApi.getStreamById(streamId as string);
           setViewerCount(stream.viewerCount);
+
+          const fetchedComments = await liveStreamApi.getComments(streamId as string);
+          if (fetchedComments && fetchedComments.length > 0) {
+            const mappedComments: ChatMessage[] = fetchedComments.map(c => {
+              const date = new Date(c.createdAt || Date.now());
+              return {
+                id: c.id,
+                userAvatar: c.user.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+                userName: c.user.displayName || c.user.username,
+                isVerified: c.user.isVerified,
+                message: c.text,
+                createdAt: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              };
+            });
+            
+            // Dedup including optimistic messages
+            setMessages(prev => {
+              const filteredPrev = prev.filter(p => {
+                // Keep real messages
+                if (!p.id.includes('.')) return true;
+                // Remove optimistic message if backend already returned it
+                const isFetched = mappedComments.some(m => m.message === p.message && m.userName === p.userName);
+                return !isFetched;
+              });
+
+              const prevIds = new Set(filteredPrev.map(p => p.id));
+              const newItems = mappedComments.filter(m => !prevIds.has(m.id));
+              if (newItems.length > 0) {
+                return [...filteredPrev, ...newItems].slice(-50); // Keep last 50
+              }
+              return filteredPrev;
+            });
+          }
         } catch (e) {}
-      }, 5000);
+      }, 3000);
     }
 
     return () => {
@@ -70,16 +105,27 @@ export default function LiveHostScreen() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleSend = () => {
+  const sendMessage = async () => {
     if (!inputText.trim()) return;
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      userAvatar: hostAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-      userName: hostName,
-      message: inputText.trim(),
-    };
-    setMessages([...messages, newMessage]);
+    
+    const messageText = replyToUser ? `@${replyToUser} ${inputText.trim()}` : inputText.trim();
+    
     setInputText('');
+    setReplyToUser(null);
+    
+    try {
+      if (streamId) {
+        await liveStreamApi.postComment(streamId as string, messageText);
+      }
+    } catch (e) {
+      console.error('Failed to post comment', e);
+      // Optional: restore input text on failure
+      // setInputText(messageText);
+    }
+  };
+
+  const handleCommentPress = (chat: ChatMessage) => {
+    setReplyToUser(chat.userName);
   };
 
   const handleHeartPress = () => {
@@ -224,6 +270,23 @@ export default function LiveHostScreen() {
     else router.replace('/');
   };
 
+  const handleSwitchCamera = () => {
+    if (agoraEngineRef.current) {
+      agoraEngineRef.current.switchCamera();
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      const shareUrl = Linking.createURL(`screens/live/${streamId}`);
+      await Share.share({
+        message: `Join my live stream on Play All! \n\n${shareUrl}`,
+      });
+    } catch (error: any) {
+      Alert.alert(error.message);
+    }
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
@@ -280,7 +343,6 @@ export default function LiveHostScreen() {
             <View className="bg-[#FF3B30] px-2 py-1 rounded-sm">
               <Text className="text-white font-bold text-xs">LIVE {formatDuration(duration)}</Text>
             </View>
-            
             <TouchableOpacity onPress={confirmEndLiveStream} className="bg-black/40 w-8 h-8 rounded-full items-center justify-center">
               <Ionicons name="close" size={20} color="#fff" />
             </TouchableOpacity>
@@ -289,7 +351,7 @@ export default function LiveHostScreen() {
 
         {/* Comments Area */}
         <View style={styles.commentsContainer}>
-          <LiveChatStream messages={messages} />
+          <LiveChatStream messages={messages} onCommentPress={handleCommentPress} />
         </View>
 
         {/* Reactions */}
@@ -299,9 +361,13 @@ export default function LiveHostScreen() {
         <LiveBottomActions
           inputText={inputText}
           onChangeText={setInputText}
-          onSend={handleSend}
-          onHeartPress={handleHeartPress}
+          onSend={sendMessage}
           onGiftPress={() => {}} // Hosts don't buy gifts
+          isHost={true}
+          onCameraFlip={handleSwitchCamera}
+          onSharePress={handleShare}
+          replyToUser={replyToUser}
+          onCancelReply={() => setReplyToUser(null)}
         />
       </View>
     </KeyboardAvoidingView>

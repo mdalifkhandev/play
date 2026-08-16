@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { KeyboardAvoidingView, Platform, StatusBar, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { KeyboardAvoidingView, Platform, StatusBar, StyleSheet, View, ActivityIndicator, Alert, Share } from 'react-native';
+import * as Linking from 'expo-linking';
 import { FloatingReactions, FloatingReactionsHandle } from '../../../components/live/FloatingReactions';
 import { LiveBottomActions } from '../../../components/live/LiveBottomActions';
 import { LiveChatStream, ChatMessage, MOCK_CHAT } from '../../../components/live/LiveChatStream';
@@ -24,6 +25,7 @@ import {
 export default function LiveSingleScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const user = useAppStore((state) => state.user);
 
   const [isJoined, setIsJoined] = useState(false);
   const [remoteUid, setRemoteUid] = useState<number>(0);
@@ -33,12 +35,53 @@ export default function LiveSingleScreen() {
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
+    let pollTimer: ReturnType<typeof setInterval>;
+
     if (isJoined && streamInfo) {
       timer = setInterval(() => {
         setStreamInfo(prev => prev ? { ...prev, duration: prev.duration + 1 } : prev);
       }, 1000);
+
+      pollTimer = setInterval(async () => {
+        try {
+          const fetchedComments = await liveStreamApi.getComments(id as string);
+          if (fetchedComments && fetchedComments.length > 0) {
+            const mappedComments: ChatMessage[] = fetchedComments.map(c => {
+              const date = new Date(c.createdAt || Date.now());
+              return {
+                id: c.id,
+                userAvatar: c.user.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+                userName: c.user.displayName || c.user.username,
+                isVerified: c.user.isVerified,
+                message: c.text,
+                createdAt: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              };
+            });
+            
+            setMessages(prev => {
+              const filteredPrev = prev.filter(p => {
+                // Keep real messages
+                if (!p.id.includes('.')) return true;
+                // Remove optimistic message if backend already returned it
+                const isFetched = mappedComments.some(m => m.message === p.message && m.userName === p.userName);
+                return !isFetched;
+              });
+
+              const prevIds = new Set(filteredPrev.map(p => p.id));
+              const newItems = mappedComments.filter(m => !prevIds.has(m.id));
+              if (newItems.length > 0) {
+                return [...filteredPrev, ...newItems].slice(-50); // Keep last 50
+              }
+              return filteredPrev;
+            });
+          }
+        } catch (e) {}
+      }, 3000);
     }
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      clearInterval(pollTimer);
+    };
   }, [isJoined, streamInfo !== null]);
 
   const formatDuration = (secs: number) => {
@@ -127,26 +170,40 @@ export default function LiveSingleScreen() {
     };
   }, [id]);
 
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_CHAT);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [giftModalVisible, setGiftModalVisible] = useState(false);
 
   const floatingReactionsRef = useRef<FloatingReactionsHandle>(null);
 
-  const handleSend = () => {
+  const sendMessage = async () => {
     if (!inputText.trim()) return;
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      userAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-      userName: 'You',
-      message: inputText.trim(),
-    };
-    setMessages([...messages, newMessage]);
+    
+    const messageText = inputText.trim();
     setInputText('');
+    
+    try {
+      await liveStreamApi.postComment(id as string, messageText);
+    } catch (e) {
+      console.error('Failed to post comment', e);
+      // Optional: restore input text on failure
+      // setInputText(messageText);
+    }
   };
 
   const handleHeartPress = () => {
     floatingReactionsRef.current?.addReaction();
+  };
+
+  const handleShare = async () => {
+    try {
+      const shareUrl = Linking.createURL(`screens/live/${id}`);
+      await Share.share({
+        message: `Join this live stream on Play All! \n\n${shareUrl}`,
+      });
+    } catch (error: any) {
+      Alert.alert(error.message);
+    }
   };
 
   const handleSelectGift = (gift: any) => {
@@ -208,9 +265,10 @@ export default function LiveSingleScreen() {
       <LiveBottomActions
         inputText={inputText}
         onChangeText={setInputText}
-        onSend={handleSend}
+        onSend={sendMessage}
         onHeartPress={handleHeartPress}
         onGiftPress={() => setGiftModalVisible(true)}
+        onSharePress={handleShare}
       />
 
       <LiveGiftModal

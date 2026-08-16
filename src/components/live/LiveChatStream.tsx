@@ -12,6 +12,7 @@ export type ChatMessage = {
   isVerified?: boolean;
   message: string;
   type?: 'join' | 'message';
+  createdAt?: string;
 };
 
 export const MOCK_CHAT: ChatMessage[] = [
@@ -20,7 +21,7 @@ export const MOCK_CHAT: ChatMessage[] = [
   { id: '3', userAvatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100', userName: 'Jenny Wilson', isVerified: true, message: 'Wow, your aim so perfect!' },
 ];
 
-export function LiveChatStream({ messages = MOCK_CHAT }: { messages?: ChatMessage[] }) {
+export function LiveChatStream({ messages = MOCK_CHAT, onCommentPress }: { messages?: ChatMessage[], onCommentPress?: (chat: ChatMessage) => void }) {
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
@@ -52,18 +53,37 @@ export function LiveChatStream({ messages = MOCK_CHAT }: { messages?: ChatMessag
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
         {messages.map((chat) => (
-          <Link key={chat.id} href={{ pathname: '/screens/user/[id]', params: { id: chat.id } }} asChild>
-            <Pressable className="flex-row items-center bg-black/40 self-start rounded-full pr-4 py-1.5 pl-1.5">
+          onCommentPress ? (
+            <Pressable key={chat.id} onPress={() => onCommentPress(chat)} className="flex-row items-center bg-black/40 self-start rounded-full pr-4 py-1.5 pl-1.5">
               <Image source={{ uri: chat.userAvatar }} style={{ width: 32, height: 32, borderRadius: 16 }} />
               <View className="ml-2">
                 <View className="flex-row items-center">
                   <Text className="text-white/80 text-xs font-semibold mr-1">{chat.userName}</Text>
-                  {chat.isVerified && <Ionicons name="checkmark-circle" size={12} color="#1DA1F2" />}
+                  {chat.isVerified && <Ionicons name="checkmark-circle" size={12} color="#0095F6" />}
+                  {chat.createdAt && <Text className="text-white/50 text-[10px] ml-1">{chat.createdAt}</Text>}
                 </View>
-                <Text className={`text-sm ${chat.type === 'join' ? 'text-white/60' : 'text-white'} mt-0.5`}>{chat.message}</Text>
+                <Text className={`${chat.type === 'join' ? 'text-[#98FF2F]' : 'text-white'} text-sm font-medium`}>
+                  {chat.message}
+                </Text>
               </View>
             </Pressable>
-          </Link>
+          ) : (
+            <Link key={chat.id} href={{ pathname: '/screens/user/[id]', params: { id: chat.id } }} asChild>
+              <Pressable className="flex-row items-center bg-black/40 self-start rounded-full pr-4 py-1.5 pl-1.5">
+                <Image source={{ uri: chat.userAvatar }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                <View className="ml-2">
+                  <View className="flex-row items-center">
+                    <Text className="text-white/80 text-xs font-semibold mr-1">{chat.userName}</Text>
+                    {chat.isVerified && <Ionicons name="checkmark-circle" size={12} color="#0095F6" />}
+                    {chat.createdAt && <Text className="text-white/50 text-[10px] ml-1">{chat.createdAt}</Text>}
+                  </View>
+                  <Text className={`${chat.type === 'join' ? 'text-[#98FF2F]' : 'text-white'} text-sm font-medium`}>
+                    {chat.message}
+                  </Text>
+                </View>
+              </Pressable>
+            </Link>
+          )
         ))}
       </ScrollView>
     </View>

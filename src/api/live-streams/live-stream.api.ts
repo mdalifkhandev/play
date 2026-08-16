@@ -34,6 +34,20 @@ export interface StreamTokenResponseDTO {
   role: 'host' | 'viewer';
 }
 
+export interface LiveStreamCommentResponseDTO {
+  id: string;
+  streamId: string;
+  user: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl?: string;
+    isVerified: boolean;
+  };
+  text: string;
+  createdAt: string;
+}
+
 export const liveStreamApi = {
   createStream: async (data: CreateLiveStreamDTO): Promise<LiveStreamResponseDTO> => {
     const res = await apiClient.post<{ data: LiveStreamResponseDTO }>('/live-streams', data);
@@ -55,9 +69,9 @@ export const liveStreamApi = {
     return res.data.data;
   },
 
-  getActiveStreams: async (page = 1, limit = 20): Promise<{ items: LiveStreamResponseDTO[], hasNextPage: boolean }> => {
+  getActiveStreams: async (page = 1, limit = 20, tab?: string): Promise<{ items: LiveStreamResponseDTO[], hasNextPage: boolean }> => {
     const res = await apiClient.get<{ data: { items: LiveStreamResponseDTO[], hasNextPage: boolean } }>('/live-streams', {
-      params: { page, limit }
+      params: { page, limit, tab }
     });
     return res.data.data;
   },
@@ -74,6 +88,16 @@ export const liveStreamApi = {
 
   leaveStream: async (streamId: string): Promise<LiveStreamResponseDTO> => {
     const res = await apiClient.post<{ data: LiveStreamResponseDTO }>(`/live-streams/${streamId}/leave`);
+    return res.data.data;
+  },
+
+  getComments: async (streamId: string): Promise<LiveStreamCommentResponseDTO[]> => {
+    const res = await apiClient.get<{ data: LiveStreamCommentResponseDTO[] }>(`/live-streams/${streamId}/comments`);
+    return res.data.data;
+  },
+
+  postComment: async (streamId: string, text: string): Promise<LiveStreamCommentResponseDTO> => {
+    const res = await apiClient.post<{ data: LiveStreamCommentResponseDTO }>(`/live-streams/${streamId}/comments`, { text });
     return res.data.data;
   }
 };

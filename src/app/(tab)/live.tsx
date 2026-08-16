@@ -19,7 +19,7 @@ export default function LiveAllScreen() {
   const fetchStreams = async () => {
     try {
       setIsLoading(true);
-      const data = await liveStreamApi.getActiveStreams();
+      const data = await liveStreamApi.getActiveStreams(1, 20, 'live');
       
       const realStreams: LiveStreamData[] = data.items.map(s => ({
         id: s.id,
