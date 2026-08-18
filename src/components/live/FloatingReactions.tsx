@@ -1,6 +1,8 @@
 import React, { forwardRef, useImperativeHandle, useState, useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet, Dimensions } from 'react-native';
+import { View, Animated, StyleSheet, Dimensions, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { avatarSource } from '../../utils/avatar';
 
 export interface FloatingReactionsHandle {
   addReaction: (avatarUrl?: string) => void;
@@ -13,8 +15,6 @@ type Reaction = {
   avatarUrl?: string;
 };
 
-import { Image } from 'expo-image';
-
 const { height } = Dimensions.get('window');
 
 const AnimatedHeart = ({ onComplete, xOffset, size, avatarUrl }: { onComplete: () => void, xOffset: number, size: number, avatarUrl?: string }) => {
@@ -25,13 +25,15 @@ const AnimatedHeart = ({ onComplete, xOffset, size, avatarUrl }: { onComplete: (
   useEffect(() => {
     Animated.parallel([
       Animated.timing(positionY, {
-        toValue: -height * 0.5, // float up 50% of screen
-        duration: 2500,
+        toValue: -300 - Math.random() * 100,
+        duration: 2000 + Math.random() * 1000,
+        easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
         toValue: 0,
-        duration: 2500,
+        duration: 2000 + Math.random() * 1000,
+        delay: 500,
         useNativeDriver: true,
       }),
       Animated.spring(scale, {
@@ -48,8 +50,8 @@ const AnimatedHeart = ({ onComplete, xOffset, size, avatarUrl }: { onComplete: (
     <Animated.View
       style={{
         position: 'absolute',
-        bottom: 80, // Start above the bottom actions
-        right: 20 + xOffset, // Align with the heart button on the right
+        bottom: 80,
+        right: 20 + xOffset,
         opacity,
         transform: [
           { translateY: positionY },
@@ -60,7 +62,7 @@ const AnimatedHeart = ({ onComplete, xOffset, size, avatarUrl }: { onComplete: (
       {avatarUrl ? (
         <View style={{ width: size * 1.5, height: size * 1.5, position: 'relative' }}>
           <Image
-            source={{ uri: avatarUrl }}
+            source={avatarSource(avatarUrl)}
             style={{ width: size * 1.5, height: size * 1.5, borderRadius: size * 0.75, borderWidth: 1.5, borderColor: '#FF3B30' }}
           />
           <View style={{ position: 'absolute', bottom: -5, right: -5, backgroundColor: '#FFF', borderRadius: 10, padding: 2 }}>

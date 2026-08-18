@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Keyboard, ScrollView, Text, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
+import { avatarSource } from '../../utils/avatar';
 
 export type ChatMessage = {
   id: string;
-  userAvatar: string;
+  userAvatar?: string;
   userName: string;
   isVerified?: boolean;
   message: string;
@@ -55,7 +56,7 @@ export function LiveChatStream({ messages = [], onCommentPress }: { messages?: C
         {messages.map((chat) => (
           onCommentPress ? (
             <Pressable key={chat.id} onPress={() => onCommentPress(chat)} className="flex-row items-center bg-black/40 self-start rounded-full pr-4 py-1.5 pl-1.5">
-              <Image source={{ uri: chat.userAvatar }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+              <Image source={avatarSource(chat.userAvatar)} style={{ width: 32, height: 32, borderRadius: 16 }} />
               <View className="ml-2">
                 <View className="flex-row items-center">
                   <Text className="text-white/80 text-xs font-semibold mr-1">{chat.userName}</Text>
@@ -70,7 +71,7 @@ export function LiveChatStream({ messages = [], onCommentPress }: { messages?: C
           ) : (
             <Link key={chat.id} href={{ pathname: '/screens/user/[id]', params: { id: chat.id } }} asChild>
               <Pressable className="flex-row items-center bg-black/40 self-start rounded-full pr-4 py-1.5 pl-1.5">
-                <Image source={{ uri: chat.userAvatar }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                <Image source={avatarSource(chat.userAvatar)} style={{ width: 32, height: 32, borderRadius: 16 }} />
                 <View className="ml-2">
                   <View className="flex-row items-center">
                     <Text className="text-white/80 text-xs font-semibold mr-1">{chat.userName}</Text>

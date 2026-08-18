@@ -16,7 +16,7 @@ import { useAppStore } from '../../../store';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoidingView, Platform, StatusBar, ActivityIndicator, PermissionsAndroid } from 'react-native';
-import { LiveChatStream, ChatMessage, MOCK_CHAT } from '../../../components/live/LiveChatStream';
+import { LiveChatStream, ChatMessage } from '../../../components/live/LiveChatStream';
 import { FloatingReactions, FloatingReactionsHandle } from '../../../components/live/FloatingReactions';
 import { LiveBottomActions } from '../../../components/live/LiveBottomActions';
 import { Image } from 'expo-image';
@@ -37,7 +37,7 @@ export default function LiveHostScreen() {
   const [tokenInfo, setTokenInfo] = useState<any>(null);
 
   // Live UI states
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_CHAT);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [duration, setDuration] = useState(0);
   const [viewerCount, setViewerCount] = useState(0);
@@ -65,7 +65,7 @@ export default function LiveHostScreen() {
               const date = new Date(c.createdAt || Date.now());
               return {
                 id: c.id,
-                userAvatar: c.user.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+                userAvatar: c.user.avatarUrl || undefined,
                 userName: c.user.displayName || c.user.username,
                 isVerified: c.user.isVerified,
                 message: c.text,
@@ -134,20 +134,16 @@ export default function LiveHostScreen() {
     const avatarUrl = user?.profile?.photoUrl || undefined;
     floatingReactionsRef.current?.addReaction(avatarUrl);
     
-    // Throttle backend calls to max 1 per second to prevent 429 Rate Limit
+    // Throttle backend calls to max 1 per second
     const now = Date.now();
     if (now - lastLikeTimeRef.current > 1000) {
       lastLikeTimeRef.current = now;
       const token = useAppStore.getState().token;
       if (token) {
         const socket = ensureChatSocket(token);
-        if (socket && socket.connected) {
+        if (socket) {
           socket.emit('live:like', { streamId });
-        } else {
-          liveStreamApi.likeStream(streamId as string).catch(() => {});
         }
-      } else {
-        liveStreamApi.likeStream(streamId as string).catch(() => {});
       }
     }
   };

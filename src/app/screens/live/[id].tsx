@@ -53,7 +53,7 @@ export default function LiveSingleScreen() {
               const date = new Date(c.createdAt || Date.now());
               return {
                 id: c.id,
-                userAvatar: c.user.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+                userAvatar: c.user.avatarUrl || undefined,
                 userName: c.user.displayName || c.user.username,
                 isVerified: c.user.isVerified,
                 message: c.text,
@@ -223,20 +223,16 @@ export default function LiveSingleScreen() {
     const avatarUrl = user?.profile?.photoUrl || undefined;
     floatingReactionsRef.current?.addReaction(avatarUrl);
     
-    // Throttle backend calls to max 1 per second to prevent 429 Rate Limit
+    // Throttle backend calls to max 1 per second
     const now = Date.now();
     if (now - lastLikeTimeRef.current > 1000) {
       lastLikeTimeRef.current = now;
       const token = useAppStore.getState().token;
       if (token) {
         const socket = ensureChatSocket(token);
-        if (socket && socket.connected) {
+        if (socket) {
           socket.emit('live:like', { streamId: id });
-        } else {
-          liveStreamApi.likeStream(id as string).catch(() => {});
         }
-      } else {
-        liveStreamApi.likeStream(id as string).catch(() => {});
       }
     }
   };
@@ -259,7 +255,7 @@ export default function LiveSingleScreen() {
       setGiftModalVisible(false);
       const newMessage: ChatMessage = {
         id: Date.now().toString(),
-        userAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+        userAvatar: user?.profile?.photoUrl || undefined,
         userName: 'You',
         message: `Sent a ${gift.icon} ${gift.name}`,
       };
