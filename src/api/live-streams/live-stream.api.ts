@@ -31,6 +31,7 @@ export interface StreamTokenResponseDTO {
   channelName: string;
   token: string;
   uid: number;
+  hostUid: number;
   role: 'host' | 'viewer';
 }
 

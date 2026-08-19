@@ -33,6 +33,7 @@ export default function LiveSingleScreen() {
   
   const agoraEngineRef = useRef<IRtcEngine | null>(null);
   const lastLikeTimeRef = useRef<number>(0);
+  const isLeavingRef = useRef(false);
 
   const [streamInfo, setStreamInfo] = useState<{ hostId: string; hostAvatar?: string; hostName: string; viewers: string, duration: number } | null>(null);
 
@@ -94,8 +95,24 @@ export default function LiveSingleScreen() {
   };
 
   useEffect(() => {
+    isLeavingRef.current = false;
+
+    const releaseAgoraEngine = () => {
+      try {
+        agoraEngineRef.current?.leaveChannel();
+        agoraEngineRef.current?.release();
+      } catch (error) {
+        console.log('Live viewer Agora cleanup failed:', error);
+      } finally {
+        agoraEngineRef.current = null;
+        setIsJoined(false);
+        setRemoteUid(0);
+      }
+    };
+
     const joinStream = async () => {
       try {
+        releaseAgoraEngine();
         const streamDetails = await liveStreamApi.joinStream(id as string);
         const tokenData = await liveStreamApi.getStreamToken(id as string);
 
@@ -124,9 +141,15 @@ export default function LiveSingleScreen() {
         engine.enableVideo();
 
         engine.registerEventHandler({
-          onJoinChannelSuccess: () => setIsJoined(true),
+          onJoinChannelSuccess: () => {
+            setIsJoined(true);
+            if (tokenData.hostUid) {
+              setRemoteUid(tokenData.hostUid);
+            }
+          },
           onUserJoined: (_conn, uid) => setRemoteUid(uid),
           onUserOffline: (_conn, uid) => {
+            if (isLeavingRef.current) return;
             setRemoteUid(0);
             toast.error('The host has ended the stream.');
             if (router.canGoBack()) router.back();
@@ -175,14 +198,21 @@ export default function LiveSingleScreen() {
         ...prev,
         {
           id: `gift-${Date.now()}-${Math.random()}`,
+          userId: data.sender?.id,
           userName: data.sender?.displayName || data.sender?.username || 'Someone',
           userAvatar: data.sender?.avatarUrl,
+          isVerified: data.sender?.isVerified,
           message: '',
           type: 'gift',
           giftName: data.gift?.name || 'gift',
           giftIconUrl: data.gift?.iconUrl,
         },
       ]);
+    };
+
+    const handleViewerCountUpdate = (data: any) => {
+      if (String(data?.streamId) !== String(id)) return;
+      setStreamInfo(prev => prev ? { ...prev, viewers: String(Math.max(0, data.viewerCount || 0)) } : prev);
     };
 
     let handleConnect: () => void = () => {};
@@ -199,6 +229,7 @@ export default function LiveSingleScreen() {
         
         socket.on('live:new_reaction', handleNewReaction);
         socket.on('live:new_gift', handleNewGift);
+        socket.on('live:viewer_count_update', handleViewerCountUpdate);
       }
     }
 
@@ -213,17 +244,17 @@ export default function LiveSingleScreen() {
     }, 5000);
 
     return () => {
+      isLeavingRef.current = true;
       clearInterval(pollTimer);
       if (socket) {
         socket.emit('live:leave', { streamId: String(id) });
         socket.off('live:new_reaction', handleNewReaction);
         socket.off('live:new_gift', handleNewGift);
+        socket.off('live:viewer_count_update', handleViewerCountUpdate);
         socket.off('connect', handleConnect);
       }
-      agoraEngineRef.current?.leaveChannel();
-      agoraEngineRef.current?.release();
+      releaseAgoraEngine();
       liveStreamApi.leaveStream(id as string).catch(() => { });
-      agoraEngineRef.current = null;
     };
   }, [id]);
 
@@ -330,7 +361,7 @@ export default function LiveSingleScreen() {
         />
       )}
 
-      <LiveChatStream messages={messages} />
+      <LiveChatStream messages={messages} currentUserId={user?.id || user?._id} />
 
       <FloatingReactions ref={floatingReactionsRef} />
 

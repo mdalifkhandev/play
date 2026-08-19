@@ -201,8 +201,10 @@ export default function LiveHostScreen() {
             ...prev,
             {
               id: `gift-${Date.now()}-${Math.random()}`,
+              userId: data.sender?.id,
               userName: data.sender?.displayName || data.sender?.username || 'Someone',
               userAvatar: data.sender?.avatarUrl,
+              isVerified: data.sender?.isVerified,
               message: '',
               type: 'gift',
               giftName: data.gift?.name || 'gift',
@@ -211,8 +213,14 @@ export default function LiveHostScreen() {
           ]);
         };
 
+        const handleViewerCountUpdate = (data: any) => {
+          if (String(data?.streamId) !== String(streamId)) return;
+          setViewerCount(Math.max(0, data.viewerCount || 0));
+        };
+
         socket.on('live:new_reaction', handleNewReaction);
         socket.on('live:new_gift', handleNewGift);
+        socket.on('live:viewer_count_update', handleViewerCountUpdate);
 
         // Store handler in ref or just use it in cleanup since it's in the same effect closure
         return () => {
@@ -220,6 +228,7 @@ export default function LiveHostScreen() {
             socket.emit('live:leave', { streamId: String(streamId) });
             socket.off('live:new_reaction', handleNewReaction);
             socket.off('live:new_gift', handleNewGift);
+            socket.off('live:viewer_count_update', handleViewerCountUpdate);
             socket.off('connect', handleConnect);
           }
           endLiveStream();
@@ -230,6 +239,7 @@ export default function LiveHostScreen() {
     return () => {
       if (socket) {
         socket.emit('live:leave', { streamId: String(streamId) });
+        socket.off('live:viewer_count_update');
       }
       endLiveStream();
     };
@@ -437,7 +447,7 @@ export default function LiveHostScreen() {
 
         {/* Comments Area */}
         <View style={styles.commentsContainer}>
-          <LiveChatStream messages={messages} onCommentPress={handleCommentPress} />
+          <LiveChatStream messages={messages} currentUserId={user?.id || user?._id} onCommentPress={handleCommentPress} />
         </View>
 
         {/* Reactions */}
