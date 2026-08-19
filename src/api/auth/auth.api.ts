@@ -53,3 +53,7 @@ export const resetPassword = async (data: ResetPasswordRequest) => {
 export const logout = async () => {
   return apiClient.post('/auth/logout');
 };
+
+export const changePassword = async (data: any) => {
+  return apiClient.put('/auth/change-password', data);
+};

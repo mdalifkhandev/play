@@ -4,15 +4,50 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header } from '../../../components/ui/Header';
 import { CustomInput } from '../../../components/inputs/CustomInput';
 import { CustomButton } from '../../../components/ui/CustomButton';
+import { changePassword } from '../../../api/auth/auth.api';
+import { useRouter } from 'expo-router';
+import { useAppStore } from '../../../store';
+import { toast } from 'sonner-native';
 
 export default function ChangePasswordScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { logout } = useAppStore();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleUpdate = () => {
-    // API call to update password
+  const handleUpdate = async () => {
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      toast.error('All fields are required');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await changePassword({
+        currentPassword: oldPassword,
+        newPassword,
+        confirmPassword,
+      });
+      toast.success('Password changed successfully!');
+      
+      // Clear inputs
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Failed to change password';
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,6 +89,7 @@ export default function ChangePasswordScreen() {
           <CustomButton
             title="Update password"
             onPress={handleUpdate}
+            isLoading={loading}
           />
         </View>
       </ScrollView>
