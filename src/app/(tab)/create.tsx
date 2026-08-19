@@ -136,17 +136,6 @@ export default function CreateScreen() {
     } else if (mainMode === 'Live') {
       try {
         let coverImage;
-        try {
-          const photo = await cameraRef.current.takePictureAsync({
-            quality: 0.5,
-            skipProcessing: false,
-          });
-          if (photo?.uri) {
-            coverImage = await uploadImage(photo.uri);
-          }
-        } catch (captureErr) {
-          console.warn('Failed to capture or upload cover image', captureErr);
-        }
 
         const result = await liveStreamApi.createStream({
           title: `Live Stream ${new Date().toLocaleTimeString()}`,

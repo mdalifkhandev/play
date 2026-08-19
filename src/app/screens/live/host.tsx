@@ -172,12 +172,20 @@ export default function LiveHostScreen() {
     // Setup socket connection
     const token = useAppStore.getState().token;
     let socket: any = null;
+    let handleConnect: () => void = () => {};
+
     if (token) {
       socket = ensureChatSocket(token);
       if (socket) {
-        socket.emit('live:join', { streamId });
-        socket.on('live:new_reaction', (data: any) => {
-          if (data.type === 'HEART' && data.userId !== user?.id) {
+        // We will emit live:join AFTER startStream is successful
+        // Re-join if the socket reconnects later
+        handleConnect = () => {
+          socket.emit('live:join', { streamId: String(streamId) });
+        };
+        socket.on('connect', handleConnect);
+
+        const handleNewReaction = (data: any) => {
+          if (data.type === 'HEART') {
             // Spawn 3 to 5 hearts for other users
             const numHearts = Math.floor(Math.random() * 3) + 3; // 3, 4, or 5
             for (let i = 0; i < numHearts; i++) {
@@ -186,14 +194,25 @@ export default function LiveHostScreen() {
               }, i * 150); // slight delay between each spawn
             }
           }
-        });
+        };
+
+        socket.on('live:new_reaction', handleNewReaction);
+
+        // Store handler in ref or just use it in cleanup since it's in the same effect closure
+        return () => {
+          if (socket) {
+            socket.emit('live:leave', { streamId: String(streamId) });
+            socket.off('live:new_reaction', handleNewReaction);
+            socket.off('connect', handleConnect);
+          }
+          endLiveStream();
+        };
       }
     }
 
     return () => {
       if (socket) {
-        socket.emit('live:leave', { streamId });
-        socket.off('live:new_reaction');
+        socket.emit('live:leave', { streamId: String(streamId) });
       }
       endLiveStream();
     };
@@ -216,6 +235,15 @@ export default function LiveHostScreen() {
 
       // 1. Tell backend to start stream
       await liveStreamApi.startStream(streamId as string);
+
+      // Now join the socket room since stream is LIVE
+      const token = useAppStore.getState().token;
+      if (token) {
+        const socket = ensureChatSocket(token);
+        if (socket) {
+          socket.emit('live:join', { streamId: String(streamId) });
+        }
+      }
 
       // Fetch latest profile info for the local host UI
       try {

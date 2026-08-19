@@ -157,21 +157,32 @@ export default function LiveSingleScreen() {
     // Setup socket connection
     const token = useAppStore.getState().token;
     let socket: any = null;
+    
+    const handleNewReaction = (data: any) => {
+      if (data.type === 'HEART') {
+        // Spawn 3 to 5 hearts for other users
+        const numHearts = Math.floor(Math.random() * 3) + 3; // 3, 4, or 5
+        for (let i = 0; i < numHearts; i++) {
+          setTimeout(() => {
+            floatingReactionsRef.current?.addReaction(data.avatarUrl);
+          }, i * 150); // slight delay between each spawn
+        }
+      }
+    };
+
+    let handleConnect: () => void = () => {};
+
     if (token) {
       socket = ensureChatSocket(token);
       if (socket) {
-        socket.emit('live:join', { streamId: id });
-        socket.on('live:new_reaction', (data: any) => {
-          if (data.type === 'HEART' && data.userId !== user?.id) {
-            // Spawn 3 to 5 hearts for other users
-            const numHearts = Math.floor(Math.random() * 3) + 3; // 3, 4, or 5
-            for (let i = 0; i < numHearts; i++) {
-              setTimeout(() => {
-                floatingReactionsRef.current?.addReaction(data.avatarUrl);
-              }, i * 150); // slight delay between each spawn
-            }
-          }
-        });
+        socket.emit('live:join', { streamId: String(id) });
+        
+        handleConnect = () => {
+          socket.emit('live:join', { streamId: String(id) });
+        };
+        socket.on('connect', handleConnect);
+        
+        socket.on('live:new_reaction', handleNewReaction);
       }
     }
 
@@ -188,8 +199,9 @@ export default function LiveSingleScreen() {
     return () => {
       clearInterval(pollTimer);
       if (socket) {
-        socket.emit('live:leave', { streamId: id });
-        socket.off('live:new_reaction');
+        socket.emit('live:leave', { streamId: String(id) });
+        socket.off('live:new_reaction', handleNewReaction);
+        socket.off('connect', handleConnect);
       }
       agoraEngineRef.current?.leaveChannel();
       agoraEngineRef.current?.release();
@@ -231,7 +243,7 @@ export default function LiveSingleScreen() {
       if (token) {
         const socket = ensureChatSocket(token);
         if (socket) {
-          socket.emit('live:like', { streamId: id });
+          socket.emit('live:like', { streamId: String(id) });
         }
       }
     }
@@ -264,9 +276,6 @@ export default function LiveSingleScreen() {
     } else {
       setGiftModalVisible(false);
       toast.error('Not enough coins!');
-      setTimeout(() => {
-        router.push('/screens/coins/wallet');
-      }, 300);
     }
   };
 
