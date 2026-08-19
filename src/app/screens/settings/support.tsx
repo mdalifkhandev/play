@@ -4,10 +4,39 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
+import { createSupportRequest } from '../../../api/support/support.api';
+import { handleApiError } from '../../../api/client';
+import { toast } from 'sonner-native';
 
 export default function SupportScreen() {
   const insets = useSafeAreaInsets();
   const [problemText, setProblemText] = useState('');
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSubmit = async () => {
+    const message = problemText.trim();
+
+    if (message.length < 10) {
+      toast.error('Please write at least 10 characters.');
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
+      const request = await createSupportRequest({
+        category: 'other',
+        subject: message.split('\n')[0]?.slice(0, 120) || 'Support request',
+        message,
+      });
+      setProblemText('');
+      toast.success(`Support request sent. Ticket ${request.ticketNumber}`);
+    } catch (error) {
+      toast.error(handleApiError(error, 'Could not send support request.'));
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -34,7 +63,7 @@ export default function SupportScreen() {
 
         <Pressable className="flex-row items-center justify-between bg-[#1C1C1E] rounded-xl px-4 py-4 mb-4 border border-[#333]">
           <Text className="text-gray-400 text-base font-inter-regular">Admin</Text>
-          <Ionicons name="chevron-down" size={20} color="#0056D2" />
+          {/* <Ionicons name="chevron-down" size={20} color="#0056D2" /> */}
         </Pressable>
 
         <View className="bg-[#1C1C1E] rounded-xl px-4 py-4 mb-6 border border-[#333] h-40">
@@ -50,12 +79,10 @@ export default function SupportScreen() {
         </View>
 
         <CustomButton
-          title="Send to admin"
+          title={isSending ? 'Sending...' : 'Send to admin'}
           variant="primary"
-          onPress={() => {
-            // Handle send action
-            setProblemText('');
-          }}
+          disabled={isSending}
+          onPress={handleSubmit}
         />
 
       </ScrollView>
