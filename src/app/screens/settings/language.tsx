@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, TextInput } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, Pressable } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../../components/ui/Header';
+import { CustomInput } from '../../../components/inputs/CustomInput';
 
 const LANGUAGES = [
   { id: '1', name: 'English' },
@@ -22,20 +23,18 @@ export default function LanguageScreen() {
   );
 
   return (
-    <View className="flex-1 bg-[#121212]">
-      <Header showBackButton={true} title="Languas" containerStyle="mt-16 px-6" />
+    <SafeAreaView className="flex-1 bg-[#121212]">
+      <Header showBackButton={true} title="Language" containerStyle="px-6 mt-2" />
 
-      <View className="px-6 mt-8">
-        <View className="flex-row items-center bg-[#1C1C1E] rounded-xl px-4 py-3 mb-6 border border-[#333]">
-          <Ionicons name="search-outline" size={20} color="#888" className="mr-3" />
-          <TextInput
-            placeholder="Search by name"
-            placeholderTextColor="#888"
-            value={search}
-            onChangeText={setSearch}
-            className="flex-1 text-white text-base ml-2 font-inter-regular"
-          />
-        </View>
+      <View className="flex-1 px-6 mt-8">
+        <CustomInput
+          placeholder="Search by name"
+          value={search}
+          onChangeText={setSearch}
+          leftIconComponent={<Ionicons name="search-outline" size={20} color="#888" />}
+          containerStyle="mb-6"
+          inputContainerStyle="bg-[#1C1C1E] border border-[#333]"
+        />
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
           {filteredLanguages.map((lang, index) => {
@@ -57,6 +56,6 @@ export default function LanguageScreen() {
           })}
         </ScrollView>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
