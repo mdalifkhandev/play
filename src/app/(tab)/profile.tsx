@@ -9,17 +9,23 @@ import { ProfileTabs } from '../../components/profile/ProfileTabs';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getMyProfileData } from '../../api/profile/profile.api';
-import type { MyProfileData } from '../../api/profile/profile.types';
+import { getMyLikedReels, getMyProfileSummary, getMyReels, getMySavedReels } from '../../api/profile/profile.api';
+import type { MyProfileSummaryData } from '../../api/profile/profile.types';
 import { handleApiError } from '../../api/client';
+import type { ReelFeedItem } from '../../api/reels/reels.types';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
   const isCreator = params.creatorMode === 'true';
-  const [profileData, setProfileData] = useState<MyProfileData | null>(null);
+  const [profileData, setProfileData] = useState<MyProfileSummaryData | null>(null);
+  const [posts, setPosts] = useState<ReelFeedItem[]>([]);
+  const [savedPosts, setSavedPosts] = useState<ReelFeedItem[]>([]);
+  const [likedPosts, setLikedPosts] = useState<ReelFeedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingTabs, setLoadingTabs] = useState({ grid: false, bookmark: false, heart: false });
+  const [loadedTabs, setLoadedTabs] = useState({ grid: false, bookmark: false, heart: false });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,10 +37,16 @@ export default function ProfileScreen() {
         setIsLoading(true);
       }
 
-      const data = await getMyProfileData();
+      const data = await getMyProfileSummary();
 
       setProfileData(data);
       setError(null);
+      if (refresh) {
+        setPosts([]);
+        setSavedPosts([]);
+        setLikedPosts([]);
+        setLoadedTabs({ grid: false, bookmark: false, heart: false });
+      }
     } catch (profileError) {
       setError(handleApiError(profileError, 'Could not load profile.'));
     } finally {
@@ -46,6 +58,46 @@ export default function ProfileScreen() {
   useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
+
+  const loadProfileTab = useCallback(async (tab: 'grid' | 'bookmark' | 'heart') => {
+    if (loadedTabs[tab] || loadingTabs[tab]) return;
+
+    setLoadingTabs(current => ({ ...current, [tab]: true }));
+
+    try {
+      if (tab === 'grid') {
+        const response = await getMyReels();
+        const items = response.items || [];
+        setPosts(items);
+        setProfileData(current => current ? {
+          ...current,
+          stats: {
+            ...current.stats,
+            reelsCount: items.length,
+            likesCount: items.reduce((total, reel) => total + (reel.stats?.likes || 0), 0),
+          },
+        } : current);
+      } else if (tab === 'bookmark') {
+        const response = await getMySavedReels();
+        setSavedPosts(response.items || []);
+      } else {
+        const response = await getMyLikedReels();
+        setLikedPosts(response.items || []);
+      }
+
+      setLoadedTabs(current => ({ ...current, [tab]: true }));
+    } catch (tabError) {
+      console.log('Profile tab load failed:', handleApiError(tabError, 'Could not load profile tab.'));
+    } finally {
+      setLoadingTabs(current => ({ ...current, [tab]: false }));
+    }
+  }, [loadedTabs, loadingTabs]);
+
+  useEffect(() => {
+    if (profileData && !loadedTabs.grid && !loadingTabs.grid) {
+      void loadProfileTab('grid');
+    }
+  }, [loadProfileTab, loadedTabs.grid, loadingTabs.grid, profileData]);
 
   const user = profileData?.user;
   const profile = user?.profile;
@@ -106,9 +158,13 @@ export default function ProfileScreen() {
         )}
 
         <ProfileTabs
-          posts={profileData?.reels || []}
-          savedPosts={profileData?.savedReels || []}
-          likedPosts={profileData?.likedReels || []}
+          posts={posts}
+          savedPosts={savedPosts}
+          likedPosts={likedPosts}
+          isLoadingPosts={loadingTabs.grid}
+          isLoadingSavedPosts={loadingTabs.bookmark}
+          isLoadingLikedPosts={loadingTabs.heart}
+          onTabChange={loadProfileTab}
         />
       </ScrollView>
     </View>

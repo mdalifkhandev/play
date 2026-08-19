@@ -1,6 +1,6 @@
 import { apiClient } from '../client';
 import type { ReelFeedResponse } from '../reels/reels.types';
-import type { FollowState, MyProfileData, ProfileUser, PublicProfileData } from './profile.types';
+import type { FollowState, MyProfileData, MyProfileSummaryData, ProfileUser, PublicProfileData } from './profile.types';
 
 const dataOf = <T>(response: { data?: { data?: T } }) => response.data?.data as T;
 
@@ -47,6 +47,21 @@ export async function getUserProfile(userId: string): Promise<{ user: ProfileUse
 export async function getUserReels(userId: string): Promise<ReelFeedResponse> {
   const response = await apiClient.get<{ data: ReelFeedResponse }>(`/reels/users/${userId}`);
   return dataOf<ReelFeedResponse>(response);
+}
+
+export async function getMyProfileSummary(): Promise<MyProfileSummaryData> {
+  const { user } = await getMe();
+  const followState = await getFollowState(user.id);
+
+  return {
+    user,
+    stats: {
+      followersCount: followState.followersCount,
+      followingCount: followState.followingCount,
+      likesCount: 0,
+      reelsCount: 0,
+    },
+  };
 }
 
 export async function getMyProfileData(): Promise<MyProfileData> {

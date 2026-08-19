@@ -36,6 +36,8 @@ export type MyProfileData = {
   likedReels: ReelFeedItem[];
 };
 
+export type MyProfileSummaryData = Pick<MyProfileData, 'user' | 'stats'>;
+
 export type PublicProfileData = MyProfileData & {
   followState: FollowState;
 };
