@@ -170,6 +170,21 @@ export default function LiveSingleScreen() {
       }
     };
 
+    const handleNewGift = (data: any) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `gift-${Date.now()}-${Math.random()}`,
+          userName: data.sender?.displayName || data.sender?.username || 'Someone',
+          userAvatar: data.sender?.avatarUrl,
+          message: '',
+          type: 'gift',
+          giftName: data.gift?.name || 'gift',
+          giftIconUrl: data.gift?.iconUrl,
+        },
+      ]);
+    };
+
     let handleConnect: () => void = () => {};
 
     if (token) {
@@ -183,6 +198,7 @@ export default function LiveSingleScreen() {
         socket.on('connect', handleConnect);
         
         socket.on('live:new_reaction', handleNewReaction);
+        socket.on('live:new_gift', handleNewGift);
       }
     }
 
@@ -201,6 +217,7 @@ export default function LiveSingleScreen() {
       if (socket) {
         socket.emit('live:leave', { streamId: String(id) });
         socket.off('live:new_reaction', handleNewReaction);
+        socket.off('live:new_gift', handleNewGift);
         socket.off('connect', handleConnect);
       }
       agoraEngineRef.current?.leaveChannel();
@@ -265,13 +282,17 @@ export default function LiveSingleScreen() {
 
     if (success) {
       setGiftModalVisible(false);
-      const newMessage: ChatMessage = {
-        id: Date.now().toString(),
-        userAvatar: user?.profile?.photoUrl || undefined,
-        userName: 'You',
-        message: `Sent a ${gift.icon} ${gift.name}`,
-      };
-      setMessages([...messages, newMessage]);
+      
+      const token = useAppStore.getState().token;
+      if (token) {
+        const socket = ensureChatSocket(token);
+        if (socket) {
+          socket.emit('live:gift', { streamId: String(id), giftId: String(gift.id), quantity: 1 });
+        }
+      }
+      
+      // We don't add the message locally anymore because the server will broadcast live:new_gift
+      // and our handleNewGift listener will add it to the chat for everyone (including us).
       floatingReactionsRef.current?.addReaction();
     } else {
       setGiftModalVisible(false);

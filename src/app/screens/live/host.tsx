@@ -196,13 +196,30 @@ export default function LiveHostScreen() {
           }
         };
 
+        const handleNewGift = (data: any) => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `gift-${Date.now()}-${Math.random()}`,
+              userName: data.sender?.displayName || data.sender?.username || 'Someone',
+              userAvatar: data.sender?.avatarUrl,
+              message: '',
+              type: 'gift',
+              giftName: data.gift?.name || 'gift',
+              giftIconUrl: data.gift?.iconUrl,
+            },
+          ]);
+        };
+
         socket.on('live:new_reaction', handleNewReaction);
+        socket.on('live:new_gift', handleNewGift);
 
         // Store handler in ref or just use it in cleanup since it's in the same effect closure
         return () => {
           if (socket) {
             socket.emit('live:leave', { streamId: String(streamId) });
             socket.off('live:new_reaction', handleNewReaction);
+            socket.off('live:new_gift', handleNewGift);
             socket.off('connect', handleConnect);
           }
           endLiveStream();

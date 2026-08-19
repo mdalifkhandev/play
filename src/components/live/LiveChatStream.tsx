@@ -12,7 +12,9 @@ export type ChatMessage = {
   userName: string;
   isVerified?: boolean;
   message: string;
-  type?: 'join' | 'message';
+  type?: 'join' | 'message' | 'gift';
+  giftName?: string;
+  giftIconUrl?: string;
   createdAt?: string;
 };
 
@@ -54,36 +56,44 @@ export function LiveChatStream({ messages = [], onCommentPress }: { messages?: C
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
         {messages.map((chat) => (
-          onCommentPress ? (
+          onCommentPress && chat.type !== 'join' && chat.type !== 'gift' ? (
             <Pressable key={chat.id} onPress={() => onCommentPress(chat)} className="flex-row items-center bg-black/40 self-start rounded-full pr-4 py-1.5 pl-1.5">
               <Image source={avatarSource(chat.userAvatar)} style={{ width: 32, height: 32, borderRadius: 16 }} />
               <View className="ml-2">
                 <View className="flex-row items-center">
-                  <Text className="text-white/80 text-xs font-semibold mr-1">{chat.userName}</Text>
-                  {chat.isVerified && <Ionicons name="checkmark-circle" size={12} color="#0095F6" />}
-                  {chat.createdAt && <Text className="text-white/50 text-[10px] ml-1">{chat.createdAt}</Text>}
+                  <Text className="text-white/60 text-[10px] font-medium mr-1">{chat.userName}</Text>
+                  {chat.isVerified && <Ionicons name="checkmark-circle" size={10} color="#3B82F6" />}
                 </View>
-                <Text className={`${chat.type === 'join' ? 'text-[#98FF2F]' : 'text-white'} text-sm font-medium`}>
-                  {chat.message}
-                </Text>
+                <Text className="text-white text-[13px] leading-5">{chat.message}</Text>
               </View>
             </Pressable>
-          ) : (
-            <Link key={chat.id} href={{ pathname: '/screens/user/[id]', params: { id: chat.id } }} asChild>
-              <Pressable className="flex-row items-center bg-black/40 self-start rounded-full pr-4 py-1.5 pl-1.5">
-                <Image source={avatarSource(chat.userAvatar)} style={{ width: 32, height: 32, borderRadius: 16 }} />
-                <View className="ml-2">
+          ) : chat.type === 'gift' ? (
+            <View key={chat.id} className="flex-row items-center bg-pink-500/80 border border-pink-400 self-start rounded-full pr-4 py-1.5 pl-1.5 shadow-md shadow-pink-500/20">
+              <Image source={avatarSource(chat.userAvatar)} style={{ width: 32, height: 32, borderRadius: 16 }} />
+              <View className="ml-2 flex-row items-center">
+                <View>
                   <View className="flex-row items-center">
-                    <Text className="text-white/80 text-xs font-semibold mr-1">{chat.userName}</Text>
-                    {chat.isVerified && <Ionicons name="checkmark-circle" size={12} color="#0095F6" />}
-                    {chat.createdAt && <Text className="text-white/50 text-[10px] ml-1">{chat.createdAt}</Text>}
+                    <Text className="text-white/90 text-[10px] font-medium mr-1">{chat.userName}</Text>
+                    {chat.isVerified && <Ionicons name="checkmark-circle" size={10} color="#3B82F6" />}
                   </View>
-                  <Text className={`${chat.type === 'join' ? 'text-[#98FF2F]' : 'text-white'} text-sm font-medium`}>
-                    {chat.message}
-                  </Text>
+                  <Text className="text-white font-bold text-[13px] leading-5">Sent a {chat.giftName}!</Text>
                 </View>
-              </Pressable>
-            </Link>
+                {chat.giftIconUrl && (
+                  <Image source={{ uri: chat.giftIconUrl }} style={{ width: 36, height: 36, marginLeft: 8 }} contentFit="contain" />
+                )}
+              </View>
+            </View>
+          ) : (
+            <View key={chat.id} className="flex-row items-center bg-black/40 self-start rounded-full pr-4 py-1.5 pl-1.5">
+              <Image source={avatarSource(chat.userAvatar)} style={{ width: 32, height: 32, borderRadius: 16 }} />
+              <View className="ml-2">
+                <View className="flex-row items-center">
+                  <Text className="text-white/60 text-[10px] font-medium mr-1">{chat.userName}</Text>
+                  {chat.isVerified && <Ionicons name="checkmark-circle" size={10} color="#3B82F6" />}
+                </View>
+                <Text className="text-white text-[13px] leading-5">{chat.message}</Text>
+              </View>
+            </View>
           )
         ))}
       </ScrollView>
