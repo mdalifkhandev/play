@@ -15,7 +15,7 @@ export type LiveStreamData = {
   hostName: string;
   hostAvatar: string;
   viewers: string;
-  badge: 'Live' | 'Top like';
+  badge: 'Live' | 'Top like' | 'Ended' | 'Video' | string;
   isVideo?: boolean;
   videoUrl?: string | number; // Number for required local assets
   title?: string;
@@ -56,7 +56,9 @@ export function LiveGridItem({ item, variant = 'live' }: { item: LiveStreamData,
         className={`rounded-lg overflow-hidden bg-[#1A1A1A] relative border border-white/10 ${variant === 'live' ? 'm-1.5' : 'mb-4'}`}
       >
         <View style={{ width: ITEM_WIDTH, aspectRatio: 3 / 4 }} className="relative">
-          <Image source={{ uri: item.thumbnail }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} contentFit="cover" />
+          {item.thumbnail ? (
+            <Image source={{ uri: item.thumbnail }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} contentFit="cover" />
+          ) : null}
           {item.isVideo && item.videoUrl && (
             <VideoView
               player={player}
@@ -114,7 +116,7 @@ export function LiveGridItem({ item, variant = 'live' }: { item: LiveStreamData,
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center flex-1 pr-2">
                 <Image
-                  source={{ uri: item.hostAvatar }}
+                  source={item.hostAvatar ? { uri: item.hostAvatar } : require('../../../assets/images/user.jpg')}
                   style={{ width: 24, height: 24, borderRadius: 12 }}
                 />
                 <View className="ml-2">
@@ -131,7 +133,7 @@ export function LiveGridItem({ item, variant = 'live' }: { item: LiveStreamData,
           </View>
         ) : (
           <View className="flex-row items-center bg-[#1A1A1A] p-2.5">
-            <Image source={{ uri: item.hostAvatar }} style={{ width: 22, height: 22, borderRadius: 11 }} />
+            <Image source={item.hostAvatar ? { uri: item.hostAvatar } : require('../../../assets/images/user.jpg')} style={{ width: 22, height: 22, borderRadius: 11 }} />
             <Text className="text-white text-xs font-medium ml-2 flex-1" numberOfLines={1}>{item.hostName}</Text>
           </View>
         )}

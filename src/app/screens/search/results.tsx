@@ -3,73 +3,18 @@ import { AudioPlayer, createAudioPlayer } from 'expo-audio';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import { LiveGridItem, LiveStreamData } from '../../../components/live/LiveGridItem';
+import { liveStreamApi } from '../../../api/live-streams/live-stream.api';
+import { searchReels } from '../../../api/reels/reels.api';
+import { searchConversationUsers } from '../../../api/conversations/conversation.api';
+import { searchMusicTracks } from '../../../api/music/music.api';
+import { SoundListItem } from '../../../components/ui/SoundListItem';
+import { avatarSource } from '../../../utils/avatar';
 
-const MOCK_SOUNDS = [
-  { id: '1', title: 'Summer Vibes', author: 'DJ Motin', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', time: '00:15', usage: '1.5M' },
-  { id: '2', title: 'Funny Background', author: 'Comedy Central', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', time: '00:08', usage: '2.1M' },
-  { id: '3', title: 'Epic Trailer', author: 'Movie Tunes', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', time: '00:30', usage: '500K' },
-  { id: '4', title: 'Chill Lo-Fi', author: 'Sleepy', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', time: '01:00', usage: '3M' },
-];
-
-const MOCK_SEARCH_RESULTS: LiveStreamData[] = [
-  {
-    id: '1',
-    thumbnail: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400',
-    badge: 'Live',
-    title: 'Norway beat Brazil 2-1 in the Round of 16 of the 202...',
-    hostName: 'Motin',
-    hostAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
-    date: '14 Aug 2026',
-    likes: '12k',
-    isVideo: true,
-    videoUrl: require('../../../../assets/videos/mov_bbb.mp4'),
-    viewers: '12k',
-  },
-  {
-    id: '2',
-    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400',
-    badge: 'Top like',
-    title: 'Norway beat Brazil 2-1 in the Round of 16 of the 202...',
-    hostName: 'Motin',
-    hostAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
-    date: '14 Aug 2026',
-    likes: '12k',
-    isVideo: true,
-    videoUrl: require('../../../../assets/videos/mov_bbb.mp4'),
-    viewers: '8k',
-  },
-  {
-    id: '3',
-    thumbnail: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=400',
-    badge: 'Live',
-    title: 'Norway beat Brazil 2-1 in the Round of 16 of the 202...',
-    hostName: 'Motin',
-    hostAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
-    date: '14 Aug 2026',
-    likes: '12k',
-    isVideo: true,
-    videoUrl: require('../../../../assets/videos/mov_bbb.mp4'),
-    viewers: '12k',
-  },
-  {
-    id: '4',
-    thumbnail: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=400',
-    badge: 'Live',
-    title: 'Norway beat Brazil 2-1 in the Round of 16 of the 202...',
-    hostName: 'Motin',
-    hostAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
-    date: '14 Aug 2026',
-    likes: '12k',
-    viewers: '12k',
-    isVideo: true,
-    videoUrl: require('../../../../assets/videos/mov_bbb.mp4'),
-  },
-];
-
-const TABS = ['Top', 'Users', 'Video', 'Photo', 'Sound', 'Hashtags'];
-const FILTERS = ['All', 'Unwatch', 'Watch', 'Recent uploaded'];
+const TABS = ['Top', 'Users', 'Video', 'Live', 'Sound'];
 
 export default function SearchResultsScreen() {
   const router = useRouter();
@@ -78,7 +23,31 @@ export default function SearchResultsScreen() {
 
   const [query, setQuery] = useState(q || '');
   const [activeTab, setActiveTab] = useState('Top');
-  const [activeFilter, setActiveFilter] = useState('All');
+
+  // Queries
+  const { data: streamsData, isLoading: isLoadingStreams } = useQuery({
+    queryKey: ['searchStreams', q],
+    queryFn: () => liveStreamApi.searchStreams(q as string),
+    enabled: !!q && (activeTab === 'Top' || activeTab === 'Live'),
+  });
+
+  const { data: reelsData, isLoading: isLoadingReels } = useQuery({
+    queryKey: ['searchReels', q],
+    queryFn: () => searchReels(q as string),
+    enabled: !!q && (activeTab === 'Top' || activeTab === 'Video'),
+  });
+
+  const { data: usersData, isLoading: isLoadingUsers } = useQuery({
+    queryKey: ['searchUsers', q],
+    queryFn: () => searchConversationUsers(q as string),
+    enabled: !!q && (activeTab === 'Top' || activeTab === 'Users'),
+  });
+
+  const { data: musicData, isLoading: isLoadingMusic } = useQuery({
+    queryKey: ['searchMusic', q],
+    queryFn: () => searchMusicTracks({ search: q as string }),
+    enabled: !!q && (activeTab === 'Top' || activeTab === 'Sound'),
+  });
 
   const [sound, setSound] = useState<AudioPlayer | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -119,12 +88,12 @@ export default function SearchResultsScreen() {
     };
   }, [stopActivePlayer]);
 
-  const toggleSound = (item: typeof MOCK_SOUNDS[0]) => {
+  const toggleSound = (item: any) => {
     const now = Date.now();
     if (now - lastTapRef.current < 350) return;
     lastTapRef.current = now;
 
-    if (playingId === item.id || loadingId === item.id) {
+    if (playingId === item.providerTrackId || loadingId === item.providerTrackId) {
       stopActivePlayer();
       setPlayingId(null);
       setLoadingId(null);
@@ -135,11 +104,11 @@ export default function SearchResultsScreen() {
     stopActivePlayer();
     setSound(null);
 
-    setLoadingId(item.id);
+    setLoadingId(item.providerTrackId);
     setPlayingId(null);
 
     try {
-      const newSound = createAudioPlayer(item.url);
+      const newSound = createAudioPlayer(item.audioPreviewUrl);
       activePlayerRef.current = newSound;
       isPlayerReadyRef.current = false;
       newSound.play();
@@ -154,7 +123,7 @@ export default function SearchResultsScreen() {
         
         if (status.isLoaded && status.playing) {
           setLoadingId(null);
-          setPlayingId(item.id);
+          setPlayingId(item.providerTrackId);
         }
         if (status.didJustFinish) {
           setPlayingId(null);
@@ -171,13 +140,39 @@ export default function SearchResultsScreen() {
     router.setParams({ q: query });
   };
 
+  const mapStreamToGridItem = (s: any): LiveStreamData => ({
+    id: s.id,
+    thumbnail: s.coverImage || '',
+    badge: s.status === 'LIVE' ? 'Live' : 'Ended',
+    title: s.title,
+    hostName: s.hostId?.displayName || s.hostId?.username || 'Host',
+    hostAvatar: s.hostId?.avatarUrl || '',
+    date: s.startedAt ? new Date(s.startedAt).toLocaleDateString() : '',
+    likes: s.likesCount?.toString() || '0',
+    isVideo: false,
+    viewers: s.viewerCount?.toString() || '0',
+  });
+
+  const mapReelToGridItem = (r: any): LiveStreamData => ({
+    id: r.id,
+    thumbnail: r.thumbnailUrl || '',
+    badge: 'Video',
+    title: r.caption || 'Video',
+    hostName: r.user?.displayName || r.user?.username || r.owner?.displayName || r.owner?.username || 'User',
+    hostAvatar: r.user?.avatarUrl || r.owner?.photoUrl || '',
+    date: r.publishedAt ? new Date(r.publishedAt).toLocaleDateString() : (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''),
+    likes: r.stats?.likes?.toString() || r.likeCount?.toString() || '0',
+    isVideo: true,
+    videoUrl: r.videoUrl || r.media?.processedUrl || r.media?.rawUrl || '',
+    viewers: r.stats?.views?.toString() || r.viewCount?.toString() || '0',
+  });
+
+  const isSearching = isLoadingUsers || isLoadingStreams || isLoadingReels || isLoadingMusic;
+
   return (
     <View className="flex-1 bg-black">
       {/* Header with Search Bar */}
-      <View
-        className="flex-row items-center px-4 pt-4 pb-2"
-        style={{ paddingTop: insets.top + 10 }}
-      >
+      <View className="flex-row items-center px-4 pt-4 pb-2" style={{ paddingTop: insets.top + 10 }}>
         <Pressable onPress={() => router.back()} className="mr-3">
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </Pressable>
@@ -195,10 +190,6 @@ export default function SearchResultsScreen() {
             returnKeyType="search"
           />
         </View>
-
-        <Pressable className="ml-3">
-          <Ionicons name="ellipsis-horizontal" size={24} color="#FFF" />
-        </Pressable>
       </View>
 
       {/* Tabs */}
@@ -217,92 +208,96 @@ export default function SearchResultsScreen() {
         </ScrollView>
       </View>
 
-      {/* Filters */}
-      <View className="py-3 px-4 border-b border-[#2A2A2A]">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {FILTERS.map((filter) => (
-            <Pressable
-              key={filter}
-              onPress={() => setActiveFilter(filter)}
-              className={`mr-3 px-4 py-1.5 rounded-md ${activeFilter === filter ? 'bg-[#98FF2F]' : 'bg-[#2A2A2A]'}`}
-            >
-              <Text className={`font-semibold text-sm ${activeFilter === filter ? 'text-black' : 'text-[#888]'}`}>{filter}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
       {/* Main Content Area */}
       <View className="flex-1">
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-          {/* Results Grid - Top Row */}
-          <View className="flex-row flex-wrap justify-between px-4 pt-4">
-            <LiveGridItem item={MOCK_SEARCH_RESULTS[0]} variant="search" />
-            <LiveGridItem item={MOCK_SEARCH_RESULTS[1]} variant="search" />
-            <LiveGridItem item={MOCK_SEARCH_RESULTS[2]} variant="search" />
-            <LiveGridItem item={MOCK_SEARCH_RESULTS[3]} variant="search" />
+        {isSearching && (
+          <View className="pt-10">
+            <ActivityIndicator size="large" color="#98FF2F" />
           </View>
+        )}
 
-          {/* Sound Section */}
-          {activeTab === 'Top' && (
-            <View className="mt-2 mb-4">
-              <View className="flex-row justify-between items-center px-4 mb-3">
-                <Text className="text-white font-bold text-lg">Sound</Text>
-                <Pressable className="flex-row items-center" onPress={() => router.push('/screens/sound')}>
-                  <Text className="text-[#888] text-sm mr-1">View all</Text>
-                  <Ionicons name="chevron-forward" size={14} color="#888" />
-                </Pressable>
+        {!isSearching && (
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            
+            {/* Users Section */}
+            {/* Live Section */}
+            {(activeTab === 'Top' || activeTab === 'Live') && streamsData?.streams && streamsData.streams.length > 0 && (
+              <View className="mt-4 mb-2">
+                <Text className="text-white font-bold text-lg px-4 mb-3">Live Streams</Text>
+                <View className="flex-row flex-wrap justify-between px-4">
+                  {streamsData.streams.slice(0, activeTab === 'Top' ? 2 : undefined).map((s: any) => (
+                    <LiveGridItem key={s.id} item={mapStreamToGridItem(s)} variant="search" />
+                  ))}
+                </View>
               </View>
+            )}
 
-              {/* Sound Items List */}
-              {MOCK_SOUNDS.slice(0, 3).map((item) => (
-                <Pressable
-                  key={item.id}
-                  className="flex-row items-center justify-between px-4 py-2"
-                  onPress={() => {
-                    if (sound) sound.remove();
-                    router.push({ pathname: '/(tab)/create', params: { soundUrl: item.url, title: item.title } });
-                  }}
-                >
-                  <View className="flex-row items-center flex-1">
-                    <View className="w-12 h-12 rounded-lg bg-[#2A2A2A] mr-3 items-center justify-center relative overflow-hidden">
-                      <Ionicons name="musical-notes" size={24} color="#98FF2F" />
-                      {playingId === item.id && (
-                        <View className="absolute inset-0 bg-black/50 items-center justify-center">
-                          <Ionicons name="stats-chart" size={20} color="#98FF2F" />
-                        </View>
-                      )}
+            {/* Sound Section */}
+            {(activeTab === 'Top' || activeTab === 'Sound') && musicData?.tracks && musicData.tracks.length > 0 && (
+              <View className="mt-4 mb-4">
+                <Text className="text-white font-bold text-lg px-4 mb-3">Sounds</Text>
+
+                {musicData.tracks.slice(0, activeTab === 'Top' ? 3 : undefined).map((item) => (
+                  <SoundListItem
+                    key={item.providerTrackId}
+                    item={item}
+                    playingId={playingId}
+                    loadingId={loadingId}
+                    onSelect={() => {
+                      if (sound) sound.remove();
+                      router.push({ pathname: '/(tab)/create', params: { soundUrl: item.audioPreviewUrl, title: item.title } });
+                    }}
+                    onTogglePlay={() => toggleSound(item)}
+                  />
+                ))}
+              </View>
+            )}
+
+            {/* Videos Section */}
+            {(activeTab === 'Top' || activeTab === 'Video') && reelsData?.reels && reelsData.reels.length > 0 && (
+              <View className="mt-4 mb-2">
+                <Text className="text-white font-bold text-lg px-4 mb-3">Videos</Text>
+                <View className="flex-row flex-wrap justify-between px-4">
+                  {reelsData.reels.slice(0, activeTab === 'Top' ? 4 : undefined).map((r: any) => (
+                    <LiveGridItem key={r.id} item={mapReelToGridItem(r)} variant="search" />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Users Section */}
+            {(activeTab === 'Top' || activeTab === 'Users') && usersData && usersData.length > 0 && (
+              <View className="mt-4 mb-2">
+                <Text className="text-white font-bold text-lg px-4 mb-3">Users</Text>
+                {usersData.slice(0, activeTab === 'Top' ? 3 : undefined).map((u) => (
+                  <Pressable key={u.id} className="flex-row items-center justify-between px-4 py-3 border-b border-[#1C1C1E]" onPress={() => router.push({ pathname: '/screens/user/[id]', params: { id: u.id } })}>
+                    <View className="flex-row items-center">
+                      <Image source={avatarSource(u.avatarUrl)} style={{ width: 48, height: 48, borderRadius: 24, marginRight: 12 }} />
+                      <View>
+                        <Text className="text-white font-semibold text-base">{u.displayName || u.username}</Text>
+                        <Text className="text-[#888] text-sm">@{u.username}</Text>
+                      </View>
                     </View>
-                    <View>
-                      <Text className="text-white font-semibold text-sm">{item.title}</Text>
-                      <Text className="text-[#888] text-xs mt-1">{item.time} • {item.usage} video</Text>
-                    </View>
-                  </View>
-                  <Pressable
-                    onPress={() => toggleSound(item)}
-                    className={`h-8 w-8 rounded-full items-center justify-center ${playingId === item.id ? 'bg-[#FF3333]' : 'bg-[#98FF2F]'}`}
-                  >
-                    {loadingId === item.id ? (
-                      <ActivityIndicator size="small" color="#000" />
-                    ) : (
-                      <Ionicons
-                        name={playingId === item.id ? "stop" : "play"}
-                        size={16}
-                        color={playingId === item.id ? "#FFF" : "#000"}
-                      />
-                    )}
                   </Pressable>
-                </Pressable>
-              ))}
-            </View>
-          )}
+                ))}
+              </View>
+            )}
 
-          {/* Results Grid - Bottom Row */}
-          <View className="flex-row flex-wrap justify-between px-4 pt-4">
-            <LiveGridItem item={MOCK_SEARCH_RESULTS[0]} variant="search" />
-            <LiveGridItem item={MOCK_SEARCH_RESULTS[1]} variant="search" />
-          </View>
-        </ScrollView>
+            {/* Removed trailing sound/video blocks because they are moved up */}
+
+            {/* Empty States */}
+            {(!usersData || usersData.length === 0) &&
+              (!streamsData?.streams || streamsData.streams.length === 0) &&
+              (!reelsData?.reels || reelsData.reels.length === 0) &&
+              (!musicData?.tracks || musicData.tracks.length === 0) && (
+              <View className="flex-1 items-center justify-center pt-20">
+                <Ionicons name="search-outline" size={48} color="#444" />
+                <Text className="text-[#888] mt-4">No results found for "{q}"</Text>
+              </View>
+            )}
+
+          </ScrollView>
+        )}
       </View>
     </View>
   );

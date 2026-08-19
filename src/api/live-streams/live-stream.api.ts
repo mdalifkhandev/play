@@ -76,6 +76,13 @@ export const liveStreamApi = {
     return res.data.data;
   },
   
+  searchStreams: async (q: string, page = 1, limit = 20): Promise<{ streams: LiveStreamResponseDTO[], total: number }> => {
+    const res = await apiClient.get<{ data: { streams: LiveStreamResponseDTO[], total: number } }>('/live-streams/search', {
+      params: { q, page, limit }
+    });
+    return res.data.data;
+  },
+  
   getStreamById: async (streamId: string): Promise<LiveStreamResponseDTO> => {
     const res = await apiClient.get<{ data: LiveStreamResponseDTO }>(`/live-streams/${streamId}`);
     return res.data.data;
