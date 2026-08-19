@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, ScrollView, Pressable, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { getKidsFeed } from '../../api/reels/reels.api';
+import { LiveGridItem } from '../../components/live/LiveGridItem';
+import type { LiveStreamData } from '../../components/live/LiveGridItem';
 
 const TopTab = ({ title, active }: { title: string; active?: boolean }) => (
   <View className={`pb-2 px-3 ${active ? 'border-b-2 border-[#98D83A]' : 'border-b-2 border-transparent'}`}>
@@ -15,33 +18,42 @@ const FilterChip = ({ title, active }: { title: string; active?: boolean }) => (
   </View>
 );
 
-const VideoCard = ({ author, date, likes }: { author: string; date: string; likes: string }) => (
-  <View className="flex-1 m-1 bg-[#1C1C1E] rounded-xl overflow-hidden mb-3">
-    <View className="h-48 bg-[#333] w-full" />
-    <View className="p-3">
-      <Text className="text-white text-sm font-inter-medium mb-2" numberOfLines={2}>
-        Rainbow Paint Splash!
-      </Text>
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center">
-          <View className="w-6 h-6 rounded-full bg-gray-600 mr-2" />
-          <View>
-            <Text className="text-gray-200 text-xs font-inter-medium">{author}</Text>
-            <Text className="text-gray-500 text-[10px]">{date}</Text>
-          </View>
-        </View>
-        <View className="flex-row items-center">
-          <Ionicons name="heart-outline" size={12} color="#888" />
-          <Text className="text-gray-400 text-xs ml-1">{likes}</Text>
-        </View>
-      </View>
-    </View>
-  </View>
-);
-
 export default function KidsModeSearchScreen() {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
+  const [reels, setReels] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchKidsFeed = async () => {
+      try {
+        setIsLoading(true);
+        const data = await getKidsFeed();
+        if (data && data.items) {
+          setReels(data.items);
+        }
+      } catch (error) {
+        console.error("Failed to load kids feed:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchKidsFeed();
+  }, []);
+
+  const mapReelToGridItem = (r: any): LiveStreamData => ({
+    id: r.id,
+    thumbnail: r.thumbnailUrl || '',
+    badge: 'Video',
+    title: r.caption || 'Video',
+    hostName: r.user?.displayName || r.user?.username || r.owner?.displayName || r.owner?.username || 'User',
+    hostAvatar: r.user?.avatarUrl || r.owner?.photoUrl || '',
+    date: r.publishedAt ? new Date(r.publishedAt).toLocaleDateString() : (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''),
+    likes: r.stats?.likes?.toString() || r.likeCount?.toString() || '0',
+    isVideo: true,
+    videoUrl: r.videoUrl || r.media?.processedUrl || r.media?.rawUrl || '',
+    viewers: r.stats?.views?.toString() || r.viewCount?.toString() || '0',
+  });
 
   return (
     <View className="flex-1 bg-[#121212]" style={{ paddingTop: insets.top }}>
@@ -73,18 +85,25 @@ export default function KidsModeSearchScreen() {
         <FilterChip title="Recent uploaded" />
       </ScrollView>
 
-      <ScrollView className="flex-1 px-3 mt-4" showsVerticalScrollIndicator={false}>
-        <View className="flex-row flex-wrap pb-20">
-          <View className="w-1/2 pr-1">
-            <VideoCard author="Motin" date="14 Aug 2026" likes="12k" />
-            <VideoCard author="Motin" date="14 Aug 2026" likes="12k" />
-          </View>
-          <View className="w-1/2 pl-1">
-            <VideoCard author="Motin" date="14 Aug 2026" likes="12k" />
-            <VideoCard author="Motin" date="14 Aug 2026" likes="12k" />
-          </View>
+      {isLoading ? (
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="#98D83A" />
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView className="flex-1 px-2 mt-4" showsVerticalScrollIndicator={false}>
+          <View className="flex-row flex-wrap pb-20 justify-between">
+            {reels.map((r: any) => (
+              <LiveGridItem key={r.id} item={mapReelToGridItem(r)} variant="search" />
+            ))}
+            {reels.length === 0 && (
+              <View className="flex-1 justify-center items-center py-20">
+                <Ionicons name="videocam-outline" size={48} color="#555" />
+                <Text className="text-[#888] font-inter-medium mt-4">No kids videos found</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 }

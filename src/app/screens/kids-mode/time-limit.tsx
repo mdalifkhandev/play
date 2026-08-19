@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, Platform, KeyboardAvoidingView, ScrollView, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { toast } from 'sonner-native';
 import { Header } from '../../../../src/components/ui/Header';
 import { CustomButton } from '../../../../src/components/ui/CustomButton';
 import { useAppStore } from '../../../../src/store';
+import { updateKidsProfile } from '../../../../src/api/users/users.api';
 
 const TimeCounter = ({ 
   label, 
@@ -45,8 +47,10 @@ const TimeCounter = ({
 export default function TimeLimitScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [hours, setHours] = useState(1);
-  const [minutes, setMinutes] = useState(1);
+  const [minutes, setMinutes] = useState(0);
+  const [isActivating, setIsActivating] = useState(false);
 
   const incrementHours = () => setHours(h => Math.min(h + 1, 23));
   const decrementHours = () => setHours(h => Math.max(h - 1, 0));
@@ -86,18 +90,43 @@ export default function TimeLimitScreen() {
 
         <View className="mt-auto">
           <CustomButton
-            title="Activate Kids Mode"
+            title={isActivating ? "Activating..." : "Activate Kids Mode"}
             variant="primary"
-            onPress={() => {
+            disabled={isActivating}
+            onPress={async () => {
               const totalMs = (hours * 60 * 60 * 1000) + (minutes * 60 * 1000);
-              const expireTimestamp = Date.now() + totalMs;
               
-              const store = useAppStore.getState();
-              store.setKidsModeExpireTime(expireTimestamp);
-              store.setKidsModeDuration(totalMs);
-              
-              // Action to activate Kids Mode and go to success screen
-              router.push('/screens/kids-mode/success');
+              if (totalMs === 0) {
+                toast.error("Please set a time limit greater than 0");
+                return;
+              }
+
+              try {
+                setIsActivating(true);
+                
+                // Save to backend
+                await updateKidsProfile({
+                  name: params.name as string | undefined,
+                  ageRange: params.ageRange as string | undefined,
+                  dailyLimitMs: totalMs,
+                  isActive: true,
+                });
+                
+                const expireTimestamp = Date.now() + totalMs;
+                
+                // Update local store
+                const store = useAppStore.getState();
+                store.setKidsModeExpireTime(expireTimestamp);
+                store.setKidsModeDuration(totalMs);
+                store.setKidsModeActive(true); // Ensure it's marked active locally
+                
+                router.push('/screens/kids-mode/success');
+              } catch (error) {
+                console.error("Failed to activate kids mode:", error);
+                toast.error("Failed to save profile. Please try again.");
+              } finally {
+                setIsActivating(false);
+              }
             }}
           />
         </View>

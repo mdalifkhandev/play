@@ -80,7 +80,10 @@ export default function SetupKidsProfileScreen() {
           <CustomButton
             title="Next"
             variant="primary"
-            onPress={() => router.push('/screens/kids-mode/time-limit')}
+            onPress={() => router.push({
+              pathname: '/screens/kids-mode/time-limit',
+              params: { name, ageRange }
+            })}
           />
         </View>
       </ScrollView>

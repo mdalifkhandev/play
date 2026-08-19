@@ -225,6 +225,12 @@ export async function getFeed(cursor?: string): Promise<ReelFeedResponse> {
   return response.data.data;
 }
 
+export async function getKidsFeed(cursor?: string): Promise<ReelFeedResponse> {
+  const params = cursor ? { cursor } : {};
+  const response = await apiClient.get<{ data: ReelFeedResponse }>('/reels/kids', { params });
+  return response.data.data;
+}
+
 export async function searchReels(q: string, page = 1, limit = 20) {
   const response = await apiClient.get<{ data: { reels: any[], hasMore: boolean, page: number } }>('/reels/search', {
     params: { q, page, limit }

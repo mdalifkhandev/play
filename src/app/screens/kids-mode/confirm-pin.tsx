@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Platform, KeyboardAvoidingView, Pressable } from 'react-native';
+import { View, Text, Platform, KeyboardAvoidingView, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, Link } from 'expo-router';
@@ -7,12 +7,14 @@ import { toast } from 'sonner-native';
 import { Header } from '../../../../src/components/ui/Header';
 import { PinPad } from '../../../../src/components/ui/PinPad';
 import { useAppStore } from '../../../../src/store';
+import { setKidsModePin, verifyKidsModePin, updateKidsProfile } from '../../../../src/api/users/users.api';
 
 export default function ConfirmPinScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
   const [pin, setPin] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const setKidsModeActive = useAppStore((state) => state.setKidsModeActive);
 
   const originalPin = params.pin as string;
@@ -20,33 +22,47 @@ export default function ConfirmPinScreen() {
 
   useEffect(() => {
     if (pin.length === 6) {
-      if (action) {
-        // We are verifying an existing PIN (mocking correct PIN as '123456')
-        if (pin === '123456' || pin === originalPin) {
-          if (action === 'exit') {
-            setKidsModeActive(false);
-            router.push('/home');
+      const handlePinSubmit = async () => {
+        try {
+          setIsLoading(true);
+          if (action) {
+            // We are verifying an existing PIN from the backend
+            await verifyKidsModePin(pin);
+            
+            if (action === 'exit') {
+              // Update backend to set isActive to false
+              await updateKidsProfile({ isActive: false });
+              setKidsModeActive(false);
+              router.push('/home');
+            } else {
+              // "Continue" action
+              const durationMs = useAppStore.getState().kidsModeDurationMs || (60 * 60 * 1000); // fallback 1h
+              useAppStore.getState().setKidsModeExpireTime(Date.now() + durationMs);
+              router.push('/home');
+            }
           } else {
-            // "Continue" action
-            const durationMs = useAppStore.getState().kidsModeDurationMs || (60 * 60 * 1000); // fallback 1h
-            useAppStore.getState().setKidsModeExpireTime(Date.now() + durationMs);
-            router.push('/home');
+            // Setup flow
+            if (pin === originalPin || !originalPin) { // fallback if no originalPin is passed for some reason
+              // Save to backend
+              await setKidsModePin(pin);
+              setTimeout(() => {
+                router.push('/screens/kids-mode/setup-profile');
+              }, 200);
+            } else {
+              toast.error('PIN does not match. Please try again.');
+              setPin('');
+            }
           }
-        } else {
-          toast.error('Incorrect PIN. Please try again.');
+        } catch (error: any) {
+          console.error(error);
+          toast.error(error?.response?.data?.error?.message || 'Incorrect PIN. Please try again.');
           setPin('');
+        } finally {
+          setIsLoading(false);
         }
-      } else {
-        // Setup flow
-        if (pin === originalPin || !originalPin) { // fallback if no originalPin is passed for some reason
-          setTimeout(() => {
-            router.push('/screens/kids-mode/setup-profile');
-          }, 200);
-        } else {
-          toast.error('PIN does not match. Please try again.');
-          setPin('');
-        }
-      }
+      };
+
+      handlePinSubmit();
     }
   }, [pin, originalPin, action, router]);
 
@@ -65,11 +81,21 @@ export default function ConfirmPinScreen() {
           <Text className="text-white text-2xl font-inter-bold text-center mb-2">
             {action ? "Use Password" : "Confirm Your PIN"}
           </Text>
-          <Text className="text-gray-400 text-sm font-inter-regular text-center">
-            {action
-              ? "You'll need this PIN to turn off Kids Mode or change settings"
-              : "Re-enter your PIN to confirm"}
-          </Text>
+          
+          <View className="h-6 justify-center">
+            {isLoading ? (
+              <View className="flex-row items-center">
+                <ActivityIndicator size="small" color="#98D83A" className="mr-2" />
+                <Text className="text-[#98D83A] text-sm font-inter-medium">Checking PIN...</Text>
+              </View>
+            ) : (
+              <Text className="text-gray-400 text-sm font-inter-regular text-center">
+                {action
+                  ? "You'll need this PIN to turn off Kids Mode or change settings"
+                  : "Re-enter your PIN to confirm"}
+              </Text>
+            )}
+          </View>
         </View>
 
         <View className="flex-1 items-center justify-start mt-4 w-full">
