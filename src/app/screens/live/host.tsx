@@ -31,6 +31,8 @@ export default function LiveHostScreen() {
   const insets = useSafeAreaInsets();
   const agoraEngineRef = useRef<IRtcEngine | null>(null);
   const lastLikeTimeRef = useRef<number>(0);
+  const isInitializingRef = useRef(false);
+  const isEndingRef = useRef(false);
 
   const [isJoined, setIsJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -209,8 +211,13 @@ export default function LiveHostScreen() {
               type: 'gift',
               giftName: data.gift?.name || 'gift',
               giftIconUrl: data.gift?.iconUrl,
+              giftIcon: data.gift?.icon,
             },
           ]);
+        };
+
+        const handleLiveError = (error: any) => {
+          console.log('Live socket error:', error?.message || error);
         };
 
         const handleViewerCountUpdate = (data: any) => {
@@ -221,6 +228,7 @@ export default function LiveHostScreen() {
         socket.on('live:new_reaction', handleNewReaction);
         socket.on('live:new_gift', handleNewGift);
         socket.on('live:viewer_count_update', handleViewerCountUpdate);
+        socket.on('live:error', handleLiveError);
 
         // Store handler in ref or just use it in cleanup since it's in the same effect closure
         return () => {
@@ -229,9 +237,10 @@ export default function LiveHostScreen() {
             socket.off('live:new_reaction', handleNewReaction);
             socket.off('live:new_gift', handleNewGift);
             socket.off('live:viewer_count_update', handleViewerCountUpdate);
+            socket.off('live:error', handleLiveError);
             socket.off('connect', handleConnect);
           }
-          endLiveStream();
+          cleanupAgoraEngine();
         };
       }
     }
@@ -241,11 +250,14 @@ export default function LiveHostScreen() {
         socket.emit('live:leave', { streamId: String(streamId) });
         socket.off('live:viewer_count_update');
       }
-      endLiveStream();
+      cleanupAgoraEngine();
     };
   }, [streamId]);
 
   const initLiveStream = async () => {
+    if (isInitializingRef.current || agoraEngineRef.current) return;
+    isInitializingRef.current = true;
+
     try {
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.requestMultiple([
@@ -343,19 +355,37 @@ export default function LiveHostScreen() {
       );
 
     } catch (e: any) {
+      if (isJoined && e?.response?.status === 409) {
+        console.log('Ignoring stale live init 409 after Agora joined.');
+        return;
+      }
       console.error('Failed to init live stream', e);
       setError(e?.message || 'Failed to initialize live stream');
       Alert.alert('Error', e?.message || 'Failed to initialize live stream');
+    } finally {
+      isInitializingRef.current = false;
     }
   };
 
-  const endLiveStream = async () => {
+  const cleanupAgoraEngine = () => {
     try {
       if (agoraEngineRef.current) {
         agoraEngineRef.current.leaveChannel();
         agoraEngineRef.current.release();
         agoraEngineRef.current = null;
       }
+      setIsJoined(false);
+    } catch (e) {
+      console.error('Error cleaning up live engine', e);
+    }
+  };
+
+  const endLiveStream = async () => {
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
+
+    try {
+      cleanupAgoraEngine();
       if (streamId) {
         await liveStreamApi.endStream(streamId as string);
       }

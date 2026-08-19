@@ -24,6 +24,7 @@ interface AppState {
   setKidsModeActive: (active: boolean) => void;
   setKidsModeExpireTime: (timestamp: number | null) => void;
   setKidsModeDuration: (durationMs: number | null) => void;
+  setCoinBalance: (amount: number) => void;
   addCoins: (amount: number) => void;
   deductCoins: (amount: number) => boolean;
   logout: () => void;
@@ -53,6 +54,7 @@ export const useAppStore = create<AppState>()(
       setKidsModeExpireTime: (timestamp: number | null) => set({ kidsModeExpireTimestamp: timestamp }),
       setKidsModeDuration: (durationMs: number | null) => set({ kidsModeDurationMs: durationMs }),
       
+      setCoinBalance: (amount: number) => set({ coinBalance: Math.max(0, amount) }),
       addCoins: (amount: number) => set((state) => ({ coinBalance: state.coinBalance + amount })),
       deductCoins: (amount: number) => {
         const state = get();

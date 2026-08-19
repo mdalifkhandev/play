@@ -195,7 +195,12 @@ export default function LiveSingleScreen() {
 
     const handleNewGift = (data: any) => {
       setMessages((prev) => [
-        ...prev,
+        ...prev.filter(message => !(
+          message.type === 'gift' &&
+          message.id.startsWith('gift-local-') &&
+          message.userId === data.sender?.id &&
+          message.giftName === (data.gift?.name || 'gift')
+        )),
         {
           id: `gift-${Date.now()}-${Math.random()}`,
           userId: data.sender?.id,
@@ -206,8 +211,13 @@ export default function LiveSingleScreen() {
           type: 'gift',
           giftName: data.gift?.name || 'gift',
           giftIconUrl: data.gift?.iconUrl,
+          giftIcon: data.gift?.icon,
         },
       ]);
+    };
+
+    const handleLiveError = (error: any) => {
+      toast.error(error?.message || 'Live action failed.');
     };
 
     const handleViewerCountUpdate = (data: any) => {
@@ -230,6 +240,7 @@ export default function LiveSingleScreen() {
         socket.on('live:new_reaction', handleNewReaction);
         socket.on('live:new_gift', handleNewGift);
         socket.on('live:viewer_count_update', handleViewerCountUpdate);
+        socket.on('live:error', handleLiveError);
       }
     }
 
@@ -251,6 +262,7 @@ export default function LiveSingleScreen() {
         socket.off('live:new_reaction', handleNewReaction);
         socket.off('live:new_gift', handleNewGift);
         socket.off('live:viewer_count_update', handleViewerCountUpdate);
+        socket.off('live:error', handleLiveError);
         socket.off('connect', handleConnect);
       }
       releaseAgoraEngine();
@@ -313,13 +325,45 @@ export default function LiveSingleScreen() {
 
     if (success) {
       setGiftModalVisible(false);
+      const localGiftMessageId = `gift-local-${Date.now()}-${Math.random()}`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: localGiftMessageId,
+          userId: user?.id || user?._id,
+          userName: user?.profile?.displayName || user?.profile?.username || user?.email?.split('@')[0] || 'You',
+          userAvatar: user?.profile?.photoUrl || undefined,
+          message: '',
+          type: 'gift' as const,
+          giftName: gift.name,
+          giftIcon: gift.icon,
+        },
+      ].slice(-50));
       
       const token = useAppStore.getState().token;
       if (token) {
         const socket = ensureChatSocket(token);
         if (socket) {
-          socket.emit('live:gift', { streamId: String(id), giftId: String(gift.id), quantity: 1 });
+          socket.emit(
+            'live:gift',
+            { streamId: String(id), giftId: String(gift.id), quantity: 1 },
+            (response?: { success: boolean; message?: string }) => {
+              if (response?.success) return;
+
+              setMessages(prev => prev.filter(message => message.id !== localGiftMessageId));
+              useAppStore.getState().addCoins(gift.price);
+              toast.error(response?.message || 'Gift could not be sent.');
+            },
+          );
+        } else {
+          setMessages(prev => prev.filter(message => message.id !== localGiftMessageId));
+          useAppStore.getState().addCoins(gift.price);
+          toast.error('Live socket is not connected.');
         }
+      } else {
+        setMessages(prev => prev.filter(message => message.id !== localGiftMessageId));
+        useAppStore.getState().addCoins(gift.price);
+        toast.error('Please login again to send gifts.');
       }
       
       // We don't add the message locally anymore because the server will broadcast live:new_gift

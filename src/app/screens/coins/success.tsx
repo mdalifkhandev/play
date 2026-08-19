@@ -6,14 +6,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../../../src/components/ui/Header';
 import { CustomButton } from '../../../../src/components/ui/CustomButton';
 import { useAppStore } from '../../../../src/store';
+import { getCoinBalance } from '../../../../src/api/coins/coins.api';
 
 export default function CoinsSuccessScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  // Give them 500 coins on success
   useEffect(() => {
-    useAppStore.getState().addCoins(500);
+    getCoinBalance()
+      .then(balance => useAppStore.getState().setCoinBalance(balance.coinBalance))
+      .catch(error => console.log('Coin balance refresh failed:', error));
   }, []);
 
   return (
@@ -32,7 +34,7 @@ export default function CoinsSuccessScreen() {
         </Text>
         
         <Text className="text-gray-400 text-base font-inter-regular text-center leading-relaxed max-w-[300px]">
-          500 Coins have been added to your wallet. You can now use them to support your favorite creators.
+          Your coin balance has been refreshed. You can now use available coins to support your favorite creators.
         </Text>
 
       </View>
