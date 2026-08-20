@@ -19,6 +19,7 @@ import {
   ChannelProfileType,
   ClientRoleType,
   IRtcEngine,
+  RenderModeType,
   RtcSurfaceView,
 } from 'react-native-agora';
 import { ensureChatSocket } from '../../../api/conversations/chatSocket';
@@ -386,7 +387,7 @@ export default function LiveSingleScreen() {
       {isJoined && remoteUid !== 0 ? (
         <RtcSurfaceView
           canvas={{ uid: remoteUid }}
-          style={StyleSheet.absoluteFill}
+           style={StyleSheet.absoluteFill}
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }]}>

@@ -9,6 +9,7 @@ import {
   ChannelProfileType,
   ClientRoleType,
   IRtcEngine,
+  RenderModeType,
   RtcSurfaceView,
 } from 'react-native-agora';
 import { ensureChatSocket } from '../../../api/conversations/chatSocket';

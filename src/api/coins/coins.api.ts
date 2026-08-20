@@ -24,6 +24,22 @@ export interface CoinPackage {
   sortOrder: number;
 }
 
+export interface DiamondBalanceResponse {
+  userId: string;
+  diamondBalance: number;
+  diamondsPerDollar: number;
+  estimatedUsdValue: number;
+}
+
+export interface ConvertDiamondsResponse {
+  converted: true;
+  diamondsConverted: number;
+  amountUsd: number;
+  coinBalance: number;
+  diamondBalance: number;
+  diamondsPerDollar: number;
+}
+
 export interface SquarePaymentResult {
   paymentProvider: 'square';
   paymentId: string;
@@ -46,6 +62,16 @@ export async function getCoinPackages(): Promise<CoinPackage[]> {
 
 export async function createSquareCoinPayment(input: { packageId: string; sourceId: string }): Promise<SquarePaymentResult> {
   const response = await apiClient.post<{ data: SquarePaymentResult }>('/coins/purchase/square-payment', input);
+  return response.data.data;
+}
+
+export async function getDiamondBalance(): Promise<DiamondBalanceResponse> {
+  const response = await apiClient.get<{ data: DiamondBalanceResponse }>('/coins/diamonds');
+  return response.data.data;
+}
+
+export async function convertDiamonds(diamonds: number): Promise<ConvertDiamondsResponse> {
+  const response = await apiClient.post<{ data: ConvertDiamondsResponse }>('/coins/diamonds/convert', { diamonds });
   return response.data.data;
 }
 
