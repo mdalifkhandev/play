@@ -1,46 +1,167 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { handleApiError } from '../../../api/client';
+import {
+  createStripeConnectLink,
+  getCoinTransactionHistory,
+  getReceivedGiftHistory,
+  getWithdrawalSettings,
+  requestCoinWithdrawal,
+  type CoinTransactionItem,
+  type GiftHistoryItem,
+  type WithdrawalSettingsResponse,
+} from '../../../api/coins/coins.api';
 import { CustomButton } from '../../../components/ui/CustomButton';
 import { Header } from '../../../components/ui/Header';
+
+function formatUsd(value: number) {
+  return Number.isFinite(value) ? value.toFixed(2) : '0.00';
+}
+
+function formatDate(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function transactionTitle(item: CoinTransactionItem) {
+  if (item.paymentProvider === 'diamond_conversion') return 'Diamond conversion';
+  if (item.paymentProvider === 'square') return 'Coin purchase';
+  return 'Payment';
+}
 
 export default function BalanceScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'All' | 'Live Gifts'>('All');
+  const [settings, setSettings] = useState<WithdrawalSettingsResponse | null>(null);
+  const [transactions, setTransactions] = useState<CoinTransactionItem[]>([]);
+  const [gifts, setGifts] = useState<GiftHistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  const loadBalance = useCallback(async (refreshing = false) => {
+    try {
+      if (refreshing) setIsRefreshing(true);
+      else setIsLoading(true);
+
+      const [withdrawSettings, history, receivedGifts] = await Promise.all([
+        getWithdrawalSettings(),
+        getCoinTransactionHistory(10),
+        getReceivedGiftHistory(10),
+      ]);
+
+      setSettings(withdrawSettings);
+      setTransactions(history.items || []);
+      setGifts(receivedGifts.items || []);
+    } catch (error) {
+      console.error('Failed to load balance screen:', error);
+      Alert.alert('Alert', handleApiError(error, 'Balance could not be loaded.'));
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBalance();
+  }, [loadBalance]);
+
+  const withdrawableCoins = settings?.userCoinBalance ?? 0;
+  const estimatedBalance = settings?.estimatedUsdValue ?? 0;
+  const canWithdraw = useMemo(() => {
+    if (!settings) return false;
+    return withdrawableCoins >= settings.minWithdrawalCoins;
+  }, [settings, withdrawableCoins]);
+
+  const handleWithdraw = useCallback(async () => {
+    if (!settings || isWithdrawing) return;
+
+    try {
+      setIsWithdrawing(true);
+
+      if (!settings.stripeConnectOnboardingComplete) {
+        if (!settings.payoutSetupAvailable) {
+          Alert.alert(
+            'Payout not ready',
+            'Coin purchase uses Square on Android and Apple Pay on iOS. Withdraw needs a payout provider to send money to your bank, and it is not configured yet.',
+          );
+          return;
+        }
+
+        const link = await createStripeConnectLink();
+        await Linking.openURL(link.url);
+        return;
+      }
+
+      if (!canWithdraw) {
+        Alert.alert('Alert', `Minimum withdrawal amount is ${settings.minWithdrawalCoins} coins.`);
+        return;
+      }
+
+      const result = await requestCoinWithdrawal(withdrawableCoins);
+      Alert.alert('Success', `$${result.amountUsd.toFixed(2)} withdrawal request submitted.`);
+      await loadBalance(true);
+    } catch (error) {
+      console.error('Failed to withdraw balance:', error);
+      Alert.alert('Alert', handleApiError(error, 'Withdrawal could not be submitted.'));
+    } finally {
+      setIsWithdrawing(false);
+    }
+  }, [canWithdraw, isWithdrawing, loadBalance, settings, withdrawableCoins]);
+
+  const visibleItems = activeTab === 'All' ? transactions : gifts;
+  const bottomPadding = Math.max(insets.bottom, 20) + 24;
 
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       <Header title="Balance" />
-      
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-        
-        {/* Estimate Balance Section */}
+
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: bottomPadding }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => loadBalance(true)} tintColor="#A3E635" />}
+      >
         <View className="items-center mt-6">
           <Pressable className="flex-row items-center mb-4">
             <Text className="text-[#888] text-sm mr-1">Estimate balance USD</Text>
             <Ionicons name="caret-down" size={14} color="#888" />
           </Pressable>
-          <Text className="text-white text-6xl font-bold font-inter-bold mb-8">0.00</Text>
-          
-          <CustomButton 
-            title="Withdraw Balance" 
-            onPress={() => {}}
+
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#A3E635" style={{ marginBottom: 32 }} />
+          ) : (
+            <Text className="text-white text-6xl font-bold font-inter-bold mb-8">{formatUsd(estimatedBalance)}</Text>
+          )}
+
+          <CustomButton
+            title={settings?.stripeConnectOnboardingComplete ? 'Withdraw Balance' : 'Setup Payout Account'}
+            onPress={handleWithdraw}
+            disabled={isLoading || isWithdrawing || !settings}
             containerStyle="w-full bg-[#A3E635]"
             textStyle="text-black"
           />
+
+          {settings && (
+            <Text className="text-[#888] text-xs text-center mt-3">
+              {withdrawableCoins.toLocaleString()} coins · Minimum {settings.minWithdrawalCoins.toLocaleString()} coins
+            </Text>
+          )}
         </View>
 
-        {/* Tabs */}
         <View className="flex-row items-center mt-8 mb-4">
-          <Pressable 
+          <Pressable
             onPress={() => setActiveTab('All')}
             className={`px-4 py-1 rounded-md mr-3 ${activeTab === 'All' ? 'bg-[#A3E635]' : 'bg-[#333]'}`}
           >
             <Text className={`text-sm ${activeTab === 'All' ? 'text-black' : 'text-[#888]'}`}>All</Text>
           </Pressable>
-          
-          <Pressable 
+
+          <Pressable
             onPress={() => setActiveTab('Live Gifts')}
             className={`px-4 py-1 rounded-md ${activeTab === 'Live Gifts' ? 'bg-[#A3E635]' : 'bg-[#333]'}`}
           >
@@ -48,24 +169,59 @@ export default function BalanceScreen() {
           </Pressable>
         </View>
 
-        {/* Transactions */}
-        <Pressable className="flex-row items-center justify-between bg-[#151515] p-4 rounded-xl border border-[#222]">
-          <Text className="text-white text-base font-medium">Transactions</Text>
-          <View className="flex-row items-center">
-            <Text className="text-[#888] text-sm mr-1">View all</Text>
-            <Ionicons name="chevron-forward" size={16} color="#888" />
+        <View className="bg-[#151515] rounded-xl border border-[#222] overflow-hidden">
+          <View className="flex-row items-center justify-between p-4 border-b border-[#222]">
+            <Text className="text-white text-base font-medium">Transactions</Text>
+            <View className="flex-row items-center">
+              <Text className="text-[#888] text-sm mr-1">Latest</Text>
+              <Ionicons name="chevron-forward" size={16} color="#888" />
+            </View>
           </View>
-        </Pressable>
 
-        {/* Services */}
+          {isLoading ? (
+            <View className="py-8">
+              <ActivityIndicator color="#A3E635" />
+            </View>
+          ) : visibleItems.length === 0 ? (
+            <Text className="text-[#888] text-sm text-center py-8">
+              {activeTab === 'All' ? 'No transactions yet.' : 'No live gifts yet.'}
+            </Text>
+          ) : (
+            visibleItems.map((item) => {
+              const isGift = activeTab === 'Live Gifts';
+              const gift = item as GiftHistoryItem;
+              const transaction = item as CoinTransactionItem;
+              const title = isGift ? `${gift.giftName} gift` : transactionTitle(transaction);
+              const subtitle = isGift
+                ? `${gift.quantity}x · ${formatDate(gift.createdAt)}`
+                : `${transaction.status} · ${formatDate(transaction.createdAt)}`;
+              const amount = isGift ? `+${gift.totalCoins}` : `+${transaction.coins}`;
+
+              return (
+                <View key={item.id} className="flex-row items-center justify-between px-4 py-3 border-b border-[#222]">
+                  <View className="flex-row items-center flex-1">
+                    <View className="w-10 h-10 rounded-full bg-[#252525] items-center justify-center mr-3">
+                      <Ionicons name={isGift ? 'gift-outline' : 'swap-horizontal'} size={18} color="#A3E635" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-white text-sm font-inter-semibold" numberOfLines={1}>{title}</Text>
+                      <Text className="text-[#888] text-xs mt-0.5" numberOfLines={1}>{subtitle}</Text>
+                    </View>
+                  </View>
+                  <Text className="text-[#A3E635] text-sm font-inter-semibold ml-3">{amount}</Text>
+                </View>
+              );
+            })
+          )}
+        </View>
+
         <View className="mt-8">
           <Text className="text-[#888] text-sm mb-4">Services</Text>
           <Pressable className="bg-[#151515] p-6 rounded-xl border border-[#222] items-center justify-center">
-            <Ionicons name="stats-chart" size={24} color="white" className="mb-2" />
+            <Ionicons name="stats-chart" size={24} color="white" />
             <Text className="text-white text-base font-medium mt-2">Monetisation</Text>
           </Pressable>
         </View>
-
       </ScrollView>
     </View>
   );
