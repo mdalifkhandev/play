@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CustomButton } from '../ui/CustomButton';
 
@@ -9,6 +9,8 @@ interface PaymentMethodSelectionProps {
 
 export function PaymentMethodSelection({ onContinue }: PaymentMethodSelectionProps) {
   const [selected, setSelected] = useState(true);
+  const paymentName = Platform.OS === 'ios' ? 'Apple Pay' : 'Square';
+  const iconName = Platform.OS === 'ios' ? 'logo-apple' : 'card-outline';
 
   return (
     <View className="px-5 flex-1 mt-4">
@@ -19,8 +21,8 @@ export function PaymentMethodSelection({ onContinue }: PaymentMethodSelectionPro
         className="flex-row items-center justify-between bg-[#151515] border border-[#333] rounded-xl p-4 mb-8"
       >
         <View className="flex-row items-center">
-          <Ionicons name="card-outline" size={24} color="#A3E635" />
-          <Text className="text-white text-base ml-3 font-medium">Payment Stripe</Text>
+          <Ionicons name={iconName} size={24} color="#A3E635" />
+          <Text className="text-white text-base ml-3 font-medium">{paymentName}</Text>
         </View>
         
         <View className="w-6 h-6 rounded-full border-2 border-[#A3E635] items-center justify-center">

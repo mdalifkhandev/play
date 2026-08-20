@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Header } from '../../../../src/components/ui/Header';
 import { CustomButton } from '../../../../src/components/ui/CustomButton';
+import { getCoinPackages, type CoinPackage as CoinPackageType } from '../../../../src/api/coins/coins.api';
 
 const CoinPackage = ({ 
   coins, 
@@ -43,34 +44,53 @@ const CoinPackage = ({
 export default function BuyCoinsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<CoinPackageType | null>(null);
+  const [packages, setPackages] = useState<CoinPackageType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const packages = [
-    { id: 1, coins: 100, price: "0.99" },
-    { id: 2, coins: 500, price: "1.99", isPopular: true },
-    { id: 3, coins: 1000, price: "3.99" },
-    { id: 4, coins: 2000, price: "7.99" },
-    { id: 5, coins: 5000, price: "19.99" },
-    { id: 6, coins: 10000, price: "39.99" },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+
+    getCoinPackages()
+      .then(items => {
+        if (!cancelled) {
+          setPackages(items);
+          setSelectedPackage(items.find(item => item.isPopular) || items[0] || null);
+        }
+      })
+      .catch(error => console.log('Coin packages load failed:', error))
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
       <Header title="Buy Coins" />
       
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20 }} showsVerticalScrollIndicator={false}>
-        <View className="flex-row flex-wrap justify-between">
-          {packages.map((pkg) => (
-            <CoinPackage 
-              key={pkg.id}
-              coins={pkg.coins}
-              price={pkg.price}
-              isPopular={pkg.isPopular}
-              selected={selectedPackage === pkg.id}
-              onSelect={() => setSelectedPackage(pkg.id)}
-            />
-          ))}
-        </View>
+        {isLoading ? (
+          <View className="py-20 items-center justify-center">
+            <ActivityIndicator color="#98FF2F" />
+          </View>
+        ) : (
+          <View className="flex-row flex-wrap justify-between">
+            {packages.map((pkg) => (
+              <CoinPackage 
+                key={pkg.id}
+                coins={pkg.coins}
+                price={pkg.price.toFixed(2)}
+                isPopular={pkg.isPopular}
+                selected={selectedPackage?.id === pkg.id}
+                onSelect={() => setSelectedPackage(pkg)}
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       <View className="px-6 mt-4">
@@ -78,7 +98,18 @@ export default function BuyCoinsScreen() {
           title="Continue" 
           variant="primary" 
           disabled={!selectedPackage}
-          onPress={() => router.push('/screens/coins/payment-method')} 
+          onPress={() => {
+            if (!selectedPackage) return;
+            router.push({
+              pathname: '/screens/coins/payment-method',
+              params: {
+                packageId: selectedPackage.id,
+                coins: String(selectedPackage.coins),
+                price: selectedPackage.price.toFixed(2),
+                currency: selectedPackage.currency,
+              },
+            });
+          }} 
         />
       </View>
     </View>

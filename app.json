@@ -51,7 +51,7 @@
         "expo-build-properties",
         {
           "android": {
-            "minSdkVersion": 26
+            "minSdkVersion": 28
           },
           "ios": {
             "deploymentTarget": "16.4"
@@ -67,6 +67,24 @@
         }
       ],
       "expo-image",
+      [
+        "react-native-square-in-app-payments",
+        {
+          "cardEntryStyle": {
+            "saveButtonText": "Pay",
+            "backgroundColor": "#0A0A0A",
+            "textColorHint": "#666666",
+            "actionBarColor": "#0A0A0A",
+            "statusBarColor": "#0A0A0A",
+            "editTextStyle": {
+              "textColor": "#FFFFFF",
+              "accentColor": "#98FF2F",
+              "errorColor": "#EF4444"
+            }
+          }
+        }
+      ],
+      "./plugins/withSquareAndroidFixes",
       [
         "@sentry/react-native/expo",
         {
