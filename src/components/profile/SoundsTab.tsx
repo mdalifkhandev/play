@@ -13,7 +13,11 @@ const formatDuration = (seconds: number) => {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 };
 
-export function SoundsTab() {
+type SoundsTabProps = {
+  onCountChange?: (count: number) => void;
+};
+
+export function SoundsTab({ onCountChange }: SoundsTabProps) {
   const router = useRouter();
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,13 +49,15 @@ export function SoundsTab() {
       const data = await getSavedTracks({ limit: 50 });
       if (data && data.tracks) {
         setTracks(data.tracks as MusicTrack[]);
+        onCountChange?.(data.tracks.length);
       }
     } catch (e) {
       console.log('Failed to load saved tracks', e);
+      onCountChange?.(0);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [onCountChange]);
 
   useEffect(() => {
     void loadTracks();
@@ -118,7 +124,11 @@ export function SoundsTab() {
 
   const handleUnsave = async (track: MusicTrack) => {
     // Optimistic remove
-    setTracks(prev => prev.filter(t => t.providerTrackId !== track.providerTrackId));
+    setTracks(prev => {
+      const nextTracks = prev.filter(t => t.providerTrackId !== track.providerTrackId);
+      onCountChange?.(nextTracks.length);
+      return nextTracks;
+    });
     try {
       await toggleSavedTrack({
         providerTrackId: track.providerTrackId,
@@ -130,7 +140,11 @@ export function SoundsTab() {
       });
     } catch (e) {
       // Revert if error
-      setTracks(prev => [track, ...prev]);
+      setTracks(prev => {
+        const nextTracks = [track, ...prev];
+        onCountChange?.(nextTracks.length);
+        return nextTracks;
+      });
     }
   };
 

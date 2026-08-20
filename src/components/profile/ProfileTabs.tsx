@@ -14,6 +14,7 @@ type ProfileTabsProps = {
   savedPosts?: ReelFeedItem[];
   likedPosts?: ReelFeedItem[];
   showPrivateTabs?: boolean;
+  showCollections?: boolean;
   isLoadingPosts?: boolean;
   isLoadingSavedPosts?: boolean;
   isLoadingLikedPosts?: boolean;
@@ -25,6 +26,7 @@ export function ProfileTabs({
   savedPosts = [],
   likedPosts = [],
   showPrivateTabs = true,
+  showCollections = false,
   isLoadingPosts = false,
   isLoadingSavedPosts = false,
   isLoadingLikedPosts = false,
@@ -32,6 +34,7 @@ export function ProfileTabs({
 }: ProfileTabsProps) {
   const [activeMainTab, setActiveMainTab] = useState<MainTabType>('grid');
   const [activeSavedTab, setActiveSavedTab] = useState<SavedTabType>('posts');
+  const [savedSoundCount, setSavedSoundCount] = useState(0);
   const selectMainTab = (tab: MainTabType) => {
     setActiveMainTab(tab);
     onTabChange?.(tab);
@@ -83,22 +86,24 @@ export function ProfileTabs({
             {activeSavedTab === 'posts' && <View className="absolute bottom-0 w-full h-[2px] bg-white" />}
           </Pressable>
 
-          <Pressable 
-            className="flex-1 py-2 items-center justify-center"
-            onPress={() => setActiveSavedTab('collections')}
-          >
-            <Text className={`text-[11px] font-semibold ${activeSavedTab === 'collections' ? 'text-white' : 'text-[#666]'}`}>
-              Collection 0
-            </Text>
-            {activeSavedTab === 'collections' && <View className="absolute bottom-0 w-full h-[2px] bg-white" />}
-          </Pressable>
+          {showCollections && (
+            <Pressable 
+              className="flex-1 py-2 items-center justify-center"
+              onPress={() => setActiveSavedTab('collections')}
+            >
+              <Text className={`text-[11px] font-semibold ${activeSavedTab === 'collections' ? 'text-white' : 'text-[#666]'}`}>
+                Collection 0
+              </Text>
+              {activeSavedTab === 'collections' && <View className="absolute bottom-0 w-full h-[2px] bg-white" />}
+            </Pressable>
+          )}
 
           <Pressable 
             className="flex-1 py-2 items-center justify-center"
             onPress={() => setActiveSavedTab('sounds')}
           >
             <Text className={`text-[11px] font-semibold ${activeSavedTab === 'sounds' ? 'text-white' : 'text-[#666]'}`}>
-              Sound 0
+              Sound {savedSoundCount}
             </Text>
             {activeSavedTab === 'sounds' && <View className="absolute bottom-0 w-full h-[2px] bg-white" />}
           </Pressable>
@@ -110,8 +115,8 @@ export function ProfileTabs({
         {activeMainTab === 'grid' && (isLoadingPosts ? <LoadingTab /> : <PostsTab posts={posts} />)}
         {activeMainTab === 'heart' && (isLoadingLikedPosts ? <LoadingTab /> : <PostsTab posts={likedPosts} />)}
         {activeMainTab === 'bookmark' && activeSavedTab === 'posts' && (isLoadingSavedPosts ? <LoadingTab /> : <PostsTab posts={savedPosts} />)}
-        {activeMainTab === 'bookmark' && activeSavedTab === 'collections' && <CollectionsTab />}
-        {activeMainTab === 'bookmark' && activeSavedTab === 'sounds' && <SoundsTab />}
+        {showCollections && activeMainTab === 'bookmark' && activeSavedTab === 'collections' && <CollectionsTab />}
+        {activeMainTab === 'bookmark' && activeSavedTab === 'sounds' && <SoundsTab onCountChange={setSavedSoundCount} />}
       </View>
     </View>
   );
