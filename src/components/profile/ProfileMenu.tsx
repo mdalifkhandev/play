@@ -109,6 +109,14 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#888" />
               </Pressable>
+
+              <Pressable onPress={() => navigateTo('/screens/menu/diamond')} className="flex-row items-center justify-between py-3 mb-2">
+                <View className="flex-row items-center">
+                  <Ionicons name="diamond-outline" size={22} color="white" />
+                  <Text className="text-white text-base ml-4 font-medium">Diamond</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#888" />
+              </Pressable>
               
               <View className="h-[1px] bg-[#222] my-2" />
             </View>
