@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Image as RNImage, Dimensions } from 'react-native';
+import { Dimensions, View } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from 'react-native';
 import type { ReelFeedItem } from '../../api/reels/reels.types';
@@ -24,6 +25,11 @@ const isUsableUri = (value: string) => (
   value.startsWith('file://') ||
   value.startsWith('content://')
 );
+const isVideoUri = (value: string) => (
+  /\/video\/upload\//i.test(value) ||
+  /\.(mp4|mov|m4v|webm|3gp|mkv)(\?|#|$)/i.test(value)
+);
+const isImageUri = (value: string) => isUsableUri(value) && !isVideoUri(value);
 
 const toPostCard = (value: unknown, index: number): PostCard | null => {
   if (!value || typeof value !== 'object') {
@@ -36,7 +42,9 @@ const toPostCard = (value: unknown, index: number): PostCard | null => {
   const id = safeString(post.id);
   const thumbnailUrl = safeString(post.thumbnailUrl) || safeString(post.media?.thumbnailUrl);
   const videoUrl = safeString(post.videoUrl) || safeString(post.media?.processedUrl) || safeString(post.media?.rawUrl);
-  const imageUri = thumbnailUrl || videoUrl;
+  const mediaType = safeString((post as { mediaType?: unknown }).mediaType);
+  const fallbackMediaUrl = mediaType === 'photo' ? videoUrl : '';
+  const imageUri = thumbnailUrl || fallbackMediaUrl;
   const views = typeof post.stats?.views === 'number' ? post.stats.views : 0;
 
   if (!id && !imageUri) {
@@ -45,7 +53,7 @@ const toPostCard = (value: unknown, index: number): PostCard | null => {
 
   return {
     key: id || `post-${index}`,
-    imageUri: isUsableUri(imageUri) ? imageUri : '',
+    imageUri: isImageUri(imageUri) ? imageUri : '',
     views,
   };
 };
@@ -66,14 +74,15 @@ export function PostsTab({ posts = [] }: PostsTabProps) {
 
   return (
     <View className="flex-row flex-wrap mt-2">
-      {cards.map((post) => {
+      {cards.map((post, index) => {
         return (
-          <View key={post.key} style={{ width: ITEM_WIDTH, height: ITEM_WIDTH * 1.5, padding: 1 }}>
+          <View key={`${post.key}-${index}`} style={{ width: ITEM_WIDTH, height: ITEM_WIDTH * 1.5, padding: 1 }}>
             {post.imageUri ? (
-              <RNImage
-                source={{ uri: post.imageUri }}
+              <Image
+                source={post.imageUri}
                 style={{ width: '100%', height: '100%' }}
-                resizeMode="cover"
+                contentFit="cover"
+                transition={120}
               />
             ) : (
               <View style={{ width: '100%', height: '100%', backgroundColor: '#333' }} />
