@@ -18,6 +18,18 @@ const formatTimeAgo = (dateString: string) => {
   return `${Math.floor(diffInSeconds / 86400)}d ago`;
 };
 
+const getActorName = (item: NotificationItem) =>
+  item.actorId?.profile?.displayName ||
+  item.actorId?.name ||
+  item.actorId?.profile?.username ||
+  item.actorId?.username ||
+  item.actorId?.email ||
+  item.title ||
+  'System';
+
+const getActorAvatar = (item: NotificationItem) =>
+  item.actorId?.profile?.photoUrl || item.actorId?.profilePicture;
+
 export default function NotificationScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -94,17 +106,20 @@ export default function NotificationScreen() {
               <Text className="text-gray-500 font-inter-medium text-base">No notifications yet</Text>
             </View>
           ) : (
-            notifications.map((item) => (
-              <Pressable 
-                key={item._id} 
-                className={`flex-row items-center bg-[#181818] border border-[#2A2A2A] rounded-2xl p-4 mb-4 ${!item.isRead ? 'border-[#98FF2F]/30' : ''}`}
-                onPress={() => handleNotificationPress(item)}
-              >
+            notifications.map((item) => {
+              const actorAvatar = getActorAvatar(item);
+
+              return (
+                <Pressable 
+                  key={item._id} 
+                  className={`flex-row items-center bg-[#181818] border border-[#2A2A2A] rounded-2xl p-4 mb-4 ${!item.isRead ? 'border-[#98FF2F]/30' : ''}`}
+                  onPress={() => handleNotificationPress(item)}
+                >
                 {/* Avatar / Icon Container */}
                 <View className="relative mr-4">
-                  {item.actorId?.profilePicture ? (
+                  {actorAvatar ? (
                     <View className="w-12 h-12 rounded-full border-2 border-[#98FF2F]/20 overflow-hidden bg-yellow-500">
-                      <Image source={{ uri: item.actorId.profilePicture }} className="w-full h-full" resizeMode="cover" />
+                      <Image source={{ uri: actorAvatar }} className="w-full h-full" resizeMode="cover" />
                     </View>
                   ) : (
                     <View className="w-12 h-12 rounded-full bg-[#2A2A2A] items-center justify-center border-2 border-[#98FF2F]/20">
@@ -139,7 +154,7 @@ export default function NotificationScreen() {
                 {/* Content */}
                 <View className="flex-1 mr-2">
                   <Text className="text-white font-inter-medium text-base mb-0.5">
-                    {item.actorId ? (item.actorId.name || item.actorId.username) : (item.title || 'System')}
+                    {getActorName(item)}
                   </Text>
                   <Text className="text-gray-400 font-inter-regular text-sm leading-5 mb-1">
                     {item.body || (item.type === 'like' ? 'liked your post' : item.type === 'follow' ? 'started following you' : item.type === 'comment' ? 'commented on your post' : 'sent a notification')}
@@ -152,7 +167,8 @@ export default function NotificationScreen() {
                   <Ionicons name="ellipsis-vertical" size={20} color="#888" />
                 </Pressable>
               </Pressable>
-            ))
+              );
+            })
           )}
         </ScrollView>
       )}

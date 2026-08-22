@@ -16,9 +16,15 @@ export type NotificationType = 'like' | 'comment' | 'follow' | 'milestone' | 'sy
 
 export interface NotificationActor {
   _id: string;
-  username: string;
+  email?: string;
+  username?: string;
   name?: string;
   profilePicture?: string;
+  profile?: {
+    displayName?: string;
+    username?: string;
+    photoUrl?: string;
+  };
 }
 
 export interface NotificationItem {

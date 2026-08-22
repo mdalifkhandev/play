@@ -1100,12 +1100,14 @@ export const FeedItem = memo(({
       )}
 
       {/* Centered Full Screen Button */}
-      <View className="absolute left-0 right-0 items-center pointer-events-auto" style={{ bottom: insets.bottom + 155 }}>
-        <Pressable className="flex-row items-center bg-black/50 px-3 py-1.5 rounded-2xl" onPress={() => onFullscreenChange?.(!isFullscreen)}>
-          <Ionicons name={isFullscreen ? "contract-outline" : "scan-outline"} size={16} color="#FFF" />
-          <Text className="text-white ml-1.5 text-xs font-medium">{isFullscreen ? 'Back' : 'Full screen'}</Text>
-        </Pressable>
-      </View>
+      {!isExpanded && (
+        <View className="absolute left-0 right-0 items-center pointer-events-auto" style={{ bottom: insets.bottom + 155 }}>
+          <Pressable className="flex-row items-center bg-black/50 px-3 py-1.5 rounded-2xl" onPress={() => onFullscreenChange?.(!isFullscreen)}>
+            <Ionicons name={isFullscreen ? "contract-outline" : "scan-outline"} size={16} color="#FFF" />
+            <Text className="text-white ml-1.5 text-xs font-medium">{isFullscreen ? 'Back' : 'Full screen'}</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* Bottom Text Details */}
       <View className={`absolute left-4 pb-2 ${isFullscreen ? 'right-4' : 'right-20'}`} style={{ bottom: insets.bottom + 60 }} pointerEvents="box-none">
