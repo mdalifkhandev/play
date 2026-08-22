@@ -16,15 +16,21 @@ function isImageUrl(url?: string | null): url is string {
 }
 
 function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
+  const hasPlayableVideo = reel.mediaType !== 'photo' && !isImageUrl(reel.videoUrl);
+  const source = hasPlayableVideo
+    ? reel.videoUrl
+    : reel.thumbnailUrl || reel.videoUrl;
+
   return {
     id: reel.id,
-    type: 'video', // backend reels are always videos initially
-    source: reel.videoUrl,
+    type: hasPlayableVideo ? 'video' : 'image',
+    source,
     thumbnailUrl: isImageUrl(reel.thumbnailUrl) ? reel.thumbnailUrl : undefined,
     user: {
       id: reel.user.id,
       username: reel.user.displayName || reel.user.username || reel.user.email || '',
       profileImage: reel.user.avatarUrl || '',
+      isPremium: Boolean(reel.user.isPremium),
     },
     description: reel.caption || '',
     date: new Date(reel.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),

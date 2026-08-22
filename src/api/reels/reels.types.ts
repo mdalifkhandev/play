@@ -67,12 +67,14 @@ export type ReelFeedItem = {
   thumbnailUrl: string;
   durationMs: number;
   caption: string | null;
+  mediaType?: 'video' | 'photo';
   user: {
     id: string;
     email: string | null;
     username: string | null;
     displayName: string | null;
     avatarUrl: string | null;
+    isPremium?: boolean;
   };
   stats: {
     likes: number;

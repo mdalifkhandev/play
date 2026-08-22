@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +24,7 @@ export interface FeedItemProps {
     id: string;
     username: string;
     profileImage: string;
+    isPremium?: boolean;
   };
   description: string;
   date: string;
@@ -1117,14 +1118,21 @@ export const FeedItem = memo(({
               style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: 'white' }}
             />
             <View className="flex-1 ml-2.5">
-              <Text
-                numberOfLines={1}
-                ellipsizeMode="tail"
-                className="text-white text-base font-bold"
-                style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
-              >
-                {user.username}
-              </Text>
+              <View className="flex-row items-center">
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  className="text-white text-base font-bold flex-shrink"
+                  style={{ textShadowColor: 'rgba(0,0,0,0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
+                >
+                  {user.username}
+                </Text>
+                {user.isPremium && (
+                  <View className="ml-1.5 h-5 w-5 rounded-full bg-[#A3E635] items-center justify-center border border-black/40">
+                    <MaterialCommunityIcons name="crown" size={13} color="#0A0A0A" />
+                  </View>
+                )}
+              </View>
               <Text numberOfLines={1} className="text-[#CCC] text-sm font-normal">{date}</Text>
             </View>
           </Pressable>

@@ -129,6 +129,7 @@ export default function UserProfileScreen() {
               followingCount={profileData?.stats.followingCount}
               followersCount={profileData?.stats.followersCount}
               likesCount={profileData?.stats.likesCount}
+              isPremium={Boolean(user?.subscription?.isPremium)}
             />
 
             <Pressable

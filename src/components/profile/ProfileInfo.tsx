@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { Text, View } from 'react-native';
 
@@ -35,8 +35,12 @@ export function ProfileInfo({
           style={{ width: 88, height: 88, borderRadius: 44 }}
           contentFit="cover"
         />
-        <View className="absolute bottom-0 right-1 bg-[#3b82f6] w-5 h-5 rounded-full items-center justify-center border-2 border-[#0A0A0A]">
-          <Text className="text-white text-[10px] font-bold italic font-serif">i</Text>
+        <View className={`absolute bottom-0 right-1 rounded-full items-center justify-center border-2 border-[#0A0A0A] ${isPremium ? 'bg-[#A3E635] w-7 h-7' : 'bg-[#3b82f6] w-5 h-5'}`}>
+          {isPremium ? (
+            <MaterialCommunityIcons name="crown" size={17} color="#0A0A0A" />
+          ) : (
+            <Text className="text-white text-[10px] font-bold italic font-serif">i</Text>
+          )}
         </View>
       </View>
 
@@ -45,11 +49,6 @@ export function ProfileInfo({
         <Text numberOfLines={1} className="text-white text-[16px] font-bold">
           {displayName}
         </Text>
-        {isPremium && (
-          <View className="ml-2 h-5 w-5 rounded-full bg-[#A3E635] items-center justify-center">
-            <Ionicons name="star" size={12} color="#0A0A0A" />
-          </View>
-        )}
       </View>
       <Text className="text-[#888] text-[14px] mt-1">@{username}</Text>
 
