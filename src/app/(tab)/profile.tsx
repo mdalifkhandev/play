@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getMyLikedReels, getMyProfileSummary, getMyReels, getMySavedReels } from '../../api/profile/profile.api';
 import type { MyProfileSummaryData } from '../../api/profile/profile.types';
+import { getCreatorEligibility, type CreatorEligibility } from '../../api/creators';
 import { handleApiError } from '../../api/client';
 import type { ReelFeedItem } from '../../api/reels/reels.types';
 
@@ -20,6 +21,7 @@ export default function ProfileScreen() {
   const params = useLocalSearchParams();
   const isCreator = params.creatorMode === 'true';
   const [profileData, setProfileData] = useState<MyProfileSummaryData | null>(null);
+  const [creatorEligibility, setCreatorEligibility] = useState<CreatorEligibility | null>(null);
   const [posts, setPosts] = useState<ReelFeedItem[]>([]);
   const [savedPosts, setSavedPosts] = useState<ReelFeedItem[]>([]);
   const [likedPosts, setLikedPosts] = useState<ReelFeedItem[]>([]);
@@ -40,6 +42,9 @@ export default function ProfileScreen() {
       const data = await getMyProfileSummary();
 
       setProfileData(data);
+      getCreatorEligibility()
+        .then(setCreatorEligibility)
+        .catch(creatorError => console.log('Creator eligibility load failed:', creatorError?.message ?? creatorError));
       setError(null);
       if (refresh) {
         setPosts([]);
@@ -103,6 +108,7 @@ export default function ProfileScreen() {
   const profile = user?.profile;
   const displayName = profile?.displayName || profile?.username || user?.email?.split('@')[0] || 'User';
   const username = profile?.username || user?.email?.split('@')[0] || 'user';
+  const isCreatorMonetized = Boolean(creatorEligibility?.isCreator || creatorEligibility?.status === 'approved');
 
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
@@ -154,7 +160,7 @@ export default function ProfileScreen() {
         ) : (
           <>
             <CreatorCard />
-            <CreatorTools />
+            {isCreatorMonetized ? <CreatorTools /> : null}
           </>
         )}
 
