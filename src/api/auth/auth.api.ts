@@ -1,6 +1,7 @@
 import { apiClient } from '../client';
 import {
   ForgotPasswordRequest,
+  AppleLoginRequest,
   GoogleLoginRequest,
   LoginRequest,
   ResendOtpRequest,
@@ -24,6 +25,10 @@ export const login = async (data: LoginRequest) => {
 
 export const googleLogin = async (data: GoogleLoginRequest) => {
   return apiClient.post('/auth/google', data);
+};
+
+export const appleLogin = async (data: AppleLoginRequest) => {
+  return apiClient.post('/auth/apple', data);
 };
 
 export const signup = async (data: SignupRequest) => {

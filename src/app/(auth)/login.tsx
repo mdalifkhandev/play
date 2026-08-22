@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -7,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 import { handleApiError } from "../../../src/api/client";
 import { useAppStore } from "../../../src/store";
-import { useGoogleLoginMutation, useLoginMutation } from "../../../src/api/auth";
+import { useAppleLoginMutation, useGoogleLoginMutation, useLoginMutation } from "../../../src/api/auth";
 import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { CustomButton } from "../../components/ui/CustomButton";
@@ -18,12 +19,15 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
+  const [isAppleSigningIn, setIsAppleSigningIn] = useState(false);
+  const [isAppleAvailable, setIsAppleAvailable] = useState(false);
   const insets = useSafeAreaInsets();
   const setAuth = useAppStore((state) => state.setAuth);
 
   const loginMutation = useLoginMutation();
   const googleLoginMutation = useGoogleLoginMutation();
-  const isAuthBusy = loginMutation.isPending || googleLoginMutation.isPending || isGoogleSigningIn;
+  const appleLoginMutation = useAppleLoginMutation();
+  const isAuthBusy = loginMutation.isPending || googleLoginMutation.isPending || appleLoginMutation.isPending || isGoogleSigningIn || isAppleSigningIn;
 
   useEffect(() => {
     GoogleSignin.configure({
@@ -31,6 +35,17 @@ export default function Login() {
       offlineAccess: false,
       profileImageSize: 120,
     });
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      setIsAppleAvailable(false);
+      return;
+    }
+
+    AppleAuthentication.isAvailableAsync()
+      .then(setIsAppleAvailable)
+      .catch(() => setIsAppleAvailable(false));
   }, []);
 
   const finishAuth = (response: any, successMessage: string) => {
@@ -80,6 +95,7 @@ export default function Login() {
       const idToken = tokens.idToken || ('data' in signInResult ? signInResult.data?.idToken : undefined);
 
       if (!idToken) {
+        setIsGoogleSigningIn(false);
         toast.error('Google did not return an ID token');
         return;
       }
@@ -104,6 +120,57 @@ export default function Login() {
         return;
       }
       toast.error(handleApiError(error, 'Failed to login with Google'));
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    if (Platform.OS !== 'ios' || !isAppleAvailable) {
+      toast.error('Apple login is available only on supported iOS devices');
+      return;
+    }
+
+    try {
+      setIsAppleSigningIn(true);
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        setIsAppleSigningIn(false);
+        toast.error('Apple did not return an identity token');
+        return;
+      }
+
+      appleLoginMutation.mutate(
+        {
+          identityToken: credential.identityToken,
+          fullName: {
+            givenName: credential.fullName?.givenName,
+            familyName: credential.fullName?.familyName,
+          },
+          rememberMe: true,
+        },
+        {
+          onSuccess: (response) => {
+            finishAuth(response, 'Apple login successful!');
+          },
+          onError: (error: any) => {
+            toast.error(handleApiError(error, 'Failed to login with Apple'));
+          },
+          onSettled: () => {
+            setIsAppleSigningIn(false);
+          },
+        },
+      );
+    } catch (error: any) {
+      setIsAppleSigningIn(false);
+      if (error?.code === 'ERR_REQUEST_CANCELED') {
+        return;
+      }
+      toast.error(handleApiError(error, 'Failed to login with Apple'));
     }
   };
 
@@ -188,9 +255,19 @@ export default function Login() {
               <GoogleIcon width={24} height={24} />
             )}
           </Pressable>
-          <Pressable disabled={isAuthBusy} className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80">
-            <Ionicons name="logo-apple" size={24} color="black" />
-          </Pressable>
+          {Platform.OS === 'ios' && isAppleAvailable && (
+            <Pressable
+              disabled={isAuthBusy}
+              className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80"
+              onPress={handleAppleLogin}
+            >
+              {isAppleSigningIn || appleLoginMutation.isPending ? (
+                <ActivityIndicator size="small" color="#111827" />
+              ) : (
+                <Ionicons name="logo-apple" size={24} color="black" />
+              )}
+            </Pressable>
+          )}
         </View>
 
         <View className="flex-row justify-center mt-[24px]">
@@ -213,7 +290,7 @@ export default function Login() {
               Signing you in
             </Text>
             <Text className="mt-2 text-center text-sm font-inter-regular text-gray-400">
-              Please wait while we connect your Google account.
+              Please wait while we connect your account.
             </Text>
           </View>
         </View>

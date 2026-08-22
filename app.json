@@ -8,7 +8,9 @@
     "scheme": "play",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.anonymous.play",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -42,6 +44,7 @@
         }
       ],
       "expo-web-browser",
+      "expo-apple-authentication",
       "@react-native-google-signin/google-signin",
       "expo-font",
       "expo-notifications",

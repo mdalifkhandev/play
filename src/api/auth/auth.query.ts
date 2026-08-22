@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import {
+  appleLogin,
   forgotPassword,
   googleLogin,
   login,
@@ -11,6 +12,7 @@ import {
   verifyResetCode,
 } from './auth.api';
 import {
+  AppleLoginRequest,
   ForgotPasswordRequest,
   GoogleLoginRequest,
   LoginRequest,
@@ -30,6 +32,12 @@ export const useLoginMutation = () => {
 export const useGoogleLoginMutation = () => {
   return useMutation({
     mutationFn: (data: GoogleLoginRequest) => googleLogin(data),
+  });
+};
+
+export const useAppleLoginMutation = () => {
+  return useMutation({
+    mutationFn: (data: AppleLoginRequest) => appleLogin(data),
   });
 };
 

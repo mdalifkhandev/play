@@ -9,6 +9,15 @@ export interface GoogleLoginRequest {
   rememberMe?: boolean;
 }
 
+export interface AppleLoginRequest {
+  identityToken: string;
+  fullName?: {
+    givenName?: string | null;
+    familyName?: string | null;
+  };
+  rememberMe?: boolean;
+}
+
 export interface SignupRequest {
   email: string;
   password?: string;

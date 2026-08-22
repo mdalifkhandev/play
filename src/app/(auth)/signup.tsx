@@ -1,11 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import { router } from "expo-router";
-import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 import { handleApiError } from "../../../src/api/client";
-import { useSignupMutation } from "../../../src/api/auth";
+import { useAppleLoginMutation, useGoogleLoginMutation, useSignupMutation } from "../../../src/api/auth";
+import { useAppStore } from "../../../src/store";
 import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { CustomButton } from "../../components/ui/CustomButton";
@@ -16,9 +19,48 @@ export default function SignUp() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
+  const [isAppleSigningIn, setIsAppleSigningIn] = useState(false);
+  const [isAppleAvailable, setIsAppleAvailable] = useState(false);
   const insets = useSafeAreaInsets();
+  const setAuth = useAppStore((state) => state.setAuth);
 
   const signupMutation = useSignupMutation();
+  const googleLoginMutation = useGoogleLoginMutation();
+  const appleLoginMutation = useAppleLoginMutation();
+  const isAuthBusy = signupMutation.isPending || googleLoginMutation.isPending || appleLoginMutation.isPending || isGoogleSigningIn || isAppleSigningIn;
+
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      offlineAccess: false,
+      profileImageSize: 120,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      setIsAppleAvailable(false);
+      return;
+    }
+
+    AppleAuthentication.isAvailableAsync()
+      .then(setIsAppleAvailable)
+      .catch(() => setIsAppleAvailable(false));
+  }, []);
+
+  const finishAuth = (response: any, successMessage: string) => {
+    const accessToken = response.data?.data?.tokens?.accessToken;
+    const refreshToken = response.data?.data?.tokens?.refreshToken;
+    const user = response.data?.data?.user;
+
+    if (accessToken) {
+      setAuth(accessToken, refreshToken || "", user);
+    }
+
+    toast.success(successMessage);
+    router.push('/home');
+  };
 
   const handleSignUp = () => {
     if (!email || !password || !confirmPassword) {
@@ -54,6 +96,100 @@ export default function SignUp() {
     );
   };
 
+  const handleGoogleLogin = async () => {
+    if (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
+      toast.error('Google Web Client ID is not configured');
+      return;
+    }
+
+    try {
+      setIsGoogleSigningIn(true);
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      await GoogleSignin.signOut().catch(() => undefined);
+      const signInResult = await GoogleSignin.signIn();
+      const tokens = await GoogleSignin.getTokens();
+      const idToken = tokens.idToken || ('data' in signInResult ? signInResult.data?.idToken : undefined);
+
+      if (!idToken) {
+        setIsGoogleSigningIn(false);
+        toast.error('Google did not return an ID token');
+        return;
+      }
+
+      googleLoginMutation.mutate(
+        { idToken, rememberMe: true },
+        {
+          onSuccess: (response) => {
+            finishAuth(response, 'Google login successful!');
+          },
+          onError: (error: any) => {
+            toast.error(handleApiError(error, 'Failed to continue with Google'));
+          },
+          onSettled: () => {
+            setIsGoogleSigningIn(false);
+          },
+        },
+      );
+    } catch (error: any) {
+      setIsGoogleSigningIn(false);
+      if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
+        return;
+      }
+      toast.error(handleApiError(error, 'Failed to continue with Google'));
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    if (Platform.OS !== 'ios' || !isAppleAvailable) {
+      toast.error('Apple login is available only on supported iOS devices');
+      return;
+    }
+
+    try {
+      setIsAppleSigningIn(true);
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        setIsAppleSigningIn(false);
+        toast.error('Apple did not return an identity token');
+        return;
+      }
+
+      appleLoginMutation.mutate(
+        {
+          identityToken: credential.identityToken,
+          fullName: {
+            givenName: credential.fullName?.givenName,
+            familyName: credential.fullName?.familyName,
+          },
+          rememberMe: true,
+        },
+        {
+          onSuccess: (response) => {
+            finishAuth(response, 'Apple login successful!');
+          },
+          onError: (error: any) => {
+            toast.error(handleApiError(error, 'Failed to continue with Apple'));
+          },
+          onSettled: () => {
+            setIsAppleSigningIn(false);
+          },
+        },
+      );
+    } catch (error: any) {
+      setIsAppleSigningIn(false);
+      if (error?.code === 'ERR_REQUEST_CANCELED') {
+        return;
+      }
+      toast.error(handleApiError(error, 'Failed to continue with Apple'));
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -73,6 +209,7 @@ export default function SignUp() {
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
+          editable={!isAuthBusy}
         />
 
         <CustomInput
@@ -83,6 +220,7 @@ export default function SignUp() {
           containerStyle="mb-6"
           value={password}
           onChangeText={setPassword}
+          editable={!isAuthBusy}
         />
 
         <CustomInput
@@ -93,11 +231,13 @@ export default function SignUp() {
           containerStyle="mb-4"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
+          editable={!isAuthBusy}
         />
 
         <Pressable
           className="flex-row items-center mb-8 py-2"
           onPress={() => setAcceptTerms(!acceptTerms)}
+          disabled={isAuthBusy}
         >
           <View className={`w-5 h-5 rounded-md border items-center justify-center mr-2 ${acceptTerms ? 'bg-[#98D83A] border-[#98D83A]' : 'border-gray-500'}`}>
             {acceptTerms && <Ionicons name="checkmark" size={14} color="black" />}
@@ -106,11 +246,11 @@ export default function SignUp() {
         </Pressable>
 
         <CustomButton
-          title={signupMutation.isPending ? "Signing Up..." : "Sign Up"}
+          title={isAuthBusy ? "Signing Up..." : "Sign Up"}
           variant="primary"
           containerStyle="mb-10"
           onPress={handleSignUp}
-          disabled={!acceptTerms || signupMutation.isPending}
+          disabled={!acceptTerms || isAuthBusy}
         />
 
         <View className="flex-row items-center mb-8">
@@ -120,15 +260,30 @@ export default function SignUp() {
         </View>
 
         <View className="flex-row justify-center space-x-6 gap-4">
-          <Pressable className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80">
-            <GoogleIcon width={24} height={24} />
+          <Pressable
+            className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80"
+            disabled={isAuthBusy}
+            onPress={handleGoogleLogin}
+          >
+            {isGoogleSigningIn || googleLoginMutation.isPending ? (
+              <ActivityIndicator size="small" color="#111827" />
+            ) : (
+              <GoogleIcon width={24} height={24} />
+            )}
           </Pressable>
-          <Pressable className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80">
-            <Ionicons name="logo-apple" size={24} color="black" />
-          </Pressable>
-          <Pressable className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80">
-            <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-          </Pressable>
+          {Platform.OS === 'ios' && isAppleAvailable && (
+            <Pressable
+              className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80"
+              disabled={isAuthBusy}
+              onPress={handleAppleLogin}
+            >
+              {isAppleSigningIn || appleLoginMutation.isPending ? (
+                <ActivityIndicator size="small" color="#111827" />
+              ) : (
+                <Ionicons name="logo-apple" size={24} color="black" />
+              )}
+            </Pressable>
+          )}
         </View>
 
         <View className="flex-row justify-center mt-[24px]">
