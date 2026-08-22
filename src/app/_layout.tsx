@@ -53,8 +53,10 @@ export default function RootLayout() {
   const hasHydrated = useAppStore((state) => state.hasHydrated);
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const token = useAppStore((state) => state.token);
+  const user = useAppStore((state) => state.user);
+  const userId = user?.id || user?._id || null;
 
-  useRegisterPushNotifications(hasHydrated && isAuthenticated && Boolean(token));
+  useRegisterPushNotifications(hasHydrated && isAuthenticated && Boolean(token), userId);
 
   const [loaded, error] = useFonts({
     Inter_100Thin,

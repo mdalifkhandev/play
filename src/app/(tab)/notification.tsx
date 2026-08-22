@@ -71,6 +71,14 @@ export default function NotificationScreen() {
         pathname: '/(tab)/home',
         params: { reelId: item.relatedEntityId },
       });
+      return;
+    }
+
+    if (item.type === 'chat_message' && item.relatedEntityId) {
+      router.push({
+        pathname: '/screens/chat/[id]',
+        params: { id: item.relatedEntityId },
+      });
     }
   };
 
@@ -124,7 +132,7 @@ export default function NotificationScreen() {
                   ) : (
                     <View className="w-12 h-12 rounded-full bg-[#2A2A2A] items-center justify-center border-2 border-[#98FF2F]/20">
                       <Ionicons 
-                        name={item.type === 'milestone' ? 'musical-notes' : 'person'} 
+                        name={item.type === 'milestone' ? 'musical-notes' : item.type === 'chat_message' ? 'chatbubble-ellipses' : 'person'} 
                         size={24} 
                         color="#D946EF" 
                       />
@@ -142,6 +150,11 @@ export default function NotificationScreen() {
                       <Ionicons name="chatbubble" size={14} color="#3B82F6" />
                     </View>
                   )}
+                  {item.type === 'chat_message' && (
+                    <View className="absolute -bottom-1 -right-1 bg-black rounded-full p-0.5">
+                      <Ionicons name="chatbubble-ellipses" size={14} color="#98FF2F" />
+                    </View>
+                  )}
                   {item.type === 'follow' && (
                     <View className="absolute -bottom-1 -right-1 bg-black rounded-full p-0.5">
                       <View className="bg-[#3B82F6] rounded-full p-1 border border-black">
@@ -157,7 +170,7 @@ export default function NotificationScreen() {
                     {getActorName(item)}
                   </Text>
                   <Text className="text-gray-400 font-inter-regular text-sm leading-5 mb-1">
-                    {item.body || (item.type === 'like' ? 'liked your post' : item.type === 'follow' ? 'started following you' : item.type === 'comment' ? 'commented on your post' : 'sent a notification')}
+                    {item.body || (item.type === 'like' ? 'liked your post' : item.type === 'follow' ? 'started following you' : item.type === 'comment' ? 'commented on your post' : item.type === 'chat_message' ? 'sent you a message' : 'sent a notification')}
                   </Text>
                   <Text className="text-gray-500 font-inter-regular text-xs">{formatTimeAgo(item.createdAt)}</Text>
                 </View>

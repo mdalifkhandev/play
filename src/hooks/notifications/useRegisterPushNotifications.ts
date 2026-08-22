@@ -18,12 +18,12 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export function useRegisterPushNotifications(isEnabled: boolean) {
+export function useRegisterPushNotifications(isEnabled: boolean, userId?: string | null) {
   useEffect(() => {
     let isCancelled = false;
 
     const registerDevice = async () => {
-      if (!isEnabled || !Device.isDevice) {
+      if (!isEnabled || !userId || !Device.isDevice) {
         return;
       }
 
@@ -52,7 +52,8 @@ export function useRegisterPushNotifications(isEnabled: boolean) {
         return;
       }
 
-      const lastRegisteredToken = await AsyncStorage.getItem(REGISTERED_PUSH_TOKEN_KEY);
+      const registeredTokenKey = `${REGISTERED_PUSH_TOKEN_KEY}:${userId}`;
+      const lastRegisteredToken = await AsyncStorage.getItem(registeredTokenKey);
 
       if (lastRegisteredToken === token) {
         return;
@@ -64,7 +65,8 @@ export function useRegisterPushNotifications(isEnabled: boolean) {
         appVersion: Constants.expoConfig?.version,
       });
 
-      await AsyncStorage.setItem(REGISTERED_PUSH_TOKEN_KEY, token);
+      await AsyncStorage.setItem(registeredTokenKey, token);
+      console.log('Push notification token registered:', { userId, platform: Platform.OS });
     };
 
     registerDevice().catch((error) => {
@@ -79,5 +81,5 @@ export function useRegisterPushNotifications(isEnabled: boolean) {
     return () => {
       isCancelled = true;
     };
-  }, [isEnabled]);
+  }, [isEnabled, userId]);
 }

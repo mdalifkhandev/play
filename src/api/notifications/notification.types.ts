@@ -12,7 +12,7 @@ export interface RegisterPushTokenResponse {
   activeDeviceCount: number;
 }
 
-export type NotificationType = 'like' | 'comment' | 'follow' | 'milestone' | 'system';
+export type NotificationType = 'like' | 'comment' | 'follow' | 'chat_message' | 'milestone' | 'system';
 
 export interface NotificationActor {
   _id: string;

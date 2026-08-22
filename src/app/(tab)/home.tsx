@@ -4,18 +4,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, InteractionManager, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
+import { getFeedAds, recordAdClick, recordAdImpression, type AdCampaign } from "../../api/ads/ads.api";
 import { getFeed, getForYouFeed } from "../../api/reels/reels.api";
 import { ReelFeedItem } from "../../api/reels/reels.types";
 import { useFeedSection } from "../../hooks/feed/useFeedSection";
 
-type FeedListItem = Omit<FeedItemProps, 'isActive' | 'shouldMountVideo'>;
+type ReelListItem = Omit<FeedItemProps, 'isActive' | 'shouldMountVideo'> & { itemType: 'reel' };
+type AdListItem = { itemType: 'ad'; id: string; ad: AdCampaign };
+type FeedListItem = ReelListItem | AdListItem;
 
 function isImageUrl(url?: string | null): url is string {
   if (!url) return false;
   return !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(url);
 }
 
-function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
+function mapBackendReelToFeedItem(reel: ReelFeedItem): ReelListItem {
   const hasPlayableVideo = reel.mediaType !== 'photo' && !isImageUrl(reel.videoUrl);
   const source = hasPlayableVideo
     ? reel.videoUrl
@@ -23,6 +26,7 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
 
   return {
     id: reel.id,
+    itemType: 'reel',
     type: hasPlayableVideo ? 'video' : 'image',
     source,
     thumbnailUrl: isImageUrl(reel.thumbnailUrl) ? reel.thumbnailUrl : undefined,
@@ -44,6 +48,78 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
     viewerState: reel.viewerState,
     edit: reel.edit,
   };
+}
+
+function insertAdsIntoFeed(reels: ReelListItem[], ads: AdCampaign[]): FeedListItem[] {
+  if (ads.length === 0 || reels.length === 0) return reels;
+
+  const mixed: FeedListItem[] = [];
+  let adIndex = 0;
+
+  reels.forEach((reel, index) => {
+    mixed.push(reel);
+
+    if ((index + 1) % 5 === 0 && adIndex < ads.length) {
+      const ad = ads[adIndex];
+      mixed.push({ itemType: 'ad', id: `ad-${ad.id}`, ad });
+      adIndex += 1;
+    }
+  });
+
+  return mixed;
+}
+
+function SponsoredAdItem({
+  ad,
+  isActive,
+}: {
+  ad: AdCampaign;
+  isActive: boolean;
+}) {
+  const { height, width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const impressionRecordedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isActive || impressionRecordedRef.current) return;
+    impressionRecordedRef.current = true;
+    void recordAdImpression(ad.id).catch(error => {
+      console.log('Record ad impression failed:', error);
+    });
+  }, [ad.id, isActive]);
+
+  const handlePress = useCallback(() => {
+    void recordAdClick(ad.id).catch(error => {
+      console.log('Record ad click failed:', error);
+    });
+  }, [ad.id]);
+
+  const imageUrl = ad.mediaUrl || 'https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=1080';
+
+  return (
+    <View style={{ height, width }} className="bg-black">
+      <Image source={{ uri: imageUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
+      <View className="absolute inset-0 bg-black/35" />
+
+      <View className="absolute left-4 right-4" style={{ top: insets.top + 78 }}>
+        <View className="self-start rounded-full bg-[#98FF2F] px-3 py-1">
+          <Text className="text-black text-xs font-inter-bold">Sponsored</Text>
+        </View>
+      </View>
+
+      <View className="absolute left-5 right-5" style={{ bottom: insets.bottom + 95 }}>
+        <Text className="text-white text-3xl font-inter-bold" numberOfLines={2}>
+          {ad.title || `${ad.category} Ad`}
+        </Text>
+        <Text className="mt-2 text-white/85 text-base leading-6" numberOfLines={3}>
+          {ad.description || `Promoted ${ad.category} campaign.`}
+        </Text>
+        <Pressable onPress={handlePress} className="mt-5 h-12 items-center justify-center rounded-2xl bg-[#98FF2F]">
+          <Text className="text-black font-inter-bold">Learn more</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 }
 
 export default function HomeScreen() {
@@ -73,7 +149,13 @@ export default function HomeScreen() {
       response = await getFeed();
     }
 
-    return response.items.map(mapBackendReelToFeedItem);
+    const reels = response.items.map(mapBackendReelToFeedItem);
+    const ads = await getFeedAds(3).then(result => result.items).catch(error => {
+      console.log('Feed ads failed:', error);
+      return [];
+    });
+
+    return insertAdsIntoFeed(reels, ads);
   }, [activeTab]);
 
   const { data, isLoading, isRefreshing, error, refetch } = useFeedSection(fetchReelsData);
@@ -158,7 +240,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!reelId || hasScrolledToRouteReelRef.current === reelId || feedData.length === 0) return;
 
-    const targetIndex = feedData.findIndex(item => item.id === reelId);
+    const targetIndex = feedData.findIndex(item => item.itemType === 'reel' && item.id === reelId);
     if (targetIndex < 0) return;
 
     hasScrolledToRouteReelRef.current = reelId;
@@ -234,13 +316,17 @@ export default function HomeScreen() {
           key={activeTab}
           data={feedData}
           renderItem={({ item, index }) => (
-            <FeedItem 
-              {...item} 
-              isActive={isScreenActive && index === activeItemIndex} 
-              shouldMountVideo={isScreenActive && index === activeItemIndex}
-              isFullscreen={fullscreenItemId === item.id}
-              onFullscreenChange={(nextIsFullscreen) => setFullscreenItemId(nextIsFullscreen ? item.id : null)}
-            />
+            item.itemType === 'ad' ? (
+              <SponsoredAdItem ad={item.ad} isActive={isScreenActive && index === activeItemIndex} />
+            ) : (
+              <FeedItem 
+                {...item} 
+                isActive={isScreenActive && index === activeItemIndex} 
+                shouldMountVideo={isScreenActive && index === activeItemIndex}
+                isFullscreen={fullscreenItemId === item.id}
+                onFullscreenChange={(nextIsFullscreen) => setFullscreenItemId(nextIsFullscreen ? item.id : null)}
+              />
+            )
           )}
           keyExtractor={(item) => item.id}
           pagingEnabled
