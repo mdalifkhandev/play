@@ -50,6 +50,12 @@ export interface AuthUser {
   id: string;
   email: string;
   isEmailVerified: boolean;
+  subscription?: {
+    plan?: 'monthly' | 'yearly';
+    status: 'none' | 'active' | 'expired' | 'canceled';
+    expiresAt?: string;
+    isPremium: boolean;
+  };
   // ... other fields as needed
 }
 

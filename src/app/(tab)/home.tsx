@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
-import { Link, useFocusEffect, useNavigation, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, InteractionManager, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
@@ -42,7 +42,10 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): FeedListItem {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { reelId } = useLocalSearchParams<{ reelId?: string }>();
   const navigation = useNavigation();
+  const listRef = useRef<FlatList<FeedListItem>>(null);
+  const hasScrolledToRouteReelRef = useRef<string | null>(null);
   const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('foryou');
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [isScreenActive, setIsScreenActive] = useState(false);
@@ -146,6 +149,23 @@ export default function HomeScreen() {
     setActiveItemIndex(0);
   }, []);
 
+  useEffect(() => {
+    if (!reelId || hasScrolledToRouteReelRef.current === reelId || feedData.length === 0) return;
+
+    const targetIndex = feedData.findIndex(item => item.id === reelId);
+    if (targetIndex < 0) return;
+
+    hasScrolledToRouteReelRef.current = reelId;
+    setActiveItemIndex(targetIndex);
+
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({
+        index: targetIndex,
+        animated: false,
+      });
+    });
+  }, [feedData, reelId]);
+
   return (
     <View className="flex-1 bg-black">
       {!fullscreenItemId && (
@@ -204,6 +224,7 @@ export default function HomeScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           key={activeTab}
           data={feedData}
           renderItem={({ item, index }) => (

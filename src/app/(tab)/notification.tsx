@@ -41,6 +41,27 @@ export default function NotificationScreen() {
     }
   }, [notifications, markAsRead]);
 
+  const handleNotificationPress = (item: NotificationItem) => {
+    if (!item.isRead) {
+      markAsRead([item._id]);
+    }
+
+    if (item.type === 'follow' && item.actorId?._id) {
+      router.push({
+        pathname: '/screens/user/[id]',
+        params: { id: item.actorId._id },
+      });
+      return;
+    }
+
+    if ((item.type === 'like' || item.type === 'comment') && item.relatedEntityId) {
+      router.push({
+        pathname: '/(tab)/home',
+        params: { reelId: item.relatedEntityId },
+      });
+    }
+  };
+
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       {/* Header */}
@@ -74,9 +95,10 @@ export default function NotificationScreen() {
             </View>
           ) : (
             notifications.map((item) => (
-              <View 
+              <Pressable 
                 key={item._id} 
                 className={`flex-row items-center bg-[#181818] border border-[#2A2A2A] rounded-2xl p-4 mb-4 ${!item.isRead ? 'border-[#98FF2F]/30' : ''}`}
+                onPress={() => handleNotificationPress(item)}
               >
                 {/* Avatar / Icon Container */}
                 <View className="relative mr-4">
@@ -129,7 +151,7 @@ export default function NotificationScreen() {
                 <Pressable className="p-2 -mr-2" onPress={() => setSelectedNotification(item)}>
                   <Ionicons name="ellipsis-vertical" size={20} color="#888" />
                 </Pressable>
-              </View>
+              </Pressable>
             ))
           )}
         </ScrollView>

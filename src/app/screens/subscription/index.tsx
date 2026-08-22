@@ -1,17 +1,54 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
+import { getMySubscription, getSubscriptionPlans, type SubscriptionPlan, type SubscriptionPlanId } from '../../../api/subscriptions/subscriptions.api';
 
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [activePlan, setActivePlan] = useState<'Monthly' | 'Yearly'>('Monthly');
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [premiumUntil, setPremiumUntil] = useState<string | null>(null);
 
   const isYearly = activePlan === 'Yearly';
+  const selectedPlanId: SubscriptionPlanId = isYearly ? 'yearly' : 'monthly';
+  const selectedPlan = useMemo(
+    () => plans.find((plan) => plan.id === selectedPlanId),
+    [plans, selectedPlanId],
+  );
+
+  useEffect(() => {
+    let mounted = true;
+
+    Promise.all([getSubscriptionPlans(), getMySubscription()])
+      .then(([nextPlans, subscription]) => {
+        if (!mounted) return;
+        setPlans(nextPlans);
+        setPremiumUntil(subscription.isPremium && subscription.expiresAt ? subscription.expiresAt : null);
+      })
+      .catch(() => {
+        if (mounted) {
+          setPlans([]);
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const price = selectedPlan?.price ?? (isYearly ? 254.15 : 25);
+  const intervalLabel = selectedPlan?.interval === 'year' || isYearly ? '/year' : '/mo';
 
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
@@ -23,6 +60,11 @@ export default function SubscriptionScreen() {
         <View className="items-center mt-2 mb-6">
           <Text className="text-white text-3xl font-bold mb-2 font-inter-bold">Choose Your Plan</Text>
           <Text className="text-[#888] text-sm text-center">Unlock premium features and exclusive content</Text>
+          {premiumUntil && (
+            <Text className="text-[#A3E635] text-xs text-center mt-2">
+              Premium active until {new Date(premiumUntil).toLocaleDateString()}
+            </Text>
+          )}
         </View>
 
         {/* Tabs */}
@@ -48,15 +90,18 @@ export default function SubscriptionScreen() {
 
         {/* Plan Card */}
         <View className="bg-[#151515] rounded-3xl p-6 border border-[#222]">
+          {isLoading && (
+            <ActivityIndicator size="small" color="#A3E635" style={{ marginBottom: 16 }} />
+          )}
           
           <View className="flex-row items-center mb-6">
             <View className="w-10 h-10 rounded-full bg-[#FDE047] items-center justify-center mr-3">
               <Ionicons name="star" size={20} color="#CA8A04" />
             </View>
             <Text className="text-[#888] text-lg mr-4">{activePlan}</Text>
-            {isYearly && (
+            {(selectedPlan?.discountLabel || isYearly) && (
               <View className="bg-[#2A3B18] px-3 py-1 rounded-md">
-                <Text className="text-[#A3E635] text-xs font-bold">15% OFF</Text>
+                <Text className="text-[#A3E635] text-xs font-bold">{selectedPlan?.discountLabel || '15% OFF'}</Text>
               </View>
             )}
           </View>
@@ -65,8 +110,8 @@ export default function SubscriptionScreen() {
           <Text className="text-[#A3E635] text-sm mb-4">Ad-Free Experience</Text>
 
           <View className="flex-row items-end mb-8">
-            <Text className="text-white text-3xl font-bold">{isYearly ? '$254.15' : '$25.00'}</Text>
-            <Text className="text-[#888] text-base mb-1 ml-1">{isYearly ? '/year' : '/mo'}</Text>
+            <Text className="text-white text-3xl font-bold">${price.toFixed(2)}</Text>
+            <Text className="text-[#888] text-base mb-1 ml-1">{intervalLabel}</Text>
           </View>
 
           {/* Features */}
@@ -95,7 +140,15 @@ export default function SubscriptionScreen() {
 
           <CustomButton 
             title="Subscribe now"
-            onPress={() => router.push('/screens/subscription/payment-method')}
+            onPress={() => router.push({
+              pathname: '/screens/subscription/payment-method',
+              params: {
+                planId: selectedPlanId,
+                planName: selectedPlan?.name || (isYearly ? 'Premium Yearly' : 'Premium Monthly'),
+                price: String(price),
+                currency: selectedPlan?.currency || 'usd',
+              },
+            })}
             containerStyle="bg-[#A3E635] w-full py-4 mt-2"
             textStyle="text-black font-bold text-base"
           />

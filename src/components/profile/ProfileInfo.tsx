@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Text, View } from 'react-native';
 
@@ -12,6 +13,7 @@ type ProfileInfoProps = {
   followingCount?: number;
   followersCount?: number;
   likesCount?: number;
+  isPremium?: boolean;
 };
 
 export function ProfileInfo({
@@ -22,6 +24,7 @@ export function ProfileInfo({
   followingCount = 0,
   followersCount = 0,
   likesCount = 0,
+  isPremium = false,
 }: ProfileInfoProps) {
   return (
     <View className="items-center mt-2 px-4">
@@ -38,7 +41,16 @@ export function ProfileInfo({
       </View>
 
       {/* Name and Handle */}
-      <Text className="text-white text-[16px] font-bold mt-4">{displayName}</Text>
+      <View className="flex-row items-center mt-4 max-w-full px-4">
+        <Text numberOfLines={1} className="text-white text-[16px] font-bold">
+          {displayName}
+        </Text>
+        {isPremium && (
+          <View className="ml-2 h-5 w-5 rounded-full bg-[#A3E635] items-center justify-center">
+            <Ionicons name="star" size={12} color="#0A0A0A" />
+          </View>
+        )}
+      </View>
       <Text className="text-[#888] text-[14px] mt-1">@{username}</Text>
 
       {/* Stats */}

@@ -6,6 +6,12 @@ export type ProfileUser = {
   phoneNumber?: string;
   dateOfBirth?: string;
   coinBalance?: number;
+  subscription?: {
+    plan?: 'monthly' | 'yearly';
+    status: 'none' | 'active' | 'expired' | 'canceled';
+    expiresAt?: string;
+    isPremium: boolean;
+  };
   profile: {
     username?: string;
     displayName?: string;
