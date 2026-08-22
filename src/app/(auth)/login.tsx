@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as Google from "expo-auth-session/providers/google";
-import * as WebBrowser from "expo-web-browser";
+import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import { Link, router } from "expo-router";
-import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 import { handleApiError } from "../../../src/api/client";
@@ -14,22 +13,25 @@ import { CustomInput } from "../../components/inputs/CustomInput";
 import { CustomButton } from "../../components/ui/CustomButton";
 import { Header } from "../../components/ui/Header";
 
-WebBrowser.maybeCompleteAuthSession();
-
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
   const insets = useSafeAreaInsets();
   const setAuth = useAppStore((state) => state.setAuth);
 
   const loginMutation = useLoginMutation();
   const googleLoginMutation = useGoogleLoginMutation();
-  const [googleRequest, , promptGoogleLogin] = Google.useIdTokenAuthRequest({
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    scopes: ['openid', 'profile', 'email'],
-    selectAccount: true,
-  });
+  const isAuthBusy = loginMutation.isPending || googleLoginMutation.isPending || isGoogleSigningIn;
+
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      offlineAccess: false,
+      profileImageSize: 120,
+    });
+  }, []);
 
   const finishAuth = (response: any, successMessage: string) => {
     const accessToken = response.data?.data?.tokens?.accessToken;
@@ -64,35 +66,45 @@ export default function Login() {
   };
 
   const handleGoogleLogin = async () => {
-    if (!process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID) {
-      toast.error('Google login is not configured');
+    if (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
+      toast.error('Google Web Client ID is not configured');
       return;
     }
 
-    const result = await promptGoogleLogin();
+    try {
+      setIsGoogleSigningIn(true);
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      await GoogleSignin.signOut().catch(() => undefined);
+      const signInResult = await GoogleSignin.signIn();
+      const tokens = await GoogleSignin.getTokens();
+      const idToken = tokens.idToken || ('data' in signInResult ? signInResult.data?.idToken : undefined);
 
-    if (result.type !== 'success') {
-      return;
-    }
+      if (!idToken) {
+        toast.error('Google did not return an ID token');
+        return;
+      }
 
-    const idToken = result.params?.id_token;
-
-    if (!idToken) {
-      toast.error('Google did not return an ID token');
-      return;
-    }
-
-    googleLoginMutation.mutate(
-      { idToken, rememberMe: true },
-      {
-        onSuccess: (response) => {
-          finishAuth(response, 'Google login successful!');
+      googleLoginMutation.mutate(
+        { idToken, rememberMe: true },
+        {
+          onSuccess: (response) => {
+            finishAuth(response, 'Google login successful!');
+          },
+          onError: (error: any) => {
+            toast.error(handleApiError(error, 'Failed to login with Google'));
+          },
+          onSettled: () => {
+            setIsGoogleSigningIn(false);
+          },
         },
-        onError: (error: any) => {
-          toast.error(handleApiError(error, 'Failed to login with Google'));
-        },
-      },
-    );
+      );
+    } catch (error: any) {
+      setIsGoogleSigningIn(false);
+      if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
+        return;
+      }
+      toast.error(handleApiError(error, 'Failed to login with Google'));
+    }
   };
 
   return (
@@ -121,6 +133,7 @@ export default function Login() {
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
+          editable={!isAuthBusy}
         />
 
         <CustomInput
@@ -130,12 +143,14 @@ export default function Login() {
           isPassword
           value={password}
           onChangeText={setPassword}
+          editable={!isAuthBusy}
         />
 
         <View className="flex-row justify-between items-center mb-8">
           <Pressable
             className="flex-row items-center py-2"
             onPress={() => setRememberMe(!rememberMe)}
+            disabled={isAuthBusy}
           >
             <View className={`w-5 h-5 rounded-md border items-center justify-center mr-2 ${rememberMe ? 'bg-[#98D83A] border-[#98D83A]' : 'border-gray-500'}`}>
               {rememberMe && <Ionicons name="checkmark" size={14} color="black" />}
@@ -148,11 +163,11 @@ export default function Login() {
         </View>
 
         <CustomButton
-          title={loginMutation.isPending ? "Logging in..." : "Login"}
+          title={isAuthBusy ? "Logging in..." : "Login"}
           variant="primary"
           containerStyle="mb-10"
           onPress={handleLogin}
-          disabled={loginMutation.isPending || googleLoginMutation.isPending}
+          disabled={isAuthBusy}
         />
 
         <View className="flex-row items-center mb-8">
@@ -165,20 +180,21 @@ export default function Login() {
           <Pressable
             className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80"
             onPress={handleGoogleLogin}
-            disabled={!googleRequest || googleLoginMutation.isPending || loginMutation.isPending}
+            disabled={isAuthBusy}
           >
-            <GoogleIcon width={24} height={24} />
+            {isAuthBusy ? (
+              <ActivityIndicator size="small" color="#111827" />
+            ) : (
+              <GoogleIcon width={24} height={24} />
+            )}
           </Pressable>
-          <Pressable className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80">
+          <Pressable disabled={isAuthBusy} className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80">
             <Ionicons name="logo-apple" size={24} color="black" />
-          </Pressable>
-          <Pressable className="w-12 h-12 bg-white rounded-full items-center justify-center active:opacity-80">
-            <Ionicons name="logo-facebook" size={24} color="#1877F2" />
           </Pressable>
         </View>
 
         <View className="flex-row justify-center mt-[24px]">
-          <Text className="text-gray-400 font-inter-regular">Don't have an account? </Text>
+          <Text className="text-gray-400 font-inter-regular">Don&apos;t have an account? </Text>
           <Link href="/(auth)/signup" asChild>
             <Pressable>
               <Text className="text-[#98D83A] font-inter-bold">Sign Up</Text>
@@ -186,6 +202,22 @@ export default function Login() {
           </Link>
         </View>
       </ScrollView>
+
+      {isAuthBusy && (
+        <View className="absolute inset-0 items-center justify-center bg-black/55 px-8">
+          <View className="w-full max-w-[280px] items-center rounded-2xl border border-white/10 bg-[#181818] px-6 py-7">
+            <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-[#98FF2F]">
+              <ActivityIndicator size="large" color="#0A0A0A" />
+            </View>
+            <Text className="text-center text-lg font-inter-bold text-white">
+              Signing you in
+            </Text>
+            <Text className="mt-2 text-center text-sm font-inter-regular text-gray-400">
+              Please wait while we connect your Google account.
+            </Text>
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }

@@ -42,6 +42,7 @@
         }
       ],
       "expo-web-browser",
+      "@react-native-google-signin/google-signin",
       "expo-font",
       "expo-notifications",
       "expo-video",

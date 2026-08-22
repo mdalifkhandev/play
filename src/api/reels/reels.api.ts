@@ -62,7 +62,6 @@ export async function publishReel(input: PublishReelInput): Promise<ReelPublishR
     timestamp: String(uploadData.timestamp),
     signature: uploadData.signature,
     public_id: uploadData.publicId,
-    overwrite: 'false',
   };
 
   await uploadToCloudinary(uploadData.uploadUrl, input.videoUri, file.type, params, input.onProgress);
@@ -189,7 +188,7 @@ export async function uploadToCloudinary(
         if (result && result.status >= 200 && result.status < 300) {
           return; // Success
         }
-        throw new Error(`Cloudinary upload failed with status ${result?.status}.`);
+        throw new Error(cloudinaryUploadErrorMessage(result?.status, result?.body));
       } else {
         const result = await FileSystem.uploadAsync(uploadUrl, videoUri, {
           httpMethod: 'POST',
@@ -201,7 +200,7 @@ export async function uploadToCloudinary(
         if (result.status >= 200 && result.status < 300) {
           return; // Success
         }
-        throw new Error(`Cloudinary upload failed with status ${result.status}.`);
+        throw new Error(cloudinaryUploadErrorMessage(result.status, result.body));
       }
     } catch (error: any) {
       lastError = error;
@@ -212,6 +211,11 @@ export async function uploadToCloudinary(
   }
 
   throw lastError;
+}
+
+function cloudinaryUploadErrorMessage(status?: number, body?: string | null) {
+  const bodyMessage = body ? ` ${body.slice(0, 300)}` : '';
+  return `Cloudinary upload failed with status ${status ?? 'unknown'}.${bodyMessage}`;
 }
 
 export async function getReelStatus(reelId: string): Promise<ReelStatusResult> {
