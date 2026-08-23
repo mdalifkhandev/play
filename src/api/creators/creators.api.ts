@@ -45,8 +45,11 @@ export type CreateCreatorApplicationRequest = {
   dateOfBirth?: string;
   occupationId?: string;
   occupation?: string;
+  contentCategoryId?: string;
   contentCategory: string;
+  contentLanguageCode?: string;
   contentLanguage: string;
+  countryCode?: string;
   country: string;
   reason: string;
   idFrontUrl?: string;
@@ -54,6 +57,11 @@ export type CreateCreatorApplicationRequest = {
 };
 
 export type Occupation = {
+  id: string;
+  name: string;
+};
+
+export type CreatorCategory = {
   id: string;
   name: string;
 };
@@ -86,4 +94,19 @@ export async function getOccupations(query?: string): Promise<{ items: Occupatio
 export async function createOccupation(name: string): Promise<Occupation> {
   const response = await apiClient.post<{ data: Occupation }>('/occupations', { name });
   return dataOf<Occupation>(response);
+}
+
+export async function getCreatorCategories(query?: string): Promise<{ items: CreatorCategory[] }> {
+  const response = await apiClient.get<{ data: { items: CreatorCategory[] } }>('/creator-categories', {
+    params: {
+      ...(query?.trim() ? { q: query.trim() } : {}),
+      limit: 20,
+    },
+  });
+  return dataOf<{ items: CreatorCategory[] }>(response);
+}
+
+export async function createCreatorCategory(name: string): Promise<CreatorCategory> {
+  const response = await apiClient.post<{ data: CreatorCategory }>('/creator-categories', { name });
+  return dataOf<CreatorCategory>(response);
 }

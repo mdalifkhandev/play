@@ -9,7 +9,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
 import { CustomInput } from '../../../components/inputs/CustomInput';
-import { createOccupation, getOccupations, submitCreatorApplication, type Occupation } from '../../../api/creators';
+import {
+  createCreatorCategory,
+  createOccupation,
+  getCreatorCategories,
+  getOccupations,
+  submitCreatorApplication,
+  type CreatorCategory,
+  type Occupation,
+} from '../../../api/creators';
 import { handleApiError } from '../../../api/client';
 import { useAppStore } from '../../../store';
 
@@ -27,8 +35,19 @@ export default function ApplyScreen() {
   const [isOccupationSheetOpen, setIsOccupationSheetOpen] = useState(false);
   const [isLoadingOccupations, setIsLoadingOccupations] = useState(false);
   const [contentCategory, setContentCategory] = useState('');
+  const [contentCategoryId, setContentCategoryId] = useState<string | undefined>();
+  const [categoryQuery, setCategoryQuery] = useState('');
+  const [categoryOptions, setCategoryOptions] = useState<CreatorCategory[]>([]);
+  const [isCategorySheetOpen, setIsCategorySheetOpen] = useState(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [contentLanguage, setContentLanguage] = useState('');
+  const [contentLanguageCode, setContentLanguageCode] = useState<string | undefined>();
+  const [languageQuery, setLanguageQuery] = useState('');
+  const [isLanguageSheetOpen, setIsLanguageSheetOpen] = useState(false);
   const [country, setCountry] = useState('');
+  const [countryCode, setCountryCode] = useState<string | undefined>();
+  const [countryQuery, setCountryQuery] = useState('');
+  const [isCountrySheetOpen, setIsCountrySheetOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -64,6 +83,18 @@ export default function ApplyScreen() {
     }
   }, []);
 
+  const loadCategories = React.useCallback(async (query = '') => {
+    setIsLoadingCategories(true);
+    try {
+      const result = await getCreatorCategories(query);
+      setCategoryOptions(result.items || []);
+    } catch (error) {
+      console.log('Category list failed:', handleApiError(error, 'Could not load categories.'));
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  }, []);
+
   React.useEffect(() => {
     if (!isOccupationSheetOpen) return;
 
@@ -74,9 +105,34 @@ export default function ApplyScreen() {
     return () => clearTimeout(timer);
   }, [isOccupationSheetOpen, loadOccupations, occupationQuery]);
 
+  React.useEffect(() => {
+    if (!isCategorySheetOpen) return;
+
+    const timer = setTimeout(() => {
+      loadCategories(categoryQuery);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [categoryQuery, isCategorySheetOpen, loadCategories]);
+
   const openOccupationSheet = () => {
     setOccupationQuery(occupation);
     setIsOccupationSheetOpen(true);
+  };
+
+  const openCategorySheet = () => {
+    setCategoryQuery(contentCategory);
+    setIsCategorySheetOpen(true);
+  };
+
+  const openLanguageSheet = () => {
+    setLanguageQuery(contentLanguage);
+    setIsLanguageSheetOpen(true);
+  };
+
+  const openCountrySheet = () => {
+    setCountryQuery(country);
+    setIsCountrySheetOpen(true);
   };
 
   const selectOccupation = (item: Occupation) => {
@@ -85,6 +141,30 @@ export default function ApplyScreen() {
     setOccupationQuery(item.name);
     Keyboard.dismiss();
     setIsOccupationSheetOpen(false);
+  };
+
+  const selectCategory = (item: CreatorCategory) => {
+    setContentCategory(item.name);
+    setContentCategoryId(item.id);
+    setCategoryQuery(item.name);
+    Keyboard.dismiss();
+    setIsCategorySheetOpen(false);
+  };
+
+  const selectLanguage = (item: FixedOption) => {
+    setContentLanguage(item.name);
+    setContentLanguageCode(item.code);
+    setLanguageQuery(item.name);
+    Keyboard.dismiss();
+    setIsLanguageSheetOpen(false);
+  };
+
+  const selectCountry = (item: FixedOption) => {
+    setCountry(item.name);
+    setCountryCode(item.code);
+    setCountryQuery(item.name);
+    Keyboard.dismiss();
+    setIsCountrySheetOpen(false);
   };
 
   const createAndSelectOccupation = async () => {
@@ -102,6 +182,24 @@ export default function ApplyScreen() {
       toast.error(handleApiError(error, 'Could not save occupation.'));
     } finally {
       setIsLoadingOccupations(false);
+    }
+  };
+
+  const createAndSelectCategory = async () => {
+    const name = categoryQuery.trim();
+    if (name.length < 2) {
+      toast.error('Please enter a valid category.');
+      return;
+    }
+
+    try {
+      setIsLoadingCategories(true);
+      const item = await createCreatorCategory(name);
+      selectCategory(item);
+    } catch (error) {
+      toast.error(handleApiError(error, 'Could not save category.'));
+    } finally {
+      setIsLoadingCategories(false);
     }
   };
 
@@ -160,8 +258,21 @@ export default function ApplyScreen() {
   const handleSubmit = async () => {
     if (isSubmitting) return;
 
-    if (!fullName.trim() || !email.trim() || !contentCategory.trim() || !contentLanguage.trim() || !country.trim() || reason.trim().length < 20) {
-      toast.error('Please complete the creator application form.');
+    const missingFields: string[] = [];
+    if (!fullName.trim()) missingFields.push('Full name');
+    if (!email.trim()) missingFields.push('Email');
+    if (!contentCategory.trim()) missingFields.push('Content category');
+    if (!contentLanguage.trim()) missingFields.push('Content language');
+    if (!country.trim()) missingFields.push('Country/Region');
+    if (!reason.trim()) missingFields.push('Reason');
+
+    if (missingFields.length) {
+      toast.error(`Please complete: ${missingFields.join(', ')}`);
+      return;
+    }
+
+    if (reason.trim().length < 20) {
+      toast.error('Please write at least 20 characters in reason.');
       return;
     }
 
@@ -173,15 +284,18 @@ export default function ApplyScreen() {
     setIsSubmitting(true);
     try {
       await submitCreatorApplication({
-        fullName,
-        email,
+        fullName: fullName.trim(),
+        email: email.trim(),
         ...(dateOfBirth.trim() ? { dateOfBirth } : {}),
         ...(occupationId ? { occupationId } : {}),
-        ...(occupation.trim() ? { occupation } : {}),
-        contentCategory,
-        contentLanguage,
-        country,
-        reason,
+        ...(occupation.trim() ? { occupation: occupation.trim() } : {}),
+        ...(contentCategoryId ? { contentCategoryId } : {}),
+        contentCategory: contentCategory.trim(),
+        ...(contentLanguageCode ? { contentLanguageCode } : {}),
+        contentLanguage: contentLanguage.trim(),
+        ...(countryCode ? { countryCode } : {}),
+        country: country.trim(),
+        reason: reason.trim(),
       });
       toast.success('Creator application submitted.');
       router.replace('/screens/creator/pending');
@@ -196,7 +310,16 @@ export default function ApplyScreen() {
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       <Header title="Creator Application" />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, paddingTop: 20 }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 20,
+          paddingBottom: Math.max(insets.bottom + keyboardHeight + 120, 140),
+        }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+      >
         <CustomInput
           label="Full Name NID"
           placeholder="Full name"
@@ -309,38 +432,53 @@ export default function ApplyScreen() {
           </View>
         </Pressable>
 
-        <CustomInput
-          label="Content Category"
-          placeholder="Music, Gaming, Education..."
-          placeholderTextColor="#555"
-          rightIcon="chevron-down"
-          inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-black text-base flex-1"
-          value={contentCategory}
-          onChangeText={setContentCategory}
-        />
+        <Pressable onPress={openCategorySheet}>
+          <View pointerEvents="none">
+            <CustomInput
+              label="Content Category"
+              placeholder="Music, Gaming, Education..."
+              placeholderTextColor="#555"
+              rightIcon="chevron-down"
+              inputContainerStyle="bg-[#151515] border border-[#333]"
+              className="text-black text-base"
+              value={contentCategory}
+              onChangeText={() => {}}
+              editable={false}
+            />
+          </View>
+        </Pressable>
 
-        <CustomInput
-          label="Content Language"
-          placeholder="Bangla, English..."
-          placeholderTextColor="#555"
-          rightIcon="chevron-down"
-          inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-black text-base flex-1"
-          value={contentLanguage}
-          onChangeText={setContentLanguage}
-        />
+        <Pressable onPress={openLanguageSheet}>
+          <View pointerEvents="none">
+            <CustomInput
+              label="Content Language"
+              placeholder="Bangla, English..."
+              placeholderTextColor="#555"
+              rightIcon="chevron-down"
+              inputContainerStyle="bg-[#151515] border border-[#333]"
+              className="text-black text-base"
+              value={contentLanguage}
+              onChangeText={() => {}}
+              editable={false}
+            />
+          </View>
+        </Pressable>
 
-        <CustomInput
-          label="Country/Region"
-          placeholder="Bangladesh"
-          placeholderTextColor="#555"
-          rightIcon="chevron-down"
-          inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-black text-base flex-1"
-          value={country}
-          onChangeText={setCountry}
-        />
+        <Pressable onPress={openCountrySheet}>
+          <View pointerEvents="none">
+            <CustomInput
+              label="Country/Region"
+              placeholder="Bangladesh"
+              placeholderTextColor="#555"
+              rightIcon="chevron-down"
+              inputContainerStyle="bg-[#151515] border border-[#333]"
+              className="text-black text-base"
+              value={country}
+              onChangeText={() => {}}
+              editable={false}
+            />
+          </View>
+        </Pressable>
 
         <CustomInput
           label="Why do you want to become a Creator?"
@@ -455,6 +593,276 @@ export default function ApplyScreen() {
           </Pressable>
         </KeyboardAvoidingView>
       </Modal>
+
+      <Modal
+        visible={isCategorySheetOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsCategorySheetOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1"
+        >
+          <Pressable
+            className="flex-1 bg-black/60 justify-end"
+            onPress={() => {
+              Keyboard.dismiss();
+              setIsCategorySheetOpen(false);
+            }}
+          >
+            <Pressable
+              className="bg-[#141414] rounded-t-3xl px-5 pt-5"
+              style={{
+                paddingBottom: Math.max(insets.bottom + 24, 32),
+                marginBottom: Platform.OS === 'android' ? keyboardHeight : 0,
+                maxHeight: keyboardHeight ? '68%' : '82%',
+              }}
+              onPress={() => undefined}
+            >
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-white text-lg font-inter-bold">Select category</Text>
+                <Pressable
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setIsCategorySheetOpen(false);
+                  }}
+                  className="h-9 w-9 rounded-full bg-[#242424] items-center justify-center"
+                >
+                  <Ionicons name="close" size={18} color="#FFF" />
+                </Pressable>
+              </View>
+
+              <View className="bg-white rounded-xl px-4 h-12 flex-row items-center mb-4">
+                <Ionicons name="search-outline" size={18} color="#555" />
+                <TextInput
+                  value={categoryQuery}
+                  onChangeText={(text) => {
+                    setCategoryQuery(text);
+                    setContentCategoryId(undefined);
+                  }}
+                  placeholder="Search or type your category"
+                  placeholderTextColor="#777"
+                  className="flex-1 text-black ml-2"
+                />
+              </View>
+
+              {isLoadingCategories ? (
+                <View className="py-6 items-center">
+                  <ActivityIndicator color="#E4FB52" />
+                </View>
+              ) : (
+                <ScrollView
+                  className="max-h-72"
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  {categoryOptions.map(item => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => selectCategory(item)}
+                      className="py-3 border-b border-white/10 flex-row items-center justify-between"
+                    >
+                      <Text className="text-white text-base">{item.name}</Text>
+                      {contentCategoryId === item.id ? <Ionicons name="checkmark" size={20} color="#E4FB52" /> : null}
+                    </Pressable>
+                  ))}
+                  {categoryQuery.trim().length >= 2 && !categoryOptions.some(item => item.name.toLowerCase() === categoryQuery.trim().toLowerCase()) ? (
+                    <Pressable
+                      onPress={createAndSelectCategory}
+                      className="mt-4 bg-[#E4FB52] rounded-xl h-12 items-center justify-center"
+                    >
+                      <Text className="text-black font-inter-bold">Create {categoryQuery.trim()}</Text>
+                    </Pressable>
+                  ) : null}
+                </ScrollView>
+              )}
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <FixedOptionSheet
+        visible={isLanguageSheetOpen}
+        title="Select language"
+        query={languageQuery}
+        onQueryChange={(text) => {
+          setLanguageQuery(text);
+          setContentLanguageCode(undefined);
+        }}
+        placeholder="Search language"
+        options={LANGUAGE_OPTIONS}
+        selectedCode={contentLanguageCode}
+        keyboardHeight={keyboardHeight}
+        bottomInset={insets.bottom}
+        onClose={() => {
+          Keyboard.dismiss();
+          setIsLanguageSheetOpen(false);
+        }}
+        onSelect={selectLanguage}
+      />
+
+      <FixedOptionSheet
+        visible={isCountrySheetOpen}
+        title="Select country"
+        query={countryQuery}
+        onQueryChange={(text) => {
+          setCountryQuery(text);
+          setCountryCode(undefined);
+        }}
+        placeholder="Search country"
+        options={COUNTRY_OPTIONS}
+        selectedCode={countryCode}
+        keyboardHeight={keyboardHeight}
+        bottomInset={insets.bottom}
+        onClose={() => {
+          Keyboard.dismiss();
+          setIsCountrySheetOpen(false);
+        }}
+        onSelect={selectCountry}
+      />
+
+      {isSubmitting ? (
+        <View className="absolute inset-0 bg-black/60 items-center justify-center px-8">
+          <View className="bg-[#171717] border border-white/10 rounded-2xl px-6 py-5 items-center w-full max-w-sm">
+            <ActivityIndicator color="#E4FB52" size="large" />
+            <Text className="text-white font-inter-bold text-base mt-4">Submitting application...</Text>
+            <Text className="text-[#A0A0A0] text-sm text-center mt-2">
+              Please wait while we send your creator information.
+            </Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
+
+type FixedOption = {
+  code: string;
+  name: string;
+};
+
+function FixedOptionSheet({
+  visible,
+  title,
+  query,
+  onQueryChange,
+  placeholder,
+  options,
+  selectedCode,
+  keyboardHeight,
+  bottomInset,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  title: string;
+  query: string;
+  onQueryChange: (text: string) => void;
+  placeholder: string;
+  options: FixedOption[];
+  selectedCode?: string;
+  keyboardHeight: number;
+  bottomInset: number;
+  onClose: () => void;
+  onSelect: (item: FixedOption) => void;
+}) {
+  const filteredOptions = React.useMemo(() => {
+    const search = query.trim().toLowerCase();
+    if (!search) return options;
+    return options.filter(item =>
+      item.name.toLowerCase().includes(search) ||
+      item.code.toLowerCase().includes(search)
+    );
+  }, [options, query]);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+        <Pressable className="flex-1 bg-black/60 justify-end" onPress={onClose}>
+          <Pressable
+            className="bg-[#141414] rounded-t-3xl px-5 pt-5"
+            style={{
+              paddingBottom: Math.max(bottomInset + 24, 32),
+              marginBottom: Platform.OS === 'android' ? keyboardHeight : 0,
+              maxHeight: keyboardHeight ? '68%' : '82%',
+            }}
+            onPress={() => undefined}
+          >
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-white text-lg font-inter-bold">{title}</Text>
+              <Pressable onPress={onClose} className="h-9 w-9 rounded-full bg-[#242424] items-center justify-center">
+                <Ionicons name="close" size={18} color="#FFF" />
+              </Pressable>
+            </View>
+
+            <View className="bg-white rounded-xl px-4 h-12 flex-row items-center mb-4">
+              <Ionicons name="search-outline" size={18} color="#555" />
+              <TextInput
+                value={query}
+                onChangeText={onQueryChange}
+                placeholder={placeholder}
+                placeholderTextColor="#777"
+                className="flex-1 text-black ml-2"
+              />
+            </View>
+
+            <ScrollView className="max-h-80" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              {filteredOptions.map(item => (
+                <Pressable
+                  key={item.code}
+                  onPress={() => onSelect(item)}
+                  className="py-3 border-b border-white/10 flex-row items-center justify-between"
+                >
+                  <Text className="text-white text-base">
+                    {item.name}
+                  </Text>
+                  {selectedCode === item.code ? <Ionicons name="checkmark" size={20} color="#E4FB52" /> : null}
+                </Pressable>
+              ))}
+              {!filteredOptions.length ? (
+                <Text className="text-[#888] text-sm text-center py-6">No result found.</Text>
+              ) : null}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const LANGUAGE_OPTIONS: FixedOption[] = [
+  { code: 'bn', name: 'Bangla' },
+  { code: 'en', name: 'English' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'ur', name: 'Urdu' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'id', name: 'Indonesian' },
+  { code: 'ms', name: 'Malay' },
+  { code: 'tr', name: 'Turkish' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'ko', name: 'Korean' },
+];
+
+const COUNTRY_OPTIONS: FixedOption[] = [
+  { code: 'BD', name: 'Bangladesh' },
+  { code: 'IN', name: 'India' },
+  { code: 'PK', name: 'Pakistan' },
+  { code: 'NP', name: 'Nepal' },
+  { code: 'LK', name: 'Sri Lanka' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'QA', name: 'Qatar' },
+  { code: 'KW', name: 'Kuwait' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'SG', name: 'Singapore' },
+];
