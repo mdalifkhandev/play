@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Platform, Image, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Platform, Image, Alert, Modal, TextInput, KeyboardAvoidingView, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
 import { CustomInput } from '../../../components/inputs/CustomInput';
-import { submitCreatorApplication } from '../../../api/creators';
+import { createOccupation, getOccupations, submitCreatorApplication, type Occupation } from '../../../api/creators';
 import { handleApiError } from '../../../api/client';
 import { useAppStore } from '../../../store';
 
@@ -21,6 +21,11 @@ export default function ApplyScreen() {
   const [email, setEmail] = useState(user?.email || '');
   const [dateOfBirth, setDateOfBirth] = useState(user?.profile?.dateOfBirth || '');
   const [occupation, setOccupation] = useState('');
+  const [occupationId, setOccupationId] = useState<string | undefined>();
+  const [occupationQuery, setOccupationQuery] = useState('');
+  const [occupationOptions, setOccupationOptions] = useState<Occupation[]>([]);
+  const [isOccupationSheetOpen, setIsOccupationSheetOpen] = useState(false);
+  const [isLoadingOccupations, setIsLoadingOccupations] = useState(false);
   const [contentCategory, setContentCategory] = useState('');
   const [contentLanguage, setContentLanguage] = useState('');
   const [country, setCountry] = useState('');
@@ -29,6 +34,76 @@ export default function ApplyScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [idFrontUri, setIdFrontUri] = useState<string | null>(null);
   const [idBackUri, setIdBackUri] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  React.useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, event => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const loadOccupations = React.useCallback(async (query = '') => {
+    setIsLoadingOccupations(true);
+    try {
+      const result = await getOccupations(query);
+      setOccupationOptions(result.items || []);
+    } catch (error) {
+      console.log('Occupation list failed:', handleApiError(error, 'Could not load occupations.'));
+    } finally {
+      setIsLoadingOccupations(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!isOccupationSheetOpen) return;
+
+    const timer = setTimeout(() => {
+      loadOccupations(occupationQuery);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [isOccupationSheetOpen, loadOccupations, occupationQuery]);
+
+  const openOccupationSheet = () => {
+    setOccupationQuery(occupation);
+    setIsOccupationSheetOpen(true);
+  };
+
+  const selectOccupation = (item: Occupation) => {
+    setOccupation(item.name);
+    setOccupationId(item.id);
+    setOccupationQuery(item.name);
+    Keyboard.dismiss();
+    setIsOccupationSheetOpen(false);
+  };
+
+  const createAndSelectOccupation = async () => {
+    const name = occupationQuery.trim();
+    if (name.length < 2) {
+      toast.error('Please enter a valid occupation.');
+      return;
+    }
+
+    try {
+      setIsLoadingOccupations(true);
+      const item = await createOccupation(name);
+      selectOccupation(item);
+    } catch (error) {
+      toast.error(handleApiError(error, 'Could not save occupation.'));
+    } finally {
+      setIsLoadingOccupations(false);
+    }
+  };
 
   const pickIdImage = async (side: 'front' | 'back') => {
     const setImage = side === 'front' ? setIdFrontUri : setIdBackUri;
@@ -101,6 +176,7 @@ export default function ApplyScreen() {
         fullName,
         email,
         ...(dateOfBirth.trim() ? { dateOfBirth } : {}),
+        ...(occupationId ? { occupationId } : {}),
         ...(occupation.trim() ? { occupation } : {}),
         contentCategory,
         contentLanguage,
@@ -217,15 +293,21 @@ export default function ApplyScreen() {
           </View>
         </View>
 
-        <CustomInput
-          label="Select occupation(Optional)"
-          placeholder="Your profession"
-          placeholderTextColor="#555"
-          inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-black text-base"
-          value={occupation}
-          onChangeText={setOccupation}
-        />
+        <Pressable onPress={openOccupationSheet}>
+          <View pointerEvents="none">
+            <CustomInput
+              label="Select occupation(Optional)"
+              placeholder="Your profession"
+              placeholderTextColor="#555"
+              rightIcon="chevron-down"
+              inputContainerStyle="bg-[#151515] border border-[#333]"
+              className="text-black text-base"
+              value={occupation}
+              onChangeText={() => {}}
+              editable={false}
+            />
+          </View>
+        </Pressable>
 
         <CustomInput
           label="Content Category"
@@ -285,6 +367,94 @@ export default function ApplyScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      <Modal
+        visible={isOccupationSheetOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsOccupationSheetOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1"
+        >
+          <Pressable
+            className="flex-1 bg-black/60 justify-end"
+            onPress={() => {
+              Keyboard.dismiss();
+              setIsOccupationSheetOpen(false);
+            }}
+          >
+            <Pressable
+              className="bg-[#141414] rounded-t-3xl px-5 pt-5"
+              style={{
+                paddingBottom: Math.max(insets.bottom + 24, 32),
+                marginBottom: Platform.OS === 'android' ? keyboardHeight : 0,
+                maxHeight: keyboardHeight ? '68%' : '82%',
+              }}
+              onPress={() => undefined}
+            >
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-white text-lg font-inter-bold">Select occupation</Text>
+                <Pressable
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setIsOccupationSheetOpen(false);
+                  }}
+                  className="h-9 w-9 rounded-full bg-[#242424] items-center justify-center"
+                >
+                  <Ionicons name="close" size={18} color="#FFF" />
+                </Pressable>
+              </View>
+
+              <View className="bg-white rounded-xl px-4 h-12 flex-row items-center mb-4">
+                <Ionicons name="search-outline" size={18} color="#555" />
+                <TextInput
+                  value={occupationQuery}
+                  onChangeText={(text) => {
+                    setOccupationQuery(text);
+                    setOccupationId(undefined);
+                  }}
+                  placeholder="Search or type your occupation"
+                  placeholderTextColor="#777"
+                  className="flex-1 text-black ml-2"
+                />
+              </View>
+
+              {isLoadingOccupations ? (
+                <View className="py-6 items-center">
+                  <ActivityIndicator color="#E4FB52" />
+                </View>
+              ) : (
+                <ScrollView
+                  className="max-h-72"
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  {occupationOptions.map(item => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => selectOccupation(item)}
+                      className="py-3 border-b border-white/10 flex-row items-center justify-between"
+                    >
+                      <Text className="text-white text-base">{item.name}</Text>
+                      {occupationId === item.id ? <Ionicons name="checkmark" size={20} color="#E4FB52" /> : null}
+                    </Pressable>
+                  ))}
+                  {occupationQuery.trim().length >= 2 && !occupationOptions.some(item => item.name.toLowerCase() === occupationQuery.trim().toLowerCase()) ? (
+                    <Pressable
+                      onPress={createAndSelectOccupation}
+                      className="mt-4 bg-[#E4FB52] rounded-xl h-12 items-center justify-center"
+                    >
+                      <Text className="text-black font-inter-bold">Create {occupationQuery.trim()}</Text>
+                    </Pressable>
+                  ) : null}
+                </ScrollView>
+              )}
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }

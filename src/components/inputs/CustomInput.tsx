@@ -24,6 +24,7 @@ export const CustomInput: React.FC<CustomInputProps> = ({
   containerStyle = "",
   inputContainerStyle = "",
   labelStyle = "",
+  className = "",
   ...props
 }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +43,7 @@ export const CustomInput: React.FC<CustomInputProps> = ({
           <Ionicons name={iconName} size={20} color={isDark ? "#888" : "#9CA3AF"} className="mr-2" />
         ) : null}
         <TextInput
-          className={`flex-1 h-full font-inter-regular ${isDark ? 'text-white' : 'text-black'}`}
+          className={`flex-1 h-full font-inter-regular ${isDark ? 'text-white' : 'text-black'} ${className}`}
           placeholderTextColor={isDark ? "#666" : "#9CA3AF"}
           secureTextEntry={isPassword && !showPassword}
           {...props}

@@ -43,6 +43,7 @@ export type CreateCreatorApplicationRequest = {
   fullName: string;
   email: string;
   dateOfBirth?: string;
+  occupationId?: string;
   occupation?: string;
   contentCategory: string;
   contentLanguage: string;
@@ -50,6 +51,11 @@ export type CreateCreatorApplicationRequest = {
   reason: string;
   idFrontUrl?: string;
   idBackUrl?: string;
+};
+
+export type Occupation = {
+  id: string;
+  name: string;
 };
 
 const dataOf = <T>(response: { data?: { data?: T } }) => response.data?.data as T;
@@ -65,4 +71,19 @@ export async function submitCreatorApplication(input: CreateCreatorApplicationRe
     input,
   );
   return dataOf<CreatorEligibility['application']>(response);
+}
+
+export async function getOccupations(query?: string): Promise<{ items: Occupation[] }> {
+  const response = await apiClient.get<{ data: { items: Occupation[] } }>('/occupations', {
+    params: {
+      ...(query?.trim() ? { q: query.trim() } : {}),
+      limit: 20,
+    },
+  });
+  return dataOf<{ items: Occupation[] }>(response);
+}
+
+export async function createOccupation(name: string): Promise<Occupation> {
+  const response = await apiClient.post<{ data: Occupation }>('/occupations', { name });
+  return dataOf<Occupation>(response);
 }
