@@ -12,9 +12,11 @@ import { CustomInput } from '../../../components/inputs/CustomInput';
 import {
   createCreatorCategory,
   createOccupation,
+  getCreatorEligibility,
   getCreatorCategories,
   getOccupations,
   submitCreatorApplication,
+  uploadCreatorDocument,
   type CreatorCategory,
   type Occupation,
 } from '../../../api/creators';
@@ -50,6 +52,8 @@ export default function ApplyScreen() {
   const [isCountrySheetOpen, setIsCountrySheetOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('Submitting application...');
+  const [submitProgress, setSubmitProgress] = useState(0);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [idFrontUri, setIdFrontUri] = useState<string | null>(null);
   const [idBackUri, setIdBackUri] = useState<string | null>(null);
@@ -282,7 +286,37 @@ export default function ApplyScreen() {
     }
 
     setIsSubmitting(true);
+    setSubmitProgress(0);
+    setSubmitMessage('Checking creator eligibility...');
     try {
+      const eligibility = await getCreatorEligibility();
+
+      if (!eligibility.canApply) {
+        const incompleteRequirements = eligibility.requirements
+          .filter(item => item.enabled !== false && !item.complete)
+          .map(item => item.title);
+        toast.error(
+          incompleteRequirements.length
+            ? `Complete these first: ${incompleteRequirements.join(', ')}`
+            : 'Creator requirements are not complete yet.',
+        );
+        router.replace('/screens/creator/criteria');
+        return;
+      }
+
+      setSubmitProgress(5);
+      setSubmitMessage('Uploading ID card front...');
+      const idFrontUrl = await uploadCreatorDocument(idFrontUri, progress => {
+        setSubmitProgress(Math.min(45, Math.round(progress * 0.45)));
+      });
+
+      setSubmitMessage('Uploading ID card back...');
+      const idBackUrl = await uploadCreatorDocument(idBackUri, progress => {
+        setSubmitProgress(45 + Math.min(45, Math.round(progress * 0.45)));
+      });
+
+      setSubmitMessage('Submitting application...');
+      setSubmitProgress(95);
       await submitCreatorApplication({
         fullName: fullName.trim(),
         email: email.trim(),
@@ -296,7 +330,10 @@ export default function ApplyScreen() {
         ...(countryCode ? { countryCode } : {}),
         country: country.trim(),
         reason: reason.trim(),
+        idFrontUrl,
+        idBackUrl,
       });
+      setSubmitProgress(100);
       toast.success('Creator application submitted.');
       router.replace('/screens/creator/pending');
     } catch (error) {
@@ -726,10 +763,17 @@ export default function ApplyScreen() {
         <View className="absolute inset-0 bg-black/60 items-center justify-center px-8">
           <View className="bg-[#171717] border border-white/10 rounded-2xl px-6 py-5 items-center w-full max-w-sm">
             <ActivityIndicator color="#E4FB52" size="large" />
-            <Text className="text-white font-inter-bold text-base mt-4">Submitting application...</Text>
+            <Text className="text-white font-inter-bold text-base mt-4">{submitMessage}</Text>
             <Text className="text-[#A0A0A0] text-sm text-center mt-2">
               Please wait while we send your creator information.
             </Text>
+            <View className="w-full h-2 rounded-full bg-white/10 mt-4 overflow-hidden">
+              <View
+                className="h-full rounded-full bg-[#E4FB52]"
+                style={{ width: `${Math.max(5, submitProgress)}%` }}
+              />
+            </View>
+            <Text className="text-[#E4FB52] text-xs font-inter-semibold mt-2">{submitProgress}%</Text>
           </View>
         </View>
       ) : null}

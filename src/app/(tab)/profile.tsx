@@ -146,22 +146,22 @@ export default function ProfileScreen() {
           <Text className="text-red-400 text-center text-sm mt-4 px-4">{error}</Text>
         )}
 
-        {isCreator ? (
-          <Pressable
-            onPress={() => router.push('/screens/menu/analytic')}
-            className="mx-4 my-6 bg-[#151515] rounded-xl flex-row items-center justify-between p-5 border border-[#333]"
-          >
-            <View>
-              <Text className="text-white text-[18px] font-bold">Creator Dashboard</Text>
-              <Text className="text-[#888] text-[13px] mt-1">Monitor your growth and earnings</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#888" />
-          </Pressable>
-        ) : (
+        {isCreatorMonetized ? (
           <>
-            <CreatorCard eligibility={creatorEligibility} />
-            {isCreatorMonetized ? <CreatorTools /> : null}
+            <Pressable
+              onPress={() => router.push('/screens/menu/analytic')}
+              className="mx-4 my-6 bg-[#151515] rounded-xl flex-row items-center justify-between p-5 border border-[#333]"
+            >
+              <View>
+                <Text className="text-white text-[18px] font-bold">Creator Dashboard</Text>
+                <Text className="text-[#888] text-[13px] mt-1">Monitor your growth and earnings</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#888" />
+            </Pressable>
+            <CreatorTools />
           </>
+        ) : (
+          <CreatorCard eligibility={creatorEligibility} />
         )}
 
         <ProfileTabs
