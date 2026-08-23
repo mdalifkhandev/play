@@ -8,7 +8,7 @@ import { ProfileInfo } from '../../components/profile/ProfileInfo';
 import { ProfileTabs } from '../../components/profile/ProfileTabs';
 
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { getMyLikedReels, getMyProfileSummary, getMyReels, getMySavedReels } from '../../api/profile/profile.api';
 import type { MyProfileSummaryData } from '../../api/profile/profile.types';
 import { getCreatorEligibility, type CreatorEligibility } from '../../api/creators';
@@ -18,8 +18,6 @@ import type { ReelFeedItem } from '../../api/reels/reels.types';
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const isCreator = params.creatorMode === 'true';
   const [profileData, setProfileData] = useState<MyProfileSummaryData | null>(null);
   const [creatorEligibility, setCreatorEligibility] = useState<CreatorEligibility | null>(null);
   const [posts, setPosts] = useState<ReelFeedItem[]>([]);
