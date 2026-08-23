@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Platform, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
 import { CustomInput } from '../../../components/inputs/CustomInput';
@@ -17,19 +19,79 @@ export default function ApplyScreen() {
   const user = useAppStore(state => state.user);
   const [fullName, setFullName] = useState(user?.profile?.displayName || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState(user?.profile?.dateOfBirth || '');
   const [occupation, setOccupation] = useState('');
   const [contentCategory, setContentCategory] = useState('');
   const [contentLanguage, setContentLanguage] = useState('');
   const [country, setCountry] = useState('');
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [idFrontUri, setIdFrontUri] = useState<string | null>(null);
+  const [idBackUri, setIdBackUri] = useState<string | null>(null);
+
+  const pickIdImage = async (side: 'front' | 'back') => {
+    const setImage = side === 'front' ? setIdFrontUri : setIdBackUri;
+
+    Alert.alert(
+      side === 'front' ? 'ID Card Front' : 'ID Card Back',
+      'Choose an option',
+      [
+        {
+          text: 'Take Photo',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              toast.error('Camera permission is required.');
+              return;
+            }
+
+            const result = await ImagePicker.launchCameraAsync({
+              allowsEditing: true,
+              quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets?.[0]?.uri) {
+              setImage(result.assets[0].uri);
+            }
+          },
+        },
+        {
+          text: 'Choose from Gallery',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              toast.error('Gallery permission is required.');
+              return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets?.[0]?.uri) {
+              setImage(result.assets[0].uri);
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+      { cancelable: true },
+    );
+  };
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
 
     if (!fullName.trim() || !email.trim() || !contentCategory.trim() || !contentLanguage.trim() || !country.trim() || reason.trim().length < 20) {
       toast.error('Please complete the creator application form.');
+      return;
+    }
+
+    if (!idFrontUri || !idBackUri) {
+      toast.error('Please add both ID card front and back images.');
       return;
     }
 
@@ -64,7 +126,7 @@ export default function ApplyScreen() {
           placeholder="Full name"
           placeholderTextColor="#555"
           inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-white text-base"
+          className="text-black text-base"
           value={fullName}
           onChangeText={setFullName}
         />
@@ -76,21 +138,43 @@ export default function ApplyScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-white text-base"
+          className="text-black text-base"
           value={email}
           onChangeText={setEmail}
         />
 
-        <CustomInput
-          label="Date of birth"
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#555"
-          rightIcon="calendar-outline"
-          inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-white text-base flex-1"
-          value={dateOfBirth}
-          onChangeText={setDateOfBirth}
-        />
+        <Pressable onPress={() => setShowDatePicker(true)}>
+          <View pointerEvents="none">
+            <CustomInput
+              label="Date of birth"
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#555"
+              rightIcon="calendar-outline"
+              inputContainerStyle="bg-[#151515] border border-[#333]"
+              className="text-black text-base flex-1"
+              value={dateOfBirth}
+              onChangeText={() => {}}
+              editable={false}
+            />
+          </View>
+        </Pressable>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={dateOfBirth ? new Date(`${dateOfBirth}T00:00:00.000Z`) : new Date()}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            maximumDate={new Date()}
+            onChange={(_, selectedDate) => {
+              if (Platform.OS === 'android') {
+                setShowDatePicker(false);
+              }
+              if (selectedDate) {
+                setDateOfBirth(selectedDate.toISOString().slice(0, 10));
+              }
+            }}
+          />
+        )}
 
         <View className="mb-6">
           <Text className="text-white font-medium text-sm">
@@ -100,19 +184,33 @@ export default function ApplyScreen() {
           
           <View className="flex-row gap-4">
             <View className="flex-1">
-              <Pressable className="bg-[#1A1A1A] border border-dashed border-[#555] rounded-xl h-28 items-center justify-center mb-2">
-                <View className="bg-[#111] p-2 rounded-full">
-                  <Ionicons name="camera" size={24} color="#FFF" />
-                </View>
+              <Pressable
+                onPress={() => pickIdImage('front')}
+                className="bg-[#1A1A1A] border border-dashed border-[#555] rounded-xl h-28 items-center justify-center mb-2 overflow-hidden"
+              >
+                {idFrontUri ? (
+                  <Image source={{ uri: idFrontUri }} className="w-full h-full" resizeMode="cover" />
+                ) : (
+                  <View className="bg-[#111] p-2 rounded-full">
+                    <Ionicons name="camera" size={24} color="#FFF" />
+                  </View>
+                )}
               </Pressable>
               <Text className="text-center text-[#888] text-xs">ID Card Front</Text>
             </View>
 
             <View className="flex-1">
-              <Pressable className="bg-[#1A1A1A] border border-dashed border-[#555] rounded-xl h-28 items-center justify-center mb-2">
-                <View className="bg-[#111] p-2 rounded-full">
-                  <Ionicons name="camera" size={24} color="#FFF" />
-                </View>
+              <Pressable
+                onPress={() => pickIdImage('back')}
+                className="bg-[#1A1A1A] border border-dashed border-[#555] rounded-xl h-28 items-center justify-center mb-2 overflow-hidden"
+              >
+                {idBackUri ? (
+                  <Image source={{ uri: idBackUri }} className="w-full h-full" resizeMode="cover" />
+                ) : (
+                  <View className="bg-[#111] p-2 rounded-full">
+                    <Ionicons name="camera" size={24} color="#FFF" />
+                  </View>
+                )}
               </Pressable>
               <Text className="text-center text-[#888] text-xs">ID Card Back</Text>
             </View>
@@ -124,7 +222,7 @@ export default function ApplyScreen() {
           placeholder="Your profession"
           placeholderTextColor="#555"
           inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-white text-base"
+          className="text-black text-base"
           value={occupation}
           onChangeText={setOccupation}
         />
@@ -135,7 +233,7 @@ export default function ApplyScreen() {
           placeholderTextColor="#555"
           rightIcon="chevron-down"
           inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-white text-base flex-1"
+          className="text-black text-base flex-1"
           value={contentCategory}
           onChangeText={setContentCategory}
         />
@@ -146,7 +244,7 @@ export default function ApplyScreen() {
           placeholderTextColor="#555"
           rightIcon="chevron-down"
           inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-white text-base flex-1"
+          className="text-black text-base flex-1"
           value={contentLanguage}
           onChangeText={setContentLanguage}
         />
@@ -157,7 +255,7 @@ export default function ApplyScreen() {
           placeholderTextColor="#555"
           rightIcon="chevron-down"
           inputContainerStyle="bg-[#151515] border border-[#333]"
-          className="text-white text-base flex-1"
+          className="text-black text-base flex-1"
           value={country}
           onChangeText={setCountry}
         />
@@ -169,7 +267,7 @@ export default function ApplyScreen() {
           multiline
           textAlignVertical="top"
           inputContainerStyle="bg-[#151515] border border-[#333] h-28"
-          className="text-white text-base"
+          className="text-black text-base"
           value={reason}
           onChangeText={setReason}
         />

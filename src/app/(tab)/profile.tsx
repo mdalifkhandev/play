@@ -159,7 +159,7 @@ export default function ProfileScreen() {
           </Pressable>
         ) : (
           <>
-            <CreatorCard />
+            <CreatorCard eligibility={creatorEligibility} />
             {isCreatorMonetized ? <CreatorTools /> : null}
           </>
         )}

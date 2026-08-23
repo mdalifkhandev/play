@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, View, Text, ScrollView } from 'react-native';
+import { ActivityIndicator, View, Text, ScrollView, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,27 +13,51 @@ export default function CriteriaScreen() {
   const insets = useSafeAreaInsets();
   const [eligibility, setEligibility] = React.useState<CreatorEligibility | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const isMountedRef = React.useRef(true);
+
+  const loadEligibility = React.useCallback(async ({ refresh = false }: { refresh?: boolean } = {}) => {
+    if (!isMountedRef.current) return;
+
+    if (refresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+
+    try {
+      const data = await getCreatorEligibility();
+      if (isMountedRef.current) setEligibility(data);
+    } catch (error: any) {
+      console.log('Creator eligibility load failed:', error?.message ?? error);
+    } finally {
+      if (!isMountedRef.current) return;
+
+      if (refresh) {
+        setIsRefreshing(false);
+      } else {
+        setIsLoading(false);
+      }
+    }
+  }, []);
 
   React.useEffect(() => {
-    let mounted = true;
-    getCreatorEligibility()
-      .then(data => {
-        if (mounted) setEligibility(data);
-      })
-      .catch(error => console.log('Creator eligibility load failed:', error?.message ?? error))
-      .finally(() => {
-        if (mounted) setIsLoading(false);
-      });
+    isMountedRef.current = true;
+    const timer = setTimeout(() => {
+      loadEligibility();
+    }, 0);
 
     return () => {
-      mounted = false;
+      clearTimeout(timer);
+      isMountedRef.current = false;
     };
-  }, []);
+  }, [loadEligibility]);
 
   const radius = 80;
   const strokeWidth = 10;
   const circumference = 2 * Math.PI * radius;
-  const progress = eligibility?.progress ?? 0;
+  const visibleRequirements = buildVisibleRequirements(eligibility?.requirements || []);
+  const progress = progressForRequirements(visibleRequirements, eligibility?.progress ?? 0);
   const strokeDashoffset = circumference - (progress / 100) * circumference;
   const buttonTitle =
     eligibility?.status === 'approved'
@@ -46,7 +70,6 @@ export default function CriteriaScreen() {
             ? 'APPLY AGAIN'
             : 'APPLY NOW';
   const canPressApply = Boolean(eligibility?.canApply || eligibility?.status === 'rejected');
-  const visibleRequirements = buildVisibleRequirements(eligibility?.requirements || []);
 
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
@@ -57,7 +80,18 @@ export default function CriteriaScreen() {
           <ActivityIndicator color="#E4FB52" />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 96 }}>
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 96 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => loadEligibility({ refresh: true })}
+              tintColor="#E4FB52"
+              colors={['#E4FB52']}
+              progressBackgroundColor="#151515"
+            />
+          }
+        >
           <View className="items-center mt-6 mb-8 relative justify-center">
             <Svg width={radius * 2 + strokeWidth * 2} height={radius * 2 + strokeWidth * 2}>
               <Circle
@@ -118,31 +152,60 @@ function MilestoneRow({ requirement }: { requirement: CreatorRequirement }) {
   const isComplete = requirement.complete;
   const color = isComplete ? '#E4FB52' : '#888';
   const icon = iconForRequirement(requirement.key);
+  const progress = progressForRequirement(requirement);
 
   return (
-    <View className="bg-[#151515] rounded-2xl p-4 flex-row items-center mb-3 border border-[#222]">
-      <View className="w-12 h-12 rounded-xl bg-[#1A1A1A] items-center justify-center mr-4 relative">
-        <Ionicons name={icon} size={24} color={color} />
-        {requirement.locked ? (
-          <View className="absolute -top-1 -right-1 bg-[#151515] rounded-full p-0.5">
-            <Ionicons name="lock-closed" size={10} color="#555" />
-          </View>
-        ) : null}
+    <View className="bg-[#151515] rounded-2xl p-4 mb-3 border border-[#222]">
+      <View className="flex-row items-center">
+        <View className="w-12 h-12 rounded-xl bg-[#1A1A1A] items-center justify-center mr-4 relative">
+          <Ionicons name={icon} size={24} color={color} />
+          {requirement.locked ? (
+            <View className="absolute -top-1 -right-1 bg-[#151515] rounded-full p-0.5">
+              <Ionicons name="lock-closed" size={10} color="#555" />
+            </View>
+          ) : null}
+        </View>
+        <View className="flex-1">
+          <Text className={`${isComplete ? 'text-white' : 'text-[#888]'} text-base font-medium mb-1`}>
+            {requirement.title}
+          </Text>
+          <Text className="text-[#888] text-xs">
+            {formatNumber(requirement.current)} / {formatNumber(requirement.target)}
+          </Text>
+        </View>
+        <Ionicons name={isComplete ? 'checkmark-circle' : 'ellipse-outline'} size={28} color={isComplete ? '#E4FB52' : '#555'} />
       </View>
-      <View className="flex-1">
-        <Text className={`${isComplete ? 'text-white' : 'text-[#888]'} text-base font-medium mb-1`}>
-          {requirement.title}
-        </Text>
-        <Text className="text-[#888] text-xs">
-          {formatNumber(requirement.current)} / {formatNumber(requirement.target)}
-        </Text>
+
+      <View className="mt-4 h-1.5 bg-[#2A2A2A] rounded-full overflow-hidden">
+        <View
+          className="h-full rounded-full"
+          style={{
+            width: `${progress}%`,
+            backgroundColor: isComplete ? '#E4FB52' : '#5F6F42',
+          }}
+        />
       </View>
-      <Ionicons name={isComplete ? 'checkmark-circle' : 'ellipse-outline'} size={28} color={isComplete ? '#E4FB52' : '#555'} />
     </View>
   );
 }
 
+function progressForRequirement(requirement: CreatorRequirement) {
+  if (requirement.complete) return 100;
+  if (requirement.key === 'guidelines') {
+    return requirement.locked ? 0 : 100;
+  }
+  if (requirement.target <= 0) return requirement.current > 0 ? 100 : 0;
+  return Math.max(0, Math.min(100, Math.round((requirement.current / requirement.target) * 100)));
+}
+
+function progressForRequirements(requirements: CreatorRequirement[], fallbackProgress: number) {
+  if (!requirements.length) return fallbackProgress;
+  const totalProgress = requirements.reduce((total, requirement) => total + progressForRequirement(requirement), 0);
+  return Math.round(totalProgress / requirements.length);
+}
+
 function iconForRequirement(key: CreatorRequirement['key']): keyof typeof Ionicons.glyphMap {
+  if (key === 'profile') return 'person-circle-outline';
   if (key === 'followers') return 'person-outline';
   if (key === 'views') return 'play-outline';
   if (key === 'watch_time') return 'time-outline';
@@ -154,22 +217,28 @@ function iconForRequirement(key: CreatorRequirement['key']): keyof typeof Ionico
 }
 
 function buildVisibleRequirements(requirements: CreatorRequirement[]) {
-  const priority: CreatorRequirement['key'][] = ['followers', 'views', 'account_age', 'guidelines'];
-  return priority.map(key => {
-    const found = requirements.find(item => item.key === key);
-    if (found) return found;
-
-    return {
+  const priority: CreatorRequirement['key'][] = ['profile', 'followers', 'views', 'account_age', 'guidelines'];
+  if (requirements.length === 0) {
+    return priority.map(key => ({
       key,
       title: fallbackTitleForRequirement(key),
       current: 0,
       target: fallbackTargetForRequirement(key),
       complete: false,
-    };
-  });
+    }));
+  }
+
+  const visible = requirements.filter(item => item.enabled !== false);
+  const ordered = priority
+    .map(key => visible.find(item => item.key === key))
+    .filter(Boolean) as CreatorRequirement[];
+  const extras = visible.filter(item => !priority.includes(item.key));
+
+  return [...ordered, ...extras];
 }
 
 function fallbackTitleForRequirement(key: CreatorRequirement['key']) {
+  if (key === 'profile') return 'Profile Complete';
   if (key === 'followers') return 'Followers';
   if (key === 'views') return 'Video Views';
   if (key === 'account_age') return 'Account Age';
@@ -178,6 +247,7 @@ function fallbackTitleForRequirement(key: CreatorRequirement['key']) {
 }
 
 function fallbackTargetForRequirement(key: CreatorRequirement['key']) {
+  if (key === 'profile') return 1;
   if (key === 'followers') return 1000;
   if (key === 'views') return 100000;
   if (key === 'account_age') return 30;

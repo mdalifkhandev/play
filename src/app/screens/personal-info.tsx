@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Platform, KeyboardAvoidingView, Pressable, Image, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, Platform, KeyboardAvoidingView, Pressable, Image, TextInput, Alert, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/ui/Header';
 import { CustomInput } from '../../components/inputs/CustomInput';
 import { CustomButton } from '../../components/ui/CustomButton';
@@ -40,6 +39,21 @@ export default function PersonalInfoScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  React.useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', event => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const hasChanges = useMemo(() => {
     return (
@@ -164,9 +178,19 @@ export default function PersonalInfoScreen() {
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
       className="flex-1 bg-[#121212]"
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 120, 120) }} className="px-6 pt-16">
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingBottom: Math.max(insets.bottom + keyboardHeight + 140, 140),
+        }}
+        className="px-6 pt-16"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+      >
         <Header showBackButton={true} title="Edit Profile" />
 
         <View className="items-center mt-6 mb-8">

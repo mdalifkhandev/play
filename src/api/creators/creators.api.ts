@@ -17,6 +17,7 @@ export type CreatorRequirement = {
   target: number;
   complete: boolean;
   locked?: boolean;
+  enabled?: boolean;
 };
 
 export type CreatorApplicationStatus = 'pending' | 'approved' | 'rejected' | 'held';

@@ -3,11 +3,12 @@ import { Text, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { getCreatorEligibility, type CreatorEligibility } from '../../api/creators';
+import Svg, { Circle } from 'react-native-svg';
+import { getCreatorEligibility, type CreatorEligibility, type CreatorRequirement } from '../../api/creators';
 
 const CREATOR_CARD_HIDDEN_KEY = 'profile:creator-card-hidden';
 
-export function CreatorCard() {
+export function CreatorCard({ eligibility: eligibilityProp }: { eligibility?: CreatorEligibility | null }) {
   const router = useRouter();
   const [eligibility, setEligibility] = React.useState<CreatorEligibility | null>(null);
   const [isHidden, setIsHidden] = React.useState(false);
@@ -20,16 +21,18 @@ export function CreatorCard() {
       })
       .catch(() => undefined);
 
-    getCreatorEligibility()
-      .then(data => {
-        if (mounted) setEligibility(data);
-      })
-      .catch(error => console.log('Creator eligibility load failed:', error?.message ?? error));
+    if (eligibilityProp === undefined) {
+      getCreatorEligibility()
+        .then(data => {
+          if (mounted) setEligibility(data);
+        })
+        .catch(error => console.log('Creator eligibility load failed:', error?.message ?? error));
+    }
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [eligibilityProp]);
 
   const hideCard = React.useCallback(async () => {
     setIsHidden(true);
@@ -41,15 +44,19 @@ export function CreatorCard() {
     await AsyncStorage.removeItem(CREATOR_CARD_HIDDEN_KEY);
   }, []);
 
-  const progress = eligibility?.progress ?? 0;
-  const completedSteps = eligibility?.completedSteps ?? 0;
-  const totalSteps = eligibility?.totalSteps ?? 0;
+  const effectiveEligibility = eligibilityProp ?? eligibility;
+  const visibleMilestones = (effectiveEligibility?.requirements || []).filter(item => item.enabled !== false);
+  const completedSteps = visibleMilestones.length
+    ? visibleMilestones.filter(item => item.complete).length
+    : effectiveEligibility?.completedSteps ?? 0;
+  const totalSteps = visibleMilestones.length || effectiveEligibility?.totalSteps || 0;
+  const progress = progressForRequirements(visibleMilestones, effectiveEligibility?.progress ?? 0);
   const title =
-    eligibility?.status === 'approved'
+    effectiveEligibility?.status === 'approved'
       ? "You're a creator"
-      : eligibility?.status === 'pending'
+      : effectiveEligibility?.status === 'pending'
         ? 'Creator application pending'
-        : eligibility?.status === 'rejected'
+        : effectiveEligibility?.status === 'rejected'
           ? 'Creator application needs review'
           : "You're on your creator path";
 
@@ -80,9 +87,14 @@ export function CreatorCard() {
         <Ionicons name="close" size={18} color="#FFF" />
       </Pressable>
 
-      <Text className="text-white text-[16px] font-inter-semibold w-[75%] leading-[22px]">
-        {title}
-      </Text>
+      <View className="flex-row items-start pr-9">
+        <View className="flex-1">
+          <Text className="text-white text-[16px] font-inter-semibold leading-[22px]">
+            {title}
+          </Text>
+        </View>
+        <ProgressCircle progress={progress} />
+      </View>
       {/* <Text className="mt-2 text-[#999] text-[12px] leading-[18px] w-[86%]">
         Complete these steps to unlock creator monetization and earning tools.
       </Text> */}
@@ -99,4 +111,57 @@ export function CreatorCard() {
       </View>
     </Pressable>
   );
+}
+
+function ProgressCircle({ progress }: { progress: number }) {
+  const size = 46;
+  const strokeWidth = 4;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+  return (
+    <View className="ml-3 items-center justify-center">
+      <Svg width={size} height={size}>
+        <Circle
+          stroke="#333"
+          fill="transparent"
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeWidth={strokeWidth}
+        />
+        <Circle
+          stroke="#A3E635"
+          fill="transparent"
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <View className="absolute inset-0 items-center justify-center">
+        <Text className="text-[#A3E635] text-[10px] font-inter-bold">{progress}%</Text>
+      </View>
+    </View>
+  );
+}
+
+function progressForRequirement(requirement: CreatorRequirement) {
+  if (requirement.complete) return 100;
+  if (requirement.key === 'guidelines') {
+    return requirement.locked ? 0 : 100;
+  }
+  if (requirement.target <= 0) return requirement.current > 0 ? 100 : 0;
+  return Math.max(0, Math.min(100, Math.round((requirement.current / requirement.target) * 100)));
+}
+
+function progressForRequirements(requirements: CreatorRequirement[], fallbackProgress: number) {
+  if (!requirements.length) return fallbackProgress;
+  const totalProgress = requirements.reduce((total, requirement) => total + progressForRequirement(requirement), 0);
+  return Math.round(totalProgress / requirements.length);
 }
