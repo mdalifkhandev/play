@@ -1,6 +1,14 @@
 import { apiClient } from '../client';
 import type { ReelFeedResponse } from '../reels/reels.types';
-import type { FollowState, MyProfileData, MyProfileSummaryData, ProfileUser, PublicProfileData } from './profile.types';
+import type {
+  DiscoverUsersResponse,
+  FollowState,
+  MyProfileData,
+  MyProfileSummaryData,
+  ProfileUser,
+  PublicProfileData,
+  ShareProfileData,
+} from './profile.types';
 
 const dataOf = <T>(response: { data?: { data?: T } }) => response.data?.data as T;
 
@@ -44,9 +52,31 @@ export async function getUserProfile(userId: string): Promise<{ user: ProfileUse
   return dataOf<{ user: ProfileUser }>(response);
 }
 
+export async function getUserProfileByUsername(username: string): Promise<{ user: ProfileUser }> {
+  const response = await apiClient.get<{ data: { user: ProfileUser } }>(
+    `/users/by-username/${encodeURIComponent(username)}/profile`,
+  );
+  return dataOf<{ user: ProfileUser }>(response);
+}
+
 export async function getUserReels(userId: string): Promise<ReelFeedResponse> {
   const response = await apiClient.get<{ data: ReelFeedResponse }>(`/reels/users/${userId}`);
   return dataOf<ReelFeedResponse>(response);
+}
+
+export async function discoverUsers(query = ''): Promise<DiscoverUsersResponse> {
+  const response = await apiClient.get<{ data: DiscoverUsersResponse }>('/users/discover', {
+    params: {
+      q: query,
+      limit: 50,
+    },
+  });
+  return dataOf<DiscoverUsersResponse>(response);
+}
+
+export async function getShareProfile(): Promise<ShareProfileData> {
+  const response = await apiClient.get<{ data: ShareProfileData }>('/users/me/share-profile');
+  return dataOf<ShareProfileData>(response);
 }
 
 export async function getMyProfileSummary(): Promise<MyProfileSummaryData> {
@@ -111,4 +141,9 @@ export async function getPublicProfileData(userId: string): Promise<PublicProfil
     savedReels: [],
     likedReels: [],
   };
+}
+
+export async function getPublicProfileDataByUsername(username: string): Promise<PublicProfileData> {
+  const { user } = await getUserProfileByUsername(username);
+  return getPublicProfileData(user.id);
 }

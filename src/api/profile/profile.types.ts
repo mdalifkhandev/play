@@ -29,6 +29,30 @@ export type FollowState = {
   followingCount: number;
 };
 
+export type DiscoverUser = {
+  id: string;
+  email?: string;
+  username?: string;
+  displayName: string;
+  avatarUrl?: string;
+  bio?: string;
+  isFollowing: boolean;
+};
+
+export type DiscoverUsersResponse = {
+  items: DiscoverUser[];
+};
+
+export type ShareProfileData = {
+  username: string;
+  displayName: string;
+  profileUrl: string;
+  webUrl?: string;
+  deepLink: string;
+  title: string;
+  message: string;
+};
+
 export type MyProfileData = {
   user: ProfileUser;
   stats: {

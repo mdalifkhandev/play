@@ -5,11 +5,18 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { handleApiError } from '../../../api/client';
-import { followUser, getPublicProfileData, unfollowUser } from '../../../api/profile/profile.api';
+import {
+  followUser,
+  getPublicProfileData,
+  getPublicProfileDataByUsername,
+  unfollowUser,
+} from '../../../api/profile/profile.api';
 import type { PublicProfileData } from '../../../api/profile/profile.types';
 import { ProfileInfo } from '../../../components/profile/ProfileInfo';
 import { ProfileTabs } from '../../../components/profile/ProfileTabs';
 import { useAppStore } from '../../../store';
+
+const objectIdPattern = /^[a-f\d]{24}$/i;
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,10 +32,16 @@ export default function UserProfileScreen() {
   const currentUser = useAppStore((state: any) => state.user);
 
   useEffect(() => {
-    if (id && currentUser?.id && id === currentUser.id) {
+    const profileKey = id ? decodeURIComponent(id).replace(/^@/, '').toLowerCase() : '';
+    const currentUsername = currentUser?.profile?.username?.toLowerCase();
+    if (
+      id &&
+      currentUser?.id &&
+      (id === currentUser.id || (currentUsername && profileKey === currentUsername))
+    ) {
       router.replace('/(tab)/profile');
     }
-  }, [id, currentUser?.id, router]);
+  }, [id, currentUser?.id, currentUser?.profile?.username, router]);
 
   const loadProfile = useCallback(async (refresh = false) => {
     if (!id) return;
@@ -40,7 +53,16 @@ export default function UserProfileScreen() {
         setIsLoading(true);
       }
 
-      const data = await getPublicProfileData(id);
+      const profileKey = decodeURIComponent(id);
+      const data = objectIdPattern.test(profileKey)
+        ? await getPublicProfileData(profileKey)
+        : await getPublicProfileDataByUsername(profileKey.replace(/^@/, ''));
+
+      if (currentUser?.id && data.user.id === currentUser.id) {
+        router.replace('/(tab)/profile');
+        return;
+      }
+
       setProfileData(data);
       setIsFollowing(data.followState.isFollowing);
       setError(null);
@@ -50,14 +72,15 @@ export default function UserProfileScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [id]);
+  }, [currentUser?.id, id, router]);
 
   useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
 
   const handleFollowToggle = async () => {
-    if (!id || isFollowBusy) return;
+    const targetUserId = profileData?.user.id || id;
+    if (!targetUserId || isFollowBusy) return;
 
     const nextFollowing = !isFollowing;
     const previousFollowing = isFollowing;
@@ -65,7 +88,7 @@ export default function UserProfileScreen() {
     setIsFollowing(nextFollowing);
 
     try {
-      const result = nextFollowing ? await followUser(id) : await unfollowUser(id);
+      const result = nextFollowing ? await followUser(targetUserId) : await unfollowUser(targetUserId);
       setIsFollowing(result.isFollowing);
       setProfileData(current => current
         ? {
@@ -119,6 +142,12 @@ export default function UserProfileScreen() {
           <View className="py-20 items-center justify-center">
             <ActivityIndicator size="large" color="#98FF2F" />
           </View>
+        ) : error && !profileData ? (
+          <View className="py-20 items-center justify-center px-6">
+            <Ionicons name="alert-circle-outline" size={42} color="#EF4444" />
+            <Text className="mt-4 text-center text-white text-base font-inter-bold">Profile could not be loaded</Text>
+            <Text className="mt-2 text-center text-gray-400 text-sm">{error}</Text>
+          </View>
         ) : (
           <>
             <ProfileInfo
@@ -145,8 +174,7 @@ export default function UserProfileScreen() {
             <ProfileTabs posts={profileData?.reels || []} showPrivateTabs={false} />
           </>
         )}
-
-        {error && (
+        {error && profileData && (
           <Text className="text-red-400 text-center text-sm mt-4 px-4">{error}</Text>
         )}
       </ScrollView>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Linking, Pressable, View, Text } from 'react-native';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
@@ -141,6 +142,7 @@ function AudioMessage({ uri, isMe }: { uri: string; isMe: boolean }) {
 }
 
 export function MessageBubble({ msg }: { msg: MessageType }) {
+  const router = useRouter();
   const isMe = msg.sender === 'me';
   const hasAttachment = Boolean(msg.attachmentType && msg.attachmentUrl);
   const text = shouldRenderText(msg.text, msg.attachmentType) ? msg.text : '';
@@ -201,9 +203,12 @@ export function MessageBubble({ msg }: { msg: MessageType }) {
           </Pressable>
         )}
         {text ? (
-          <Text className={`${hasAttachment ? 'mt-2 px-1' : ''} text-base`} style={{ color: textColor }}>
-            {text}
-          </Text>
+          <LinkifiedMessageText
+            text={text}
+            color={textColor}
+            className={`${hasAttachment ? 'mt-2 px-1' : ''} text-base`}
+            onOpenProfile={(profileKey) => router.push(`/screens/user/${encodeURIComponent(profileKey)}`)}
+          />
         ) : null}
         <Text className={`text-[10px] ${hasAttachment ? 'px-1 mt-1' : 'mt-1'}`} style={{ color: timeColor, alignSelf: 'flex-end' }}>
           {msg.time}
@@ -211,6 +216,80 @@ export function MessageBubble({ msg }: { msg: MessageType }) {
       </View>
     </View>
   );
+}
+
+function LinkifiedMessageText({
+  text,
+  color,
+  className,
+  onOpenProfile,
+}: {
+  text: string;
+  color: string;
+  className?: string;
+  onOpenProfile: (profileKey: string) => void;
+}) {
+  const parts = splitMessageLinks(text);
+
+  return (
+    <Text className={className} style={{ color }}>
+      {parts.map((part, index) => {
+        if (part.type !== 'link') return part.value;
+
+        return (
+          <Text
+            key={`${part.value}-${index}`}
+            style={{ color: '#4DA3FF', textDecorationLine: 'underline' }}
+            onPress={() => openMessageLink(part.value, onOpenProfile)}
+          >
+            {part.value}
+          </Text>
+        );
+      })}
+    </Text>
+  );
+}
+
+function splitMessageLinks(text: string): Array<{ type: 'text' | 'link'; value: string }> {
+  const urlPattern = /(play:\/\/screens\/user\/[^\s]+|https?:\/\/play\.app\s*\/\s*@[a-zA-Z0-9._-]+|https?:\/\/[^\s]+)/gi;
+  const parts: Array<{ type: 'text' | 'link'; value: string }> = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = urlPattern.exec(text))) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', value: text.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: 'link', value: match[0] });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+
+  return parts.length ? parts : [{ type: 'text', value: text }];
+}
+
+function openMessageLink(link: string, onOpenProfile: (profileKey: string) => void) {
+  const profileKey = profileKeyFromLink(link);
+  if (profileKey) {
+    onOpenProfile(profileKey);
+    return;
+  }
+
+  void Linking.openURL(link);
+}
+
+function profileKeyFromLink(link: string) {
+  const normalizedLink = link.replace(/\s+/g, '');
+  const appMatch = normalizedLink.match(/^play:\/\/screens\/user\/([^?\s#]+)/i);
+  if (appMatch?.[1]) return decodeURIComponent(appMatch[1]).replace(/^@/, '');
+
+  const webMatch = normalizedLink.match(/^https?:\/\/play\.app\/@([^?\s#]+)/i);
+  if (webMatch?.[1]) return decodeURIComponent(webMatch[1]).replace(/^@/, '');
+
+  return null;
 }
 
 function shouldRenderText(text: string, attachmentType?: MessageType['attachmentType']) {
