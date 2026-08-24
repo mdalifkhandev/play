@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { Link, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,10 +9,22 @@ import { getFeedAds, recordAdClick, recordAdImpression, type AdCampaign } from "
 import { getFeed, getForYouFeed } from "../../api/reels/reels.api";
 import { ReelFeedItem } from "../../api/reels/reels.types";
 import { useFeedSection } from "../../hooks/feed/useFeedSection";
+import { avatarSource } from "../../utils/avatar";
 
 type ReelListItem = Omit<FeedItemProps, 'isActive' | 'shouldMountVideo'> & { itemType: 'reel' };
+type LiveListItem = {
+  itemType: 'live';
+  id: string;
+  liveStreamId: string;
+  source: string;
+  user: ReelListItem['user'];
+  title: string;
+  description: string;
+  date: string;
+  viewerCount: number;
+};
 type AdListItem = { itemType: 'ad'; id: string; ad: AdCampaign };
-type FeedListItem = ReelListItem | AdListItem;
+type FeedListItem = ReelListItem | LiveListItem | AdListItem;
 
 function isImageUrl(url?: string | null): url is string {
   if (!url) return false;
@@ -50,7 +63,33 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): ReelListItem {
   };
 }
 
-function insertAdsIntoFeed(reels: ReelListItem[], ads: AdCampaign[]): FeedListItem[] {
+function mapBackendLiveToFeedItem(reel: ReelFeedItem): LiveListItem {
+  return {
+    id: reel.id,
+    itemType: 'live',
+    liveStreamId: reel.liveStreamId || reel.id.replace(/^live-/, ''),
+    source: reel.thumbnailUrl || reel.videoUrl || reel.user.avatarUrl || '',
+    user: {
+      id: reel.user.id,
+      username: reel.user.displayName || reel.user.username || reel.user.email || '',
+      profileImage: reel.user.avatarUrl || '',
+      isPremium: Boolean(reel.user.isPremium),
+    },
+    title: 'LIVE',
+    description: reel.caption || 'Live now',
+    date: new Date(reel.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    viewerCount: reel.stats.views,
+  };
+}
+
+function mapBackendFeedItem(reel: ReelFeedItem): ReelListItem | LiveListItem {
+  if (reel.kind === 'live') {
+    return mapBackendLiveToFeedItem(reel);
+  }
+  return mapBackendReelToFeedItem(reel);
+}
+
+function insertAdsIntoFeed(reels: Array<ReelListItem | LiveListItem>, ads: AdCampaign[]): FeedListItem[] {
   if (ads.length === 0 || reels.length === 0) return reels;
 
   const mixed: FeedListItem[] = [];
@@ -122,6 +161,58 @@ function SponsoredAdItem({
   );
 }
 
+function LiveFeedCard({
+  item,
+}: {
+  item: LiveListItem;
+  isActive: boolean;
+}) {
+  const router = useRouter();
+  const { height, width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Pressable
+      style={{ height, width }}
+      className="bg-black"
+      onPress={() => router.push({ pathname: '/screens/live/[id]', params: { id: item.liveStreamId } } as never)}
+    >
+      {item.source ? (
+        <Image source={{ uri: item.source }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
+      ) : (
+        <View className="absolute inset-0 bg-[#151515]" />
+      )}
+      <View className="absolute inset-0 bg-black/45" />
+
+      <View className="absolute left-5 right-5" style={{ top: insets.top + 88 }}>
+        <View className="self-start flex-row items-center rounded-full bg-red-500 px-3 py-1.5">
+          <View className="mr-2 h-2 w-2 rounded-full bg-white" />
+          <Text className="text-white text-xs font-inter-bold">LIVE</Text>
+        </View>
+      </View>
+
+      <View className="absolute left-5 right-5 items-center" style={{ top: '42%' }}>
+        <View className="h-20 w-20 items-center justify-center rounded-full bg-[#98FF2F]">
+          <Ionicons name="play" size={38} color="#000" />
+        </View>
+        <Text className="mt-4 text-white text-2xl font-inter-bold" numberOfLines={2}>{item.description}</Text>
+        <Text className="mt-2 text-white/75 text-sm">{item.viewerCount} watching</Text>
+      </View>
+
+      <View className="absolute left-5 right-5 flex-row items-center" style={{ bottom: insets.bottom + 82 }}>
+        <Image source={avatarSource(item.user.profileImage)} style={{ width: 38, height: 38, borderRadius: 19 }} contentFit="cover" />
+        <View className="ml-3 flex-1">
+          <Text className="text-white text-base font-inter-bold" numberOfLines={1}>{item.user.username}</Text>
+          <Text className="text-white/65 text-xs">{item.date}</Text>
+        </View>
+        <View className="rounded-full bg-[#98FF2F] px-4 py-2">
+          <Text className="text-black text-sm font-inter-bold">Join</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { reelId } = useLocalSearchParams<{ reelId?: string }>();
@@ -138,7 +229,7 @@ export default function HomeScreen() {
   const fetchReelsData = useCallback(async () => {
     if (activeTab === 'following') {
       const response = await getFeed();
-      return response.items.map(mapBackendReelToFeedItem);
+      return response.items.map(mapBackendFeedItem);
     }
 
     let response;
@@ -149,7 +240,7 @@ export default function HomeScreen() {
       response = await getFeed();
     }
 
-    const reels = response.items.map(mapBackendReelToFeedItem);
+    const reels = response.items.map(mapBackendFeedItem);
     const ads = await getFeedAds(3).then(result => result.items).catch(error => {
       console.log('Feed ads failed:', error);
       return [];
@@ -240,7 +331,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!reelId || hasScrolledToRouteReelRef.current === reelId || feedData.length === 0) return;
 
-    const targetIndex = feedData.findIndex(item => item.itemType === 'reel' && item.id === reelId);
+    const targetIndex = feedData.findIndex(item => item.itemType !== 'ad' && item.id === reelId);
     if (targetIndex < 0) return;
 
     hasScrolledToRouteReelRef.current = reelId;
@@ -318,6 +409,8 @@ export default function HomeScreen() {
           renderItem={({ item, index }) => (
             item.itemType === 'ad' ? (
               <SponsoredAdItem ad={item.ad} isActive={isScreenActive && index === activeItemIndex} />
+            ) : item.itemType === 'live' ? (
+              <LiveFeedCard item={item} isActive={isScreenActive && index === activeItemIndex} />
             ) : (
               <FeedItem 
                 {...item} 

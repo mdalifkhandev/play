@@ -278,8 +278,8 @@ function CommentsModal({
                   <View className="ml-3 flex-1">
                     <Text className="text-white text-sm font-inter-semibold">{item.authorName || 'User'}</Text>
                     <Text className="mt-1 text-gray-200 text-sm">{item.text}</Text>
-                    <View className="mt-2 flex-row gap-4">
-                      {isOwnComment ? (
+                    <View className="mt-2 flex-row flex-wrap gap-4">
+                      {isOwnComment && (
                         <>
                           <Pressable onPress={() => startEdit(item)}>
                             <Text className="text-[#98FF2F] text-xs font-inter-semibold">Edit</Text>
@@ -288,11 +288,11 @@ function CommentsModal({
                             <Text className="text-red-400 text-xs font-inter-semibold">Delete</Text>
                           </Pressable>
                         </>
-                      ) : (
-                        <Pressable onPress={() => setReportCommentId(item.id)}>
-                          <Text className="text-red-400 text-xs font-inter-semibold">Report</Text>
-                        </Pressable>
                       )}
+                      <Pressable className="flex-row items-center gap-1" onPress={() => setReportCommentId(item.id)}>
+                        <Ionicons name="flag-outline" size={13} color="#F87171" />
+                        <Text className="text-red-400 text-xs font-inter-semibold">Report</Text>
+                      </Pressable>
                     </View>
                   </View>
                 </View>

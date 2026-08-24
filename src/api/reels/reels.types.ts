@@ -62,7 +62,10 @@ export type ReelStatusResult = {
 };
 
 export type ReelFeedItem = {
+  kind?: 'reel' | 'live' | 'live_replay';
   id: string;
+  liveStreamId?: string;
+  liveStatus?: string;
   videoUrl: string;
   thumbnailUrl: string;
   durationMs: number;
