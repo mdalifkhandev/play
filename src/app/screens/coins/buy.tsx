@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Header } from '../../../../src/components/ui/Header';
@@ -47,24 +47,41 @@ export default function BuyCoinsScreen() {
   const [selectedPackage, setSelectedPackage] = useState<CoinPackageType | null>(null);
   const [packages, setPackages] = useState<CoinPackageType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadPackages = async (refreshing = false) => {
+    if (refreshing) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
 
-    getCoinPackages()
+    return getCoinPackages()
       .then(items => {
-        if (!cancelled) {
-          setPackages(items);
-          setSelectedPackage(items.find(item => item.isPopular) || items[0] || null);
-        }
+        setPackages(items);
+        setSelectedPackage(current => {
+          if (current && items.some(item => item.id === current.id)) {
+            return items.find(item => item.id === current.id) || current;
+          }
+          return items.find(item => item.isPopular) || items[0] || null;
+        });
       })
       .catch(error => console.log('Coin packages load failed:', error))
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        setIsLoading(false);
+        setIsRefreshing(false);
       });
+  };
+
+  useEffect(() => {
+    let mounted = true;
+
+    loadPackages().finally(() => {
+      if (!mounted) return;
+    });
 
     return () => {
-      cancelled = true;
+      mounted = false;
     };
   }, []);
 
@@ -72,7 +89,13 @@ export default function BuyCoinsScreen() {
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
       <Header title="Buy Coins" />
       
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={() => loadPackages(true)} tintColor="#98FF2F" />
+        }
+      >
         {isLoading ? (
           <View className="py-20 items-center justify-center">
             <ActivityIndicator color="#98FF2F" />
