@@ -304,6 +304,19 @@ export default function LiveHostScreen() {
       const tokenData = await liveStreamApi.getStreamToken(streamId as string);
       setTokenInfo(tokenData);
 
+      const renewAgoraToken = async () => {
+        try {
+          if (!streamId || !agoraEngineRef.current) return;
+
+          const freshTokenData = await liveStreamApi.getStreamToken(streamId as string);
+          agoraEngineRef.current?.renewToken(freshTokenData.token);
+          setTokenInfo(freshTokenData);
+          console.log('Agora host token renewed');
+        } catch (tokenError) {
+          console.log('Agora host token renew failed:', tokenError);
+        }
+      };
+
       // 3. Initialize Agora
       const appId = process.env.EXPO_PUBLIC_AGORA_APP_ID;
       if (!appId) {
@@ -335,6 +348,12 @@ export default function LiveHostScreen() {
         onError: (err, msg) => {
           console.error('Agora Error:', err, msg);
           setError(`Agora Error: ${msg}`);
+        },
+        onTokenPrivilegeWillExpire: () => {
+          renewAgoraToken();
+        },
+        onRequestToken: () => {
+          renewAgoraToken();
         },
       });
 

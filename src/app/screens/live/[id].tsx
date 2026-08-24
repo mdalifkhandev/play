@@ -141,6 +141,18 @@ export default function LiveSingleScreen() {
         engine.initialize({ appId, channelProfile: ChannelProfileType.ChannelProfileLiveBroadcasting });
         engine.enableVideo();
 
+        const renewAgoraToken = async () => {
+          try {
+            if (!id || !agoraEngineRef.current || isLeavingRef.current) return;
+
+            const freshTokenData = await liveStreamApi.getStreamToken(id as string);
+            agoraEngineRef.current?.renewToken(freshTokenData.token);
+            console.log('Agora viewer token renewed');
+          } catch (tokenError) {
+            console.log('Agora viewer token renew failed:', tokenError);
+          }
+        };
+
         engine.registerEventHandler({
           onJoinChannelSuccess: () => {
             setIsJoined(true);
@@ -155,6 +167,12 @@ export default function LiveSingleScreen() {
             toast.error('The host has ended the stream.');
             if (router.canGoBack()) router.back();
             else router.replace('/');
+          },
+          onTokenPrivilegeWillExpire: () => {
+            renewAgoraToken();
+          },
+          onRequestToken: () => {
+            renewAgoraToken();
           },
         });
 
