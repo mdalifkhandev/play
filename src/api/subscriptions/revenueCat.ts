@@ -24,12 +24,12 @@ export async function configureRevenueCat(userId: string) {
   configuredUserId = userId;
 }
 
-export async function purchaseRevenueCatPlan(userId: string, planId: SubscriptionPlanId) {
+export async function purchaseRevenueCatPlan(userId: string, planId: SubscriptionPlanId, productIdentifier?: string) {
   await configureRevenueCat(userId);
 
   const offerings = await Purchases.getOfferings();
   const packages = offerings.current?.availablePackages || [];
-  const targetProductId = planId === 'yearly' ? yearlyProductId : monthlyProductId;
+  const targetProductId = productIdentifier || (planId === 'yearly' ? yearlyProductId : monthlyProductId);
   const selectedPackage = findRevenueCatPackage(packages, planId, targetProductId);
 
   if (!selectedPackage) {
@@ -59,8 +59,13 @@ function findRevenueCatPackage(
     if (byProduct) return byProduct;
   }
 
-  const planKeyword = planId === 'yearly' ? 'annual' : 'monthly';
+  const normalizedPlanId = planId.toLowerCase();
+  const planKeyword = normalizedPlanId.includes('lifetime')
+    ? 'lifetime'
+    : normalizedPlanId.includes('year')
+      ? 'annual'
+      : 'monthly';
   return packages.find((item) => item.identifier.toLowerCase().includes(planKeyword))
-    || packages.find((item) => item.product.identifier.toLowerCase().includes(planId))
-    || packages[planId === 'yearly' ? 1 : 0];
+    || packages.find((item) => item.product.identifier.toLowerCase().includes(normalizedPlanId))
+    || packages[normalizedPlanId.includes('year') ? 1 : 0];
 }
