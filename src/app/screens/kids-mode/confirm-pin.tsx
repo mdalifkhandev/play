@@ -7,7 +7,7 @@ import { toast } from 'sonner-native';
 import { Header } from '../../../../src/components/ui/Header';
 import { PinPad } from '../../../../src/components/ui/PinPad';
 import { useAppStore } from '../../../../src/store';
-import { setKidsModePin, verifyKidsModePin, updateKidsProfile } from '../../../../src/api/users/users.api';
+import { enterKidsMode, exitKidsMode } from '../../../../src/api/kids-mode/kids-mode.api';
 
 export default function ConfirmPinScreen() {
   const insets = useSafeAreaInsets();
@@ -26,27 +26,26 @@ export default function ConfirmPinScreen() {
         try {
           setIsLoading(true);
           if (action) {
-            // We are verifying an existing PIN from the backend
-            await verifyKidsModePin(pin);
-            
             if (action === 'exit') {
-              // Update backend to set isActive to false
-              await updateKidsProfile({ isActive: false });
+              await exitKidsMode(pin);
               setKidsModeActive(false);
               router.push('/home');
             } else {
-              // "Continue" action
-              const durationMs = useAppStore.getState().kidsModeDurationMs || (60 * 60 * 1000); // fallback 1h
+              const status = await enterKidsMode(pin);
+              const durationMs = Math.max(1, status.remainingSeconds) * 1000;
               useAppStore.getState().setKidsModeExpireTime(Date.now() + durationMs);
+              useAppStore.getState().setKidsModeDuration((status.dailyLimitMinutes ?? 60) * 60 * 1000);
+              setKidsModeActive(true);
               router.push('/home');
             }
           } else {
             // Setup flow
             if (pin === originalPin || !originalPin) { // fallback if no originalPin is passed for some reason
-              // Save to backend
-              await setKidsModePin(pin);
               setTimeout(() => {
-                router.push('/screens/kids-mode/setup-profile');
+                router.push({
+                  pathname: '/screens/kids-mode/setup-profile',
+                  params: { pin },
+                });
               }, 200);
             } else {
               toast.error('PIN does not match. Please try again.');

@@ -7,7 +7,7 @@ import { toast } from 'sonner-native';
 import { Header } from '../../../../src/components/ui/Header';
 import { CustomButton } from '../../../../src/components/ui/CustomButton';
 import { useAppStore } from '../../../../src/store';
-import { updateKidsProfile } from '../../../../src/api/users/users.api';
+import { setupKidsMode, type KidsModeAgeGroup } from '../../../../src/api/kids-mode/kids-mode.api';
 
 const TimeCounter = ({ 
   label, 
@@ -103,21 +103,29 @@ export default function TimeLimitScreen() {
 
               try {
                 setIsActivating(true);
-                
-                // Save to backend
-                await updateKidsProfile({
-                  name: params.name as string | undefined,
-                  ageRange: params.ageRange as string | undefined,
-                  dailyLimitMs: totalMs,
-                  isActive: true,
+
+                const setupPin = params.pin as string | undefined;
+                if (!setupPin) {
+                  toast.error('PIN is missing. Please set Kids Mode PIN again.');
+                  router.replace('/screens/kids-mode/set-pin');
+                  return;
+                }
+
+                const dailyLimitMinutes = Math.max(1, Math.round(totalMs / 60000));
+                const status = await setupKidsMode({
+                  pin: setupPin,
+                  confirmPin: setupPin,
+                  childNickname: typeof params.name === 'string' && params.name.trim() ? params.name.trim() : undefined,
+                  ageGroup: mapAgeGroup(params.ageRange),
+                  dailyLimitMinutes,
                 });
-                
-                const expireTimestamp = Date.now() + totalMs;
+
+                const expireTimestamp = Date.now() + Math.max(1, status.remainingSeconds) * 1000;
                 
                 // Update local store
                 const store = useAppStore.getState();
                 store.setKidsModeExpireTime(expireTimestamp);
-                store.setKidsModeDuration(totalMs);
+                store.setKidsModeDuration((status.dailyLimitMinutes ?? dailyLimitMinutes) * 60 * 1000);
                 store.setKidsModeActive(true); // Ensure it's marked active locally
                 
                 router.push('/screens/kids-mode/success');
@@ -133,4 +141,11 @@ export default function TimeLimitScreen() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
+}
+
+function mapAgeGroup(value: unknown): KidsModeAgeGroup {
+  if (value === '3-6' || value === '7-9' || value === '10-15') {
+    return value;
+  }
+  return '7-9';
 }

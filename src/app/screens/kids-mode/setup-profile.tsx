@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, KeyboardAvoidingView, Platform, ScrollView, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Header } from '../../../../src/components/ui/Header';
 import { CustomButton } from '../../../../src/components/ui/CustomButton';
 
@@ -29,6 +29,7 @@ const AgeButton = ({
 export default function SetupKidsProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [name, setName] = useState('');
   const [ageRange, setAgeRange] = useState('7-9'); // Default selected in mockup
 
@@ -82,7 +83,7 @@ export default function SetupKidsProfileScreen() {
             variant="primary"
             onPress={() => router.push({
               pathname: '/screens/kids-mode/time-limit',
-              params: { name, ageRange }
+              params: { name, ageRange, pin: params.pin as string }
             })}
           />
         </View>

@@ -231,7 +231,7 @@ export async function getFeed(cursor?: string): Promise<ReelFeedResponse> {
 
 export async function getKidsFeed(cursor?: string): Promise<ReelFeedResponse> {
   const params = cursor ? { cursor } : {};
-  const response = await apiClient.get<{ data: ReelFeedResponse }>('/reels/kids', { params });
+  const response = await apiClient.get<{ data: ReelFeedResponse }>('/kids-mode/feed', { params });
   return response.data.data;
 }
 
