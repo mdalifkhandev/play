@@ -12,6 +12,7 @@ import { createReelComment, deleteComment, editComment, likeReel, listReelCommen
 import type { ReelComment } from '../../api/engagement/engagement.types';
 import { followUser, getFollowState, unfollowUser } from '../../api/profile/profile.api';
 import { recordReelView } from '../../api/reels/reels.api';
+import { ReportSheet } from '../moderation/ReportSheet';
 import { useAppStore } from '../../store';
 import { avatarSource } from '../../utils/avatar';
 
@@ -135,6 +136,7 @@ function CommentsModal({
   const [text, setText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [reportCommentId, setReportCommentId] = useState<string | null>(null);
   const isLoadingRef = useRef(false);
 
   const loadComments = useCallback(async (cursor?: string) => {
@@ -276,16 +278,22 @@ function CommentsModal({
                   <View className="ml-3 flex-1">
                     <Text className="text-white text-sm font-inter-semibold">{item.authorName || 'User'}</Text>
                     <Text className="mt-1 text-gray-200 text-sm">{item.text}</Text>
-                    {isOwnComment && (
-                      <View className="mt-2 flex-row gap-4">
-                        <Pressable onPress={() => startEdit(item)}>
-                          <Text className="text-[#98FF2F] text-xs font-inter-semibold">Edit</Text>
+                    <View className="mt-2 flex-row gap-4">
+                      {isOwnComment ? (
+                        <>
+                          <Pressable onPress={() => startEdit(item)}>
+                            <Text className="text-[#98FF2F] text-xs font-inter-semibold">Edit</Text>
+                          </Pressable>
+                          <Pressable onPress={() => setPendingDeleteId(item.id)}>
+                            <Text className="text-red-400 text-xs font-inter-semibold">Delete</Text>
+                          </Pressable>
+                        </>
+                      ) : (
+                        <Pressable onPress={() => setReportCommentId(item.id)}>
+                          <Text className="text-red-400 text-xs font-inter-semibold">Report</Text>
                         </Pressable>
-                        <Pressable onPress={() => setPendingDeleteId(item.id)}>
-                          <Text className="text-red-400 text-xs font-inter-semibold">Delete</Text>
-                        </Pressable>
-                      </View>
-                    )}
+                      )}
+                    </View>
                   </View>
                 </View>
               );
@@ -336,6 +344,13 @@ function CommentsModal({
             </View>
           )}
         </View>
+        <ReportSheet
+          visible={Boolean(reportCommentId)}
+          targetType="comment"
+          targetId={reportCommentId || undefined}
+          title="Report comment"
+          onClose={() => setReportCommentId(null)}
+        />
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -732,6 +747,7 @@ export const FeedItem = memo(({
   const [playbackTime, setPlaybackTime] = useState({ currentTime: 0, duration: 0 });
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
+  const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<'like' | 'save' | 'share' | 'follow' | null>(null);
   const [shouldRenderVideo, setShouldRenderVideo] = useState(false);
   
@@ -1090,6 +1106,11 @@ export const FeedItem = memo(({
           <Ionicons name="arrow-redo-outline" size={24} color="#FFF" />
           <Text className="text-white text-xs font-semibold mt-1" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>{formatCount(shareCount)}</Text>
         </Pressable>
+        {!isOwnReel && (
+          <Pressable className="items-center justify-center" onPress={() => setIsReportSheetOpen(true)}>
+            <Ionicons name="flag-outline" size={24} color="#FFF" />
+          </Pressable>
+        )}
         <Pressable className="items-center justify-center" onPress={() => setIsMuted(!isMuted)}>
           <Ionicons name={isMuted ? "volume-mute-outline" : "volume-high-outline"} size={24} color="#FFF" />
          
@@ -1213,6 +1234,13 @@ export const FeedItem = memo(({
         isSharing={busyAction === 'share'}
         onClose={() => setIsShareSheetOpen(false)}
         onSelect={handleShare}
+      />
+      <ReportSheet
+        visible={isReportSheetOpen}
+        targetType="reel"
+        targetId={id}
+        title="Report reel"
+        onClose={() => setIsReportSheetOpen(false)}
       />
     </View>
   );

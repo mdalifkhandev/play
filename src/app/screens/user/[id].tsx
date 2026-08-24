@@ -14,6 +14,7 @@ import {
 import type { PublicProfileData } from '../../../api/profile/profile.types';
 import { ProfileInfo } from '../../../components/profile/ProfileInfo';
 import { ProfileTabs } from '../../../components/profile/ProfileTabs';
+import { ReportSheet } from '../../../components/moderation/ReportSheet';
 import { useAppStore } from '../../../store';
 
 const objectIdPattern = /^[a-f\d]{24}$/i;
@@ -27,6 +28,7 @@ export default function UserProfileScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowBusy, setIsFollowBusy] = useState(false);
+  const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const currentUser = useAppStore((state: any) => state.user);
@@ -123,7 +125,16 @@ export default function UserProfileScreen() {
         <Text numberOfLines={1} className="flex-1 px-3 text-center text-white text-lg font-inter-bold">
           {displayName}
         </Text>
-        <View className="h-10 w-10" />
+        {profileData?.user.id ? (
+          <Pressable
+            className="h-10 w-10 items-center justify-center rounded-full bg-white/10"
+            onPress={() => setIsReportSheetOpen(true)}
+          >
+            <Ionicons name="flag-outline" size={20} color="#FFF" />
+          </Pressable>
+        ) : (
+          <View className="h-10 w-10" />
+        )}
       </View>
 
       <ScrollView
@@ -178,6 +189,13 @@ export default function UserProfileScreen() {
           <Text className="text-red-400 text-center text-sm mt-4 px-4">{error}</Text>
         )}
       </ScrollView>
+      <ReportSheet
+        visible={isReportSheetOpen}
+        targetType="profile"
+        targetId={profileData?.user.id}
+        title="Report profile"
+        onClose={() => setIsReportSheetOpen(false)}
+      />
     </View>
   );
 }
