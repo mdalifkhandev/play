@@ -111,5 +111,17 @@ export const liveStreamApi = {
 
   likeStream: async (streamId: string): Promise<void> => {
     await apiClient.post(`/live-streams/${streamId}/like`);
-  }
+  },
+
+  reportStream: async (
+    streamId: string,
+    reason: 'spam' | 'harassment' | 'hate_speech' | 'violence' | 'nudity' | 'false_information' | 'copyright' | 'impersonation' | 'scam' | 'other',
+    details?: string,
+  ): Promise<{ reported: boolean }> => {
+    const res = await apiClient.post<{ data: { reported: boolean } }>(`/reports/live-streams/${streamId}`, {
+      reason,
+      ...(details ? { details } : {}),
+    });
+    return res.data.data;
+  },
 };

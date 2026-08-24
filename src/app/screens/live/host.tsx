@@ -60,6 +60,10 @@ export default function LiveHostScreen() {
       pollTimer = setInterval(async () => {
         try {
           const stream = await liveStreamApi.getStreamById(streamId as string);
+          if (String(stream.status).toUpperCase() === 'ENDED') {
+            handleRemoteStreamEnded();
+            return;
+          }
           setViewerCount(stream.viewerCount);
 
           const fetchedComments = await liveStreamApi.getComments(streamId as string);
@@ -162,6 +166,22 @@ export default function LiveHostScreen() {
     );
   };
 
+  function handleRemoteStreamEnded() {
+    if (isEndingRef.current) return;
+
+    isEndingRef.current = true;
+    cleanupAgoraEngine();
+    Alert.alert('Live ended', 'This live stream was ended by admin.', [
+      {
+        text: 'OK',
+        onPress: () => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/');
+        },
+      },
+    ]);
+  }
+
   useEffect(() => {
     if (!streamId) {
       Alert.alert('Error', 'Missing stream ID');
@@ -226,9 +246,16 @@ export default function LiveHostScreen() {
           setViewerCount(Math.max(0, data.viewerCount || 0));
         };
 
+        const handleStreamStatusChanged = (data: any) => {
+          if (String(data?.streamId) !== String(streamId)) return;
+          if (String(data?.status).toUpperCase() !== 'ENDED') return;
+          handleRemoteStreamEnded();
+        };
+
         socket.on('live:new_reaction', handleNewReaction);
         socket.on('live:new_gift', handleNewGift);
         socket.on('live:viewer_count_update', handleViewerCountUpdate);
+        socket.on('live:status_changed', handleStreamStatusChanged);
         socket.on('live:error', handleLiveError);
 
         // Store handler in ref or just use it in cleanup since it's in the same effect closure
@@ -238,6 +265,7 @@ export default function LiveHostScreen() {
             socket.off('live:new_reaction', handleNewReaction);
             socket.off('live:new_gift', handleNewGift);
             socket.off('live:viewer_count_update', handleViewerCountUpdate);
+            socket.off('live:status_changed', handleStreamStatusChanged);
             socket.off('live:error', handleLiveError);
             socket.off('connect', handleConnect);
           }
@@ -249,7 +277,6 @@ export default function LiveHostScreen() {
     return () => {
       if (socket) {
         socket.emit('live:leave', { streamId: String(streamId) });
-        socket.off('live:viewer_count_update');
       }
       cleanupAgoraEngine();
     };
@@ -285,20 +312,23 @@ export default function LiveHostScreen() {
         }
       }
 
-      // Fetch latest profile info for the local host UI
-      try {
-        const myProfile = await getMyProfileData();
-        const p = myProfile.user.profile;
-        setHostName(p?.displayName || p?.username || displayName);
-        setHostAvatar(p?.photoUrl || profile?.photoUrl);
-      } catch (e) {
-        // Fallback to stream details if profile fetch fails
-        const streamDetails = await liveStreamApi.getStreamById(streamId as string);
-        if (streamDetails.hostId) {
-          setHostName(streamDetails.hostId.displayName || streamDetails.hostId.username || displayName);
-          setHostAvatar(streamDetails.hostId.avatarUrl || profile?.photoUrl);
+      // Keep Agora startup fast; profile details can refresh in the background.
+      void (async () => {
+        try {
+          const myProfile = await getMyProfileData();
+          const p = myProfile.user.profile;
+          setHostName(p?.displayName || p?.username || displayName);
+          setHostAvatar(p?.photoUrl || profile?.photoUrl);
+        } catch (e) {
+          try {
+            const streamDetails = await liveStreamApi.getStreamById(streamId as string);
+            if (streamDetails.hostId) {
+              setHostName(streamDetails.hostId.displayName || streamDetails.hostId.username || displayName);
+              setHostAvatar(streamDetails.hostId.avatarUrl || profile?.photoUrl);
+            }
+          } catch {}
         }
-      }
+      })();
 
       // 2. Fetch token
       const tokenData = await liveStreamApi.getStreamToken(streamId as string);
@@ -387,7 +417,7 @@ export default function LiveHostScreen() {
     }
   };
 
-  const cleanupAgoraEngine = () => {
+  function cleanupAgoraEngine() {
     try {
       if (agoraEngineRef.current) {
         agoraEngineRef.current.leaveChannel();
@@ -398,7 +428,7 @@ export default function LiveHostScreen() {
     } catch (e) {
       console.error('Error cleaning up live engine', e);
     }
-  };
+  }
 
   const endLiveStream = async () => {
     if (isEndingRef.current) return;

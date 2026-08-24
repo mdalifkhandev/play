@@ -244,6 +244,28 @@ export default function LiveSingleScreen() {
       setStreamInfo(prev => prev ? { ...prev, viewers: String(Math.max(0, data.viewerCount || 0)) } : prev);
     };
 
+    const handleRemoteStreamEnded = () => {
+      if (isLeavingRef.current) return;
+
+      isLeavingRef.current = true;
+      releaseAgoraEngine();
+      Alert.alert('Live ended', 'This live stream has ended.', [
+        {
+          text: 'OK',
+          onPress: () => {
+            if (router.canGoBack()) router.back();
+            else router.replace('/');
+          },
+        },
+      ]);
+    };
+
+    const handleStreamStatusChanged = (data: any) => {
+      if (String(data?.streamId) !== String(id)) return;
+      if (String(data?.status).toUpperCase() !== 'ENDED') return;
+      handleRemoteStreamEnded();
+    };
+
     let handleConnect: () => void = () => {};
 
     if (token) {
@@ -259,6 +281,7 @@ export default function LiveSingleScreen() {
         socket.on('live:new_reaction', handleNewReaction);
         socket.on('live:new_gift', handleNewGift);
         socket.on('live:viewer_count_update', handleViewerCountUpdate);
+        socket.on('live:status_changed', handleStreamStatusChanged);
         socket.on('live:error', handleLiveError);
       }
     }
@@ -267,6 +290,10 @@ export default function LiveSingleScreen() {
     const pollTimer = setInterval(async () => {
       try {
         const stream = await liveStreamApi.getStreamById(id as string);
+        if (String(stream.status).toUpperCase() === 'ENDED') {
+          handleRemoteStreamEnded();
+          return;
+        }
         setStreamInfo(prev => prev ? { ...prev, viewers: stream.viewerCount.toString() } : prev);
       } catch (e) {
         // Ignore poll errors
@@ -281,6 +308,7 @@ export default function LiveSingleScreen() {
         socket.off('live:new_reaction', handleNewReaction);
         socket.off('live:new_gift', handleNewGift);
         socket.off('live:viewer_count_update', handleViewerCountUpdate);
+        socket.off('live:status_changed', handleStreamStatusChanged);
         socket.off('live:error', handleLiveError);
         socket.off('connect', handleConnect);
       }

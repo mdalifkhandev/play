@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
@@ -31,6 +31,7 @@ export default function CreateScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isScreenFocused, setIsScreenFocused] = useState(false);
   const [isStoppingRecording, setIsStoppingRecording] = useState(false);
+  const [isStartingLive, setIsStartingLive] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -49,6 +50,7 @@ export default function CreateScreen() {
   const isCameraReadyRef = useRef(false);
   const isRecordingRef = useRef(false);
   const isStoppingRecordingRef = useRef(false);
+  const isStartingLiveRef = useRef(false);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -87,8 +89,10 @@ export default function CreateScreen() {
         isCameraReadyRef.current = false;
         isRecordingRef.current = false;
         isStoppingRecordingRef.current = false;
+        isStartingLiveRef.current = false;
         setIsRecording(false);
         setIsStoppingRecording(false);
+        setIsStartingLive(false);
         stopTimer();
       };
     }, [])
@@ -134,7 +138,11 @@ export default function CreateScreen() {
         console.error('Failed to take picture:', error);
       }
     } else if (mainMode === 'Live') {
+      if (isStartingLiveRef.current) return;
+
       try {
+        isStartingLiveRef.current = true;
+        setIsStartingLive(true);
         let coverImage;
 
         const result = await liveStreamApi.createStream({
@@ -144,13 +152,15 @@ export default function CreateScreen() {
         });
         
         // Ensure router push matches the actual file path we are going to create
-        router.push({
+        router.replace({
           pathname: '/screens/live/host',
           params: { streamId: result.id },
         });
       } catch (error) {
         Alert.alert('Failed to start Live', 'Could not create a live stream. Please try again.');
         console.error('Failed to create stream:', error);
+        isStartingLiveRef.current = false;
+        setIsStartingLive(false);
       }
     } else if (isRecordingRef.current) {
       try {
@@ -263,6 +273,13 @@ export default function CreateScreen() {
   return (
     <View className="flex-1 bg-black">
       <View className="flex-1 overflow-hidden rounded-b-xl">
+        {isStartingLive && (
+          <View className="absolute inset-0 bg-black/60 z-20 items-center justify-center">
+            <ActivityIndicator size="large" color="#A3E635" />
+            <Text className="text-white font-inter-semibold text-base mt-3">Opening live...</Text>
+          </View>
+        )}
+
         {isScreenFocused && (
           <CameraView
             // @ts-ignore - React Native component accepts ref, but @types/react is mismatched
@@ -341,9 +358,9 @@ export default function CreateScreen() {
           <View className="flex-row items-center justify-center relative">
             <Pressable
               onPress={handleRecordAction}
-              disabled={!isCameraReady || isStoppingRecording}
+              disabled={!isCameraReady || isStoppingRecording || isStartingLive}
               className={`w-[72px] h-[72px] rounded-full border-[3px] items-center justify-center ${isRecording ? 'border-red-500' : 'border-white'
-                } ${!isCameraReady || isStoppingRecording ? 'opacity-50' : ''}`}
+                } ${!isCameraReady || isStoppingRecording || isStartingLive ? 'opacity-50' : ''}`}
             >
               <View
                 className={`${isRecording ? 'w-8 h-8 rounded-lg bg-red-500' : 'w-[60px] h-[60px] bg-red-500 rounded-full'
