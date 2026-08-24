@@ -9,7 +9,7 @@ interface PaymentMethodSelectionProps {
 
 export function PaymentMethodSelection({ onContinue }: PaymentMethodSelectionProps) {
   const [selected, setSelected] = useState(true);
-  const paymentName = Platform.OS === 'ios' ? 'Apple Pay' : 'Square';
+  const paymentName = Platform.OS === 'ios' ? 'Apple Pay' : 'Stripe Card';
   const iconName = Platform.OS === 'ios' ? 'logo-apple' : 'card-outline';
 
   return (

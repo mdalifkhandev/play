@@ -16,17 +16,16 @@ export interface SubscriptionStatus {
   plan?: SubscriptionPlanId;
   status: 'none' | 'active' | 'expired' | 'canceled';
   expiresAt?: string;
-  provider?: 'square' | 'apple_pay';
+  provider?: 'revenuecat' | 'apple_pay' | 'stripe';
   paymentId?: string;
   isPremium: boolean;
 }
 
-export interface SquareSubscriptionResult {
-  paymentProvider: 'square';
-  paymentId: string;
+export interface RevenueCatSubscriptionResult {
+  paymentProvider: 'revenuecat';
+  productIdentifier: string;
   plan: SubscriptionPlan;
   subscription: SubscriptionStatus;
-  status: string;
 }
 
 export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
@@ -39,12 +38,13 @@ export async function getMySubscription(): Promise<SubscriptionStatus> {
   return response.data.data;
 }
 
-export async function createSquareSubscriptionPayment(input: {
+export async function syncRevenueCatSubscription(input: {
   planId: SubscriptionPlanId;
-  sourceId: string;
-}): Promise<SquareSubscriptionResult> {
-  const response = await apiClient.post<{ data: SquareSubscriptionResult }>(
-    '/subscriptions/purchase/square-payment',
+  platform: 'ios' | 'android';
+  productIdentifier?: string;
+}): Promise<RevenueCatSubscriptionResult> {
+  const response = await apiClient.post<{ data: RevenueCatSubscriptionResult }>(
+    '/subscriptions/revenuecat/sync',
     input,
   );
   return response.data.data;

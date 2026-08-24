@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Linking as RNLinking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,10 +8,12 @@ import {
   createStripeConnectLink,
   getCoinTransactionHistory,
   getReceivedGiftHistory,
+  getWithdrawalHistory,
   getWithdrawalSettings,
   requestCoinWithdrawal,
   type CoinTransactionItem,
   type GiftHistoryItem,
+  type WithdrawalHistoryItem,
   type WithdrawalSettingsResponse,
 } from '../../../api/coins/coins.api';
 import { CustomButton } from '../../../components/ui/CustomButton';
@@ -30,15 +32,21 @@ function formatDate(value?: string) {
 
 function transactionTitle(item: CoinTransactionItem) {
   if (item.paymentProvider === 'diamond_conversion') return 'Diamond conversion';
-  if (item.paymentProvider === 'square') return 'Coin purchase';
+  if (item.paymentProvider === 'stripe') return 'Coin purchase';
   return 'Payment';
+}
+
+function formatCurrencyAmount(amount: number, currency = 'usd') {
+  const symbol = currency.toLowerCase() === 'usd' ? '$' : `${currency.toUpperCase()} `;
+  return `${symbol}${formatUsd(amount)}`;
 }
 
 export default function BalanceScreen() {
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<'All' | 'Live Gifts'>('All');
+  const [activeTab, setActiveTab] = useState<'All' | 'Live Gifts' | 'Coin'>('All');
   const [settings, setSettings] = useState<WithdrawalSettingsResponse | null>(null);
   const [transactions, setTransactions] = useState<CoinTransactionItem[]>([]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalHistoryItem[]>([]);
   const [gifts, setGifts] = useState<GiftHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -49,14 +57,16 @@ export default function BalanceScreen() {
       if (refreshing) setIsRefreshing(true);
       else setIsLoading(true);
 
-      const [withdrawSettings, history, receivedGifts] = await Promise.all([
+      const [withdrawSettings, history, withdrawalHistory, receivedGifts] = await Promise.all([
         getWithdrawalSettings(),
         getCoinTransactionHistory(10),
+        getWithdrawalHistory(10),
         getReceivedGiftHistory(10),
       ]);
 
       setSettings(withdrawSettings);
       setTransactions(history.items || []);
+      setWithdrawals(withdrawalHistory.items || []);
       setGifts(receivedGifts.items || []);
     } catch (error) {
       console.error('Failed to load balance screen:', error);
@@ -73,6 +83,9 @@ export default function BalanceScreen() {
 
   const withdrawableCoins = settings?.userCoinBalance ?? 0;
   const estimatedBalance = settings?.estimatedUsdValue ?? 0;
+  const pendingWithdrawalCoins = settings?.pendingWithdrawalCoins ?? 0;
+  const pendingWithdrawalUsdValue = settings?.pendingWithdrawalUsdValue ?? 0;
+  const pendingWithdrawalCount = settings?.pendingWithdrawalCount ?? 0;
   const canWithdraw = useMemo(() => {
     if (!settings) return false;
     return withdrawableCoins >= settings.minWithdrawalCoins;
@@ -88,13 +101,22 @@ export default function BalanceScreen() {
         if (!settings.payoutSetupAvailable) {
           Alert.alert(
             'Payout not ready',
-            'Coin purchase uses Square on Android and Apple Pay on iOS. Withdraw needs a payout provider to send money to your bank, and it is not configured yet.',
+            'Coin purchase uses Stripe on Android and Apple Pay on iOS. Withdraw needs Stripe Connect to send money to your bank, and it is not configured yet.',
           );
           return;
         }
 
         const link = await createStripeConnectLink();
-        await Linking.openURL(link.url);
+        if (__DEV__) {
+          console.log('Stripe Connect onboarding link created:', {
+            stripeConnectAccountId: link.stripeConnectAccountId,
+            hasUrl: Boolean(link.url),
+          });
+        }
+        if (!link.url) {
+          throw new Error('Stripe Connect onboarding link was not returned.');
+        }
+        await RNLinking.openURL(link.url);
         return;
       }
 
@@ -114,7 +136,16 @@ export default function BalanceScreen() {
     }
   }, [canWithdraw, isWithdrawing, loadBalance, settings, withdrawableCoins]);
 
-  const visibleItems = activeTab === 'All' ? transactions : gifts;
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        loadBalance(true);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [loadBalance]);
+
   const bottomPadding = Math.max(insets.bottom, 20) + 24;
 
   return (
@@ -128,7 +159,7 @@ export default function BalanceScreen() {
       >
         <View className="items-center mt-6">
           <Pressable className="flex-row items-center mb-4">
-            <Text className="text-[#888] text-sm mr-1">Estimate balance USD</Text>
+            <Text className="text-[#888] text-sm mr-1">Available balance USD</Text>
             <Ionicons name="caret-down" size={14} color="#888" />
           </Pressable>
 
@@ -151,6 +182,18 @@ export default function BalanceScreen() {
               {withdrawableCoins.toLocaleString()} coins · Minimum {settings.minWithdrawalCoins.toLocaleString()} coins
             </Text>
           )}
+
+          {settings && pendingWithdrawalCoins > 0 && (
+            <View className="w-full bg-[#151515] rounded-xl border border-[#222] px-4 py-3 mt-4">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-white text-sm font-inter-semibold">Pending payout</Text>
+                <Text className="text-[#A3E635] text-sm font-inter-semibold">${formatUsd(pendingWithdrawalUsdValue)}</Text>
+              </View>
+              <Text className="text-[#888] text-xs mt-1">
+                {pendingWithdrawalCoins.toLocaleString()} coins in {pendingWithdrawalCount} request{pendingWithdrawalCount === 1 ? '' : 's'}.
+              </Text>
+            </View>
+          )}
         </View>
 
         <View className="flex-row items-center mt-8 mb-4">
@@ -163,9 +206,16 @@ export default function BalanceScreen() {
 
           <Pressable
             onPress={() => setActiveTab('Live Gifts')}
-            className={`px-4 py-1 rounded-md ${activeTab === 'Live Gifts' ? 'bg-[#A3E635]' : 'bg-[#333]'}`}
+            className={`px-4 py-1 rounded-md mr-3 ${activeTab === 'Live Gifts' ? 'bg-[#A3E635]' : 'bg-[#333]'}`}
           >
             <Text className={`text-sm ${activeTab === 'Live Gifts' ? 'text-black' : 'text-[#888]'}`}>Live Gifts</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setActiveTab('Coin')}
+            className={`px-4 py-1 rounded-md ${activeTab === 'Coin' ? 'bg-[#A3E635]' : 'bg-[#333]'}`}
+          >
+            <Text className={`text-sm ${activeTab === 'Coin' ? 'text-black' : 'text-[#888]'}`}>Coin</Text>
           </Pressable>
         </View>
 
@@ -182,33 +232,89 @@ export default function BalanceScreen() {
             <View className="py-8">
               <ActivityIndicator color="#A3E635" />
             </View>
-          ) : visibleItems.length === 0 ? (
+          ) : activeTab === 'All' && withdrawals.length === 0 ? (
             <Text className="text-[#888] text-sm text-center py-8">
-              {activeTab === 'All' ? 'No transactions yet.' : 'No live gifts yet.'}
+              No dollar transactions yet.
             </Text>
-          ) : (
-            visibleItems.map((item) => {
-              const isGift = activeTab === 'Live Gifts';
-              const gift = item as GiftHistoryItem;
-              const transaction = item as CoinTransactionItem;
-              const title = isGift ? `${gift.giftName} gift` : transactionTitle(transaction);
-              const subtitle = isGift
-                ? `${gift.quantity}x · ${formatDate(gift.createdAt)}`
-                : `${transaction.status} · ${formatDate(transaction.createdAt)}`;
-              const amount = isGift ? `+${gift.totalCoins}` : `+${transaction.coins}`;
+          ) : activeTab === 'Live Gifts' && gifts.length === 0 ? (
+            <Text className="text-[#888] text-sm text-center py-8">
+              No live gifts yet.
+            </Text>
+          ) : activeTab === 'Coin' && transactions.length === 0 ? (
+            <Text className="text-[#888] text-sm text-center py-8">
+              No coin transactions yet.
+            </Text>
+          ) : activeTab === 'All' ? (
+            withdrawals.map((withdrawal) => {
+              const isRejected = withdrawal.status === 'rejected' || withdrawal.status === 'failed';
+              const statusText =
+                withdrawal.status === 'transferred'
+                  ? 'accepted'
+                  : withdrawal.status === 'approved'
+                    ? 'processing'
+                    : withdrawal.status;
 
               return (
-                <View key={item.id} className="flex-row items-center justify-between px-4 py-3 border-b border-[#222]">
+                <View key={withdrawal.id} className="flex-row items-center justify-between px-4 py-3 border-b border-[#222]">
                   <View className="flex-row items-center flex-1">
                     <View className="w-10 h-10 rounded-full bg-[#252525] items-center justify-center mr-3">
-                      <Ionicons name={isGift ? 'gift-outline' : 'swap-horizontal'} size={18} color="#A3E635" />
+                      <Ionicons name={isRejected ? 'close-circle-outline' : 'cash-outline'} size={18} color={isRejected ? '#fb7185' : '#A3E635'} />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-white text-sm font-inter-semibold" numberOfLines={1}>
+                        Withdrawal {statusText}
+                      </Text>
+                      <Text className="text-[#888] text-xs mt-0.5" numberOfLines={1}>
+                        {withdrawal.coins.toLocaleString()} coins · {formatDate(withdrawal.processedAt || withdrawal.createdAt)}
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="items-end ml-3">
+                    <Text className={`${isRejected ? 'text-red-400' : 'text-[#A3E635]'} text-sm font-inter-semibold`}>
+                      {isRejected ? '-' : '+'}${formatUsd(withdrawal.amountUsd)}
+                    </Text>
+                    <Text className="text-[#888] text-xs mt-0.5">{withdrawal.status}</Text>
+                  </View>
+                </View>
+              );
+            })
+          ) : activeTab === 'Live Gifts' ? (
+            gifts.map((gift) => (
+              <View key={gift.id} className="flex-row items-center justify-between px-4 py-3 border-b border-[#222]">
+                <View className="flex-row items-center flex-1">
+                  <View className="w-10 h-10 rounded-full bg-[#252525] items-center justify-center mr-3">
+                    <Ionicons name="gift-outline" size={18} color="#A3E635" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-white text-sm font-inter-semibold" numberOfLines={1}>{gift.giftName} gift</Text>
+                    <Text className="text-[#888] text-xs mt-0.5" numberOfLines={1}>{gift.quantity}x · {formatDate(gift.createdAt)}</Text>
+                  </View>
+                </View>
+                <Text className="text-[#A3E635] text-sm font-inter-semibold ml-3">+{gift.totalCoins}</Text>
+              </View>
+            ))
+          ) : (
+            transactions.map((transaction) => {
+              const title = transactionTitle(transaction);
+              const subtitle = `${transaction.status} · ${formatDate(transaction.createdAt)}`;
+              const amount = `+${transaction.coins}`;
+              const cashAmount = formatCurrencyAmount(transaction.amount, transaction.currency);
+
+              return (
+                <View key={transaction.id} className="flex-row items-center justify-between px-4 py-3 border-b border-[#222]">
+                  <View className="flex-row items-center flex-1">
+                    <View className="w-10 h-10 rounded-full bg-[#252525] items-center justify-center mr-3">
+                      <Ionicons name="swap-horizontal" size={18} color="#A3E635" />
                     </View>
                     <View className="flex-1">
                       <Text className="text-white text-sm font-inter-semibold" numberOfLines={1}>{title}</Text>
                       <Text className="text-[#888] text-xs mt-0.5" numberOfLines={1}>{subtitle}</Text>
                     </View>
                   </View>
-                  <Text className="text-[#A3E635] text-sm font-inter-semibold ml-3">{amount}</Text>
+                  <View className="items-end ml-3">
+                    <Text className="text-[#A3E635] text-sm font-inter-semibold">{amount}</Text>
+                    <Text className="text-[#888] text-xs mt-0.5">{cashAmount}</Text>
+                  </View>
                 </View>
               );
             })

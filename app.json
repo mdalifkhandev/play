@@ -25,7 +25,8 @@
         "RECORD_AUDIO",
         "POST_NOTIFICATIONS",
         "WRITE_EXTERNAL_STORAGE",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "com.android.vending.BILLING"
       ]
     },
     "web": {
@@ -72,23 +73,12 @@
       ],
       "expo-image",
       [
-        "react-native-square-in-app-payments",
+        "@stripe/stripe-react-native",
         {
-          "cardEntryStyle": {
-            "saveButtonText": "Pay",
-            "backgroundColor": "#0A0A0A",
-            "textColorHint": "#666666",
-            "actionBarColor": "#0A0A0A",
-            "statusBarColor": "#0A0A0A",
-            "editTextStyle": {
-              "textColor": "#FFFFFF",
-              "accentColor": "#98FF2F",
-              "errorColor": "#EF4444"
-            }
-          }
+          "merchantIdentifier": "merchant.com.anonymous.play",
+          "enableGooglePay": false
         }
       ],
-      "./plugins/withSquareAndroidFixes",
       [
         "@sentry/react-native/expo",
         {

@@ -1,13 +1,13 @@
 import React from 'react';
-import { View, ScrollView } from 'react-native';
+import { Platform, View, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 import { Header } from '../../../components/ui/Header';
 import { CardDetailsForm } from '../../../components/payment/CardDetailsForm';
 import { handleApiError } from '../../../api/client';
-import { requestSquareSourceId } from '../../../api/coins/squarePayment';
-import { createSquareSubscriptionPayment, type SubscriptionPlanId } from '../../../api/subscriptions/subscriptions.api';
+import { syncRevenueCatSubscription, type SubscriptionPlanId } from '../../../api/subscriptions/subscriptions.api';
+import { purchaseRevenueCatPlan } from '../../../api/subscriptions/revenueCat';
 import { useAppStore } from '../../../store';
 
 export default function CardDetailsScreen() {
@@ -17,22 +17,21 @@ export default function CardDetailsScreen() {
 
   const planId = String(params.planId || 'monthly') as SubscriptionPlanId;
   const planName = String(params.planName || (planId === 'yearly' ? 'Premium Yearly' : 'Premium Monthly'));
-  const price = Number(params.price || (planId === 'yearly' ? 254.15 : 25));
-  const currency = String(params.currency || 'usd');
 
   const handleConfirm = async () => {
     try {
-      const sourceId = await requestSquareSourceId({
-        id: planId,
-        name: planName,
-        coins: 0,
-        price,
-        currency,
-        isPopular: false,
-        sortOrder: 0,
-      });
-      const result = await createSquareSubscriptionPayment({ planId, sourceId });
       const currentUser = useAppStore.getState().user;
+      const userId = currentUser?.id || currentUser?._id;
+      if (!userId) {
+        throw new Error('Please login again before buying a subscription.');
+      }
+
+      const purchase = await purchaseRevenueCatPlan(userId, planId);
+      const result = await syncRevenueCatSubscription({
+        planId,
+        platform: Platform.OS === 'ios' ? 'ios' : 'android',
+        productIdentifier: purchase.productIdentifier,
+      });
       const token = useAppStore.getState().token;
       const refreshToken = useAppStore.getState().refreshToken;
       if (currentUser && token && refreshToken) {

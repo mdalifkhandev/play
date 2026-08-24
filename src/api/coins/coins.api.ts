@@ -46,6 +46,9 @@ export interface WithdrawalSettingsResponse {
   maxWithdrawalCoins: number;
   userCoinBalance: number;
   estimatedUsdValue: number;
+  pendingWithdrawalCoins?: number;
+  pendingWithdrawalUsdValue?: number;
+  pendingWithdrawalCount?: number;
   stripeConnectAccountId?: string;
   stripeConnectOnboardingComplete: boolean;
   payoutSetupAvailable?: boolean;
@@ -57,7 +60,7 @@ export interface CoinTransactionItem {
   amount: number;
   currency: string;
   status: string;
-  paymentProvider: 'stripe' | 'square' | 'diamond_conversion';
+  paymentProvider: 'stripe' | 'diamond_conversion';
   stripePaymentIntentId?: string;
   createdAt: string;
   completedAt?: string;
@@ -86,6 +89,19 @@ export interface WithdrawalRequestResponse {
   createdAt: string;
 }
 
+export interface WithdrawalHistoryItem {
+  id: string;
+  coins: number;
+  coinsPerDollar: number;
+  amountUsd: number;
+  currency: string;
+  status: 'pending' | 'approved' | 'rejected' | 'transferred' | 'failed' | string;
+  stripeTransferId?: string;
+  adminNotes?: string;
+  createdAt: string;
+  processedAt?: string;
+}
+
 export interface StripeConnectLinkResponse {
   url: string;
   stripeConnectAccountId: string;
@@ -101,14 +117,28 @@ interface PaginatedResponse<T> {
   };
 }
 
-export interface SquarePaymentResult {
-  paymentProvider: 'square';
-  paymentId: string;
+export interface CreateStripePaymentIntentResponse {
   transactionId: string;
-  coinsAdded: number;
-  coinBalance: number;
-  coinsCredited: boolean;
+  clientSecret: string;
+  paymentIntentId: string;
+  publishableKey: string;
+  amount: number;
+  currency: string;
+  coins: number;
+  packageId: string;
+}
+
+export interface VerifyStripePaymentResponse {
   status: string;
+  coinsCredited: boolean;
+  coinBalance: number;
+  coinsAdded: number;
+}
+
+export interface StripePaymentResult extends VerifyStripePaymentResponse {
+  paymentProvider: 'stripe';
+  paymentIntentId: string;
+  transactionId: string;
 }
 
 export async function getCoinBalance(): Promise<CoinBalanceResponse> {
@@ -121,8 +151,18 @@ export async function getCoinPackages(): Promise<CoinPackage[]> {
   return response.data.data;
 }
 
-export async function createSquareCoinPayment(input: { packageId: string; sourceId: string }): Promise<SquarePaymentResult> {
-  const response = await apiClient.post<{ data: SquarePaymentResult }>('/coins/purchase/square-payment', input);
+export async function createStripeCoinPaymentIntent(packageId: string): Promise<CreateStripePaymentIntentResponse> {
+  const response = await apiClient.post<{ data: CreateStripePaymentIntentResponse }>(
+    '/coins/purchase/create-payment-intent',
+    { packageId },
+  );
+  return response.data.data;
+}
+
+export async function verifyStripeCoinPayment(paymentIntentId: string): Promise<VerifyStripePaymentResponse> {
+  const response = await apiClient.post<{ data: VerifyStripePaymentResponse }>('/coins/purchase/verify-payment', {
+    paymentIntentId,
+  });
   return response.data.data;
 }
 
@@ -146,13 +186,42 @@ export async function requestCoinWithdrawal(coins: number): Promise<WithdrawalRe
   return response.data.data;
 }
 
-export async function createStripeConnectLink(): Promise<StripeConnectLinkResponse> {
-  const response = await apiClient.post<{ data: StripeConnectLinkResponse }>('/coins/payouts/stripe-connect/account-link', {});
-  return response.data.data;
+export async function createStripeConnectLink(input: {
+  returnUrl?: string;
+  refreshUrl?: string;
+} = {}): Promise<StripeConnectLinkResponse> {
+  try {
+    const response = await apiClient.post<{ data: StripeConnectLinkResponse }>(
+      '/coins/payouts/stripe-connect/account-link',
+      input,
+      { timeout: 60000 },
+    );
+    return response.data.data;
+  } catch (error: any) {
+    if (!error?.response) {
+      if (__DEV__) {
+        console.log('Stripe Connect link request lost response; retrying once.');
+      }
+      const retryResponse = await apiClient.post<{ data: StripeConnectLinkResponse }>(
+        '/coins/payouts/stripe-connect/account-link',
+        input,
+        { timeout: 60000 },
+      );
+      return retryResponse.data.data;
+    }
+    throw error;
+  }
 }
 
 export async function getCoinTransactionHistory(limit = 10): Promise<PaginatedResponse<CoinTransactionItem>> {
   const response = await apiClient.get<{ data: PaginatedResponse<CoinTransactionItem> }>('/coins/history', {
+    params: { page: 1, limit },
+  });
+  return response.data.data;
+}
+
+export async function getWithdrawalHistory(limit = 10): Promise<PaginatedResponse<WithdrawalHistoryItem>> {
+  const response = await apiClient.get<{ data: PaginatedResponse<WithdrawalHistoryItem> }>('/coins/withdraw/history', {
     params: { page: 1, limit },
   });
   return response.data.data;

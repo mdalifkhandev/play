@@ -15,6 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import "../../global.css";
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import { useAppStore } from "../store";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { useRegisterPushNotifications } from "../hooks/notifications/useRegisterPushNotifications";
@@ -108,9 +109,14 @@ export default function RootLayout() {
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
-          <StatusBar style="light" />
-          <Stack screenOptions={{ headerShown: false }} />
-          <Toaster />
+          <StripeProvider
+            publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_not_configured'}
+            merchantIdentifier={process.env.EXPO_PUBLIC_APPLE_MERCHANT_ID || 'merchant.com.anonymous.play'}
+          >
+            <StatusBar style="light" />
+            <Stack screenOptions={{ headerShown: false }} />
+            <Toaster />
+          </StripeProvider>
         </QueryClientProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

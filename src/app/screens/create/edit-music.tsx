@@ -548,7 +548,7 @@ export default function EditMusicScreen() {
       </View>
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 40, 40) }}>
-        {/* Main Preview (Square crop matching mockup) */}
+        {/* Main Preview (1:1 crop matching mockup) */}
         <View className="items-center justify-center mt-2 px-4">
           <View className="w-full aspect-square rounded-[32px] overflow-hidden relative bg-[#222]">
             {isVideo ? (
