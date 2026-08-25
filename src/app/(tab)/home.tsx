@@ -13,6 +13,7 @@ import { ReelFeedItem } from "../../api/reels/reels.types";
 import { useFeedSection } from "../../hooks/feed/useFeedSection";
 import { avatarSource } from "../../utils/avatar";
 import { usePublicPlatformSettingsQuery } from "../../api/settings";
+import { useAppStore } from "../../store";
 
 type ReelListItem = Omit<FeedItemProps, 'isActive' | 'shouldMountVideo'> & { itemType: 'reel' };
 type LiveListItem = {
@@ -276,6 +277,7 @@ export default function HomeScreen() {
   const [isScreenActive, setIsScreenActive] = useState(false);
   const [fullscreenItemId, setFullscreenItemId] = useState<string | null>(null);
   const [announcementRefreshKey, setAnnouncementRefreshKey] = useState(0);
+  const currentUser = useAppStore((state) => state.user);
   const publicSettingsQuery = usePublicPlatformSettingsQuery();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -296,14 +298,19 @@ export default function HomeScreen() {
 
     const reels = response.items.map(mapBackendFeedItem);
     const adsEnabled = publicSettingsQuery.data?.featureFlags?.ads !== false;
+    const isPremiumUser = Boolean(currentUser?.subscription?.isPremium);
+    if (!adsEnabled || isPremiumUser) {
+      return reels;
+    }
+
     const videosBetweenAds = Math.max(1, publicSettingsQuery.data?.videosBetweenAds || 5);
-    const ads = adsEnabled ? await getFeedAds(3).then(result => result.items).catch(error => {
+    const ads = await getFeedAds(3).then(result => result.items).catch(error => {
       console.log('Feed ads failed:', error);
       return [];
-    }) : [];
+    });
 
     return insertAdsIntoFeed(reels, ads, videosBetweenAds);
-  }, [activeTab, publicSettingsQuery.data?.featureFlags?.ads, publicSettingsQuery.data?.videosBetweenAds]);
+  }, [activeTab, currentUser?.subscription?.isPremium, publicSettingsQuery.data?.featureFlags?.ads, publicSettingsQuery.data?.videosBetweenAds]);
 
   const { data, isLoading, isRefreshing, error, refetch } = useFeedSection(fetchReelsData);
   const feedData = data || [];

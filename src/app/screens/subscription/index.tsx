@@ -6,9 +6,10 @@ import { useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
-import { cancelMySubscription, getMySubscription, getSubscriptionPlans, type SubscriptionPlan, type SubscriptionPlanId } from '../../../api/subscriptions/subscriptions.api';
+import { cancelMySubscription, getMySubscription, getSubscriptionPlans, type SubscriptionPlan, type SubscriptionPlanId, type SubscriptionStatus } from '../../../api/subscriptions/subscriptions.api';
 import { handleApiError } from '../../../api/client';
 import { FeatureGuard } from '../../../components/settings/FeatureGuard';
+import { useAppStore } from '../../../store';
 
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
@@ -59,6 +60,7 @@ export default function SubscriptionScreen() {
           return nextPlans[0]?.id || null;
         });
         setPremiumUntil(subscription.isPremium && subscription.expiresAt ? subscription.expiresAt : null);
+        syncSubscriptionToStore(subscription);
       })
       .catch(() => {
         if (!isActive()) return;
@@ -96,6 +98,12 @@ export default function SubscriptionScreen() {
             try {
               setIsCanceling(true);
               await cancelMySubscription();
+              syncSubscriptionToStore({
+                plan: undefined,
+                status: 'canceled',
+                expiresAt: undefined,
+                isPremium: false,
+              });
               setCurrentPremiumPlanId(null);
               setPremiumUntil(null);
               toast.success('Subscription canceled.');
@@ -382,4 +390,14 @@ function makeFeatureIcon(name: React.ComponentProps<typeof Ionicons>['name']) {
     backgroundColor: 'rgba(132, 204, 22, 0.12)',
     borderColor: 'rgba(132, 204, 22, 0.35)',
   };
+}
+
+function syncSubscriptionToStore(subscription: SubscriptionStatus) {
+  const state = useAppStore.getState();
+  if (!state.user || !state.token || !state.refreshToken) return;
+
+  state.setAuth(state.token, state.refreshToken, {
+    ...state.user,
+    subscription,
+  });
 }
