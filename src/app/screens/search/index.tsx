@@ -1,15 +1,63 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getKidsFeed, searchReels } from '../../../api/reels/reels.api';
+
+type SearchSuggestion = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  highlighted?: boolean;
+};
 
 export default function SearchScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(true);
+
+  const mapReelToSuggestion = (reel: any, highlighted = false): SearchSuggestion => ({
+    id: reel.id,
+    title: reel.caption?.trim() || reel.user?.displayName || reel.user?.username || reel.owner?.displayName || reel.owner?.username || 'Video',
+    subtitle: reel.caption?.trim() ? reel.user?.displayName || reel.user?.username || reel.owner?.displayName || reel.owner?.username || 'Video' : 'Video',
+    highlighted,
+  });
+
+  const loadSuggestions = async (text = query) => {
+    const trimmed = text.trim();
+    try {
+      setIsLoadingSuggestions(true);
+      if (trimmed) {
+        const data = await searchReels(trimmed, 1, 8);
+        setSuggestions((data.reels || []).map((reel: any, index: number) => mapReelToSuggestion(reel, index < 2)));
+        return;
+      }
+
+      const data = await getKidsFeed();
+      setSuggestions((data.items || []).slice(0, 8).map((reel: any, index: number) => ({
+        ...mapReelToSuggestion(reel, index < 2),
+        subtitle: index === 0 ? 'Just watched' : mapReelToSuggestion(reel).subtitle,
+      })));
+    } catch (error) {
+      console.error('Failed to load search suggestions:', error);
+      setSuggestions([]);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadSuggestions(query);
+    }, query.trim() ? 350 : 0);
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const handleSearch = (textToSearch: string) => {
     if (!textToSearch.trim()) return;
@@ -20,55 +68,47 @@ export default function SearchScreen() {
     <View className="flex-1 px-4 mt-6">
       <View className="flex-row justify-between items-center mb-4">
         <Text className="text-white font-bold text-lg">You may like</Text>
-        <Pressable className="flex-row items-center">
+        <Pressable className="flex-row items-center" onPress={() => loadSuggestions()}>
           <Ionicons name="refresh-outline" size={16} color="#888" />
           <Text className="text-[#888] ml-1">Refresh</Text>
         </Pressable>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Item 1 - Green */}
-        <Pressable className="flex-row justify-between items-center py-3 border-b border-[#1C1C1E]" onPress={() => handleSearch('Satoru Gojo')}>
-          <View className="flex-row items-center flex-1">
-            <Ionicons name="ellipse-outline" size={12} color="#98FF2F" className="mr-3" />
-            <View className="ml-3">
-              <Text className="text-[#98FF2F] text-base font-semibold">Satoru Gojo</Text>
-              <Text className="text-[#888] text-xs">Just watched</Text>
-            </View>
+        {isLoadingSuggestions ? (
+          <View className="items-center py-8">
+            <ActivityIndicator color="#98FF2F" />
           </View>
-          <View className="bg-[#FF7A7A] w-6 h-6 rounded-full items-center justify-center">
-            <Text style={{ fontSize: 12 }}>🍑</Text>
+        ) : suggestions.length > 0 ? (
+          suggestions.map((item) => (
+            <Pressable
+              key={item.id}
+              className="flex-row justify-between items-center py-3 border-b border-[#1C1C1E]"
+              onPress={() => handleSearch(item.title)}
+            >
+              <View className="flex-row items-center flex-1">
+                <Ionicons name="ellipse-outline" size={12} color={item.highlighted ? '#98FF2F' : '#FFF'} className="mr-3" />
+                <View className="ml-3 flex-1">
+                  <Text
+                    className={`${item.highlighted ? 'text-[#98FF2F]' : 'text-white'} text-base font-semibold`}
+                    numberOfLines={1}
+                  >
+                    {item.title}
+                  </Text>
+                  {item.subtitle ? (
+                    <Text className="text-[#888] text-xs" numberOfLines={1}>{item.subtitle}</Text>
+                  ) : null}
+                </View>
+              </View>
+              <Ionicons name="search" size={20} color="#888" />
+            </Pressable>
+          ))
+        ) : (
+          <View className="items-center py-12">
+            <Ionicons name="search-outline" size={36} color="#555" />
+            <Text className="text-[#888] mt-3">No suggestions found</Text>
           </View>
-        </Pressable>
-
-        {/* Item 2 - Green */}
-        <Pressable className="flex-row justify-between items-center py-3 border-b border-[#1C1C1E]" onPress={() => handleSearch('Satoru Gojo')}>
-          <View className="flex-row items-center flex-1">
-            <Ionicons name="ellipse-outline" size={12} color="#98FF2F" className="mr-3" />
-            <Text className="text-[#98FF2F] text-base font-semibold ml-3">Satoru Gojo</Text>
-          </View>
-          <Ionicons name="search" size={20} color="#888" />
-        </Pressable>
-
-        {/* Item 3 - White */}
-        <Pressable className="flex-row justify-between items-center py-3 border-b border-[#1C1C1E]" onPress={() => handleSearch('Satoru Gojo')}>
-          <View className="flex-row items-center flex-1">
-            <Ionicons name="ellipse-outline" size={12} color="#FFF" className="mr-3" />
-            <Text className="text-white text-base font-semibold ml-3">Satoru Gojo</Text>
-          </View>
-          <View className="bg-[#FF7A7A] w-6 h-6 rounded-full items-center justify-center">
-            <Text style={{ fontSize: 12 }}>🍑</Text>
-          </View>
-        </Pressable>
-
-        {/* Item 4 - White */}
-        <Pressable className="flex-row justify-between items-center py-3 border-b border-[#1C1C1E]" onPress={() => handleSearch('Satoru Gojo')}>
-          <View className="flex-row items-center flex-1">
-            <Ionicons name="ellipse-outline" size={12} color="#FFF" className="mr-3" />
-            <Text className="text-white text-base font-semibold ml-3">Satoru Gojo</Text>
-          </View>
-          <Ionicons name="search" size={20} color="#888" />
-        </Pressable>
+        )}
       </ScrollView>
     </View>
   );

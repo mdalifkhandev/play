@@ -23,7 +23,6 @@ export default function InboxScreen() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showNewChat, setShowNewChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -178,7 +177,7 @@ export default function InboxScreen() {
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-3">
-        <Pressable onPress={() => setShowNewChat(!showNewChat)}>
+        <Pressable onPress={() => router.push('/screens/find-friends')}>
           <Image source={require('../../../assets/icon/user-add.svg')} style={{ width: 24, height: 24, tintColor: '#FFF' }} contentFit="contain" />
         </Pressable>
         <Text className="text-white text-lg font-bold">Inbox</Text>
