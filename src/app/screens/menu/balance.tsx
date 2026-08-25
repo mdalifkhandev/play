@@ -84,7 +84,8 @@ export default function BalanceScreen() {
   }, [loadBalance]);
 
   const withdrawableCoins = settings?.userCoinBalance ?? 0;
-  const estimatedBalance = settings?.estimatedUsdValue ?? 0;
+  const availableBalanceUsd = settings?.availableBalanceUsd ?? 0;
+  const pendingBalanceUsd = settings?.pendingBalanceUsd ?? 0;
   const pendingWithdrawalCoins = settings?.pendingWithdrawalCoins ?? 0;
   const pendingWithdrawalUsdValue = settings?.pendingWithdrawalUsdValue ?? 0;
   const pendingWithdrawalCount = settings?.pendingWithdrawalCount ?? 0;
@@ -173,7 +174,7 @@ export default function BalanceScreen() {
           {isLoading ? (
             <ActivityIndicator size="large" color="#A3E635" style={{ marginBottom: 32 }} />
           ) : (
-            <Text className="text-white text-6xl font-bold font-inter-bold mb-8">{formatUsd(estimatedBalance)}</Text>
+            <Text className="text-white text-6xl font-bold font-inter-bold mb-8">{formatUsd(availableBalanceUsd)}</Text>
           )}
 
           <CustomButton
@@ -204,6 +205,18 @@ export default function BalanceScreen() {
               </View>
               <Text className="text-[#888] text-xs mt-1">
                 {pendingWithdrawalCoins.toLocaleString()} coins in {pendingWithdrawalCount} request{pendingWithdrawalCount === 1 ? '' : 's'}.
+              </Text>
+            </View>
+          )}
+
+          {settings && pendingBalanceUsd > 0 && (
+            <View className="w-full bg-[#151515] rounded-xl border border-[#222] px-4 py-3 mt-4">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-white text-sm font-inter-semibold">Pending earnings</Text>
+                <Text className="text-[#A3E635] text-sm font-inter-semibold">${formatUsd(pendingBalanceUsd)}</Text>
+              </View>
+              <Text className="text-[#888] text-xs mt-1">
+                Reel view earnings are held before they become withdrawable.
               </Text>
             </View>
           )}

@@ -12,6 +12,9 @@ export interface GiftCatalogItem {
 export interface CoinBalanceResponse {
   userId: string;
   coinBalance: number;
+  availableBalanceUsd?: number;
+  pendingBalanceUsd?: number;
+  totalBalanceUsd?: number;
 }
 
 export interface CoinPackage {
@@ -49,6 +52,9 @@ export interface WithdrawalSettingsResponse {
   pendingWithdrawalCoins?: number;
   pendingWithdrawalUsdValue?: number;
   pendingWithdrawalCount?: number;
+  availableBalanceUsd?: number;
+  pendingBalanceUsd?: number;
+  totalBalanceUsd?: number;
   stripeConnectAccountId?: string;
   stripeConnectOnboardingComplete: boolean;
   payoutSetupAvailable?: boolean;
