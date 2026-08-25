@@ -11,6 +11,7 @@ import {
   getWithdrawalHistory,
   getWithdrawalSettings,
   requestCoinWithdrawal,
+  requestEarningWithdrawal,
   type CoinTransactionItem,
   type GiftHistoryItem,
   type WithdrawalHistoryItem,
@@ -128,8 +129,15 @@ export default function BalanceScreen() {
         return;
       }
 
+      if (availableBalanceUsd > 0) {
+        const result = await requestEarningWithdrawal();
+        Alert.alert('Success', `$${result.amountUsd.toFixed(2)} withdrawal request submitted.`);
+        await loadBalance(true);
+        return;
+      }
+
       if (!canWithdraw) {
-        Alert.alert('Alert', `Minimum withdrawal amount is ${settings.minWithdrawalCoins} coins.`);
+        Alert.alert('Alert', `Minimum withdrawal amount is ${settings.minWithdrawalCoins} coins or available creator earnings.`);
         return;
       }
 
@@ -142,7 +150,7 @@ export default function BalanceScreen() {
     } finally {
       setIsWithdrawing(false);
     }
-  }, [canWithdraw, isWithdrawing, loadBalance, settings, withdrawableCoins, withdrawalsFeature.enabled]);
+  }, [availableBalanceUsd, canWithdraw, isWithdrawing, loadBalance, settings, withdrawableCoins, withdrawalsFeature.enabled]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -291,7 +299,7 @@ export default function BalanceScreen() {
                         Withdrawal {statusText}
                       </Text>
                       <Text className="text-[#888] text-xs mt-0.5" numberOfLines={1}>
-                        {withdrawal.coins.toLocaleString()} coins · {formatDate(withdrawal.processedAt || withdrawal.createdAt)}
+                        {withdrawal.withdrawalType === 'earnings' ? 'Creator earnings' : `${withdrawal.coins.toLocaleString()} coins`} · {formatDate(withdrawal.processedAt || withdrawal.createdAt)}
                       </Text>
                     </View>
                   </View>

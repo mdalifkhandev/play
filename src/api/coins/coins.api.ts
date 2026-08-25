@@ -87,16 +87,19 @@ export interface GiftHistoryItem {
 
 export interface WithdrawalRequestResponse {
   withdrawalId: string;
+  withdrawalType?: 'coins' | 'earnings' | string;
   coins: number;
   coinsPerDollar: number;
   amountUsd: number;
   status: string;
-  remainingCoinBalance: number;
+  remainingCoinBalance?: number;
+  remainingAvailableBalanceUsd?: number;
   createdAt: string;
 }
 
 export interface WithdrawalHistoryItem {
   id: string;
+  withdrawalType?: 'coins' | 'earnings' | string;
   coins: number;
   coinsPerDollar: number;
   amountUsd: number;
@@ -189,6 +192,11 @@ export async function getWithdrawalSettings(): Promise<WithdrawalSettingsRespons
 
 export async function requestCoinWithdrawal(coins: number): Promise<WithdrawalRequestResponse> {
   const response = await apiClient.post<{ data: WithdrawalRequestResponse }>('/coins/withdraw', { coins });
+  return response.data.data;
+}
+
+export async function requestEarningWithdrawal(): Promise<WithdrawalRequestResponse> {
+  const response = await apiClient.post<{ data: WithdrawalRequestResponse }>('/coins/withdraw/earnings');
   return response.data.data;
 }
 
