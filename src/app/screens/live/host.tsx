@@ -20,6 +20,7 @@ import { KeyboardAvoidingView, Platform, StatusBar, ActivityIndicator, Permissio
 import { LiveChatStream, ChatMessage } from '../../../components/live/LiveChatStream';
 import { FloatingReactions, FloatingReactionsHandle } from '../../../components/live/FloatingReactions';
 import { LiveBottomActions } from '../../../components/live/LiveBottomActions';
+import { FeatureGuard } from '../../../components/settings/FeatureGuard';
 import { Image } from 'expo-image';
 import { avatarSource } from '../../../utils/avatar';
 
@@ -464,6 +465,7 @@ export default function LiveHostScreen() {
   };
 
   return (
+    <FeatureGuard feature="liveStreaming" title="Live is unavailable">
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -548,6 +550,7 @@ export default function LiveHostScreen() {
         />
       </View>
     </KeyboardAvoidingView>
+    </FeatureGuard>
   );
 }
 

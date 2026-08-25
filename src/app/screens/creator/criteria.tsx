@@ -7,6 +7,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
 import { getCreatorEligibility, type CreatorEligibility, type CreatorRequirement } from '../../../api/creators';
+import { FeatureGuard } from '../../../components/settings/FeatureGuard';
 
 export default function CriteriaScreen() {
   const router = useRouter();
@@ -72,6 +73,7 @@ export default function CriteriaScreen() {
   const canPressApply = Boolean(eligibility?.canApply || eligibility?.status === 'rejected');
 
   return (
+    <FeatureGuard feature="creatorApplications" title="Creator applications are unavailable">
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       <Header title="LIVE Become a Creator" />
 
@@ -145,6 +147,7 @@ export default function CriteriaScreen() {
         </ScrollView>
       )}
     </View>
+    </FeatureGuard>
   );
 }
 

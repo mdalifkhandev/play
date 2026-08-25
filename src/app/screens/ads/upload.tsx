@@ -11,6 +11,7 @@ import { handleApiError } from '../../../api/client';
 import { createAdCampaign, uploadAdMedia, type AdAreaType, type AdAudienceType, type AdUploadStep } from '../../../api/ads/ads.api';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
+import { FeatureGuard } from '../../../components/settings/FeatureGuard';
 
 export default function AdsUploadScreen() {
   const insets = useSafeAreaInsets();
@@ -145,6 +146,7 @@ export default function AdsUploadScreen() {
   };
 
   return (
+    <FeatureGuard feature="ads" title="Ads are unavailable">
     <View className="flex-1 bg-[#050505]" style={{ paddingTop: insets.top }}>
       <Header title="Ads Management" />
 
@@ -224,5 +226,6 @@ export default function AdsUploadScreen() {
         )}
       </View>
     </View>
+    </FeatureGuard>
   );
 }

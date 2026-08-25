@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import { toast } from 'sonner-native';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
+import { FeatureGuard } from '../../../components/settings/FeatureGuard';
 
 const CATEGORIES = ['Food', 'Fashion', 'Music', 'Sports', 'Education', 'Travel', 'Technology', 'Health', 'Beauty', 'Business'];
 const DAY_OPTIONS = [
@@ -134,6 +135,7 @@ export default function AdsManagementFormScreen() {
   };
 
   return (
+    <FeatureGuard feature="ads" title="Ads are unavailable">
     <View className="flex-1 bg-[#050505]" style={{ paddingTop: insets.top }}>
       <Header title="Ads Management" />
 
@@ -254,5 +256,6 @@ export default function AdsManagementFormScreen() {
       </View>
       <PickerModal />
     </View>
+    </FeatureGuard>
   );
 }

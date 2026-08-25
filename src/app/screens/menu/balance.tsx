@@ -18,6 +18,7 @@ import {
 } from '../../../api/coins/coins.api';
 import { CustomButton } from '../../../components/ui/CustomButton';
 import { Header } from '../../../components/ui/Header';
+import { usePlatformFeature } from '../../../components/settings/FeatureGuard';
 
 function formatUsd(value: number) {
   return Number.isFinite(value) ? value.toFixed(2) : '0.00';
@@ -51,6 +52,7 @@ export default function BalanceScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const withdrawalsFeature = usePlatformFeature('withdrawals');
 
   const loadBalance = useCallback(async (refreshing = false) => {
     try {
@@ -94,6 +96,11 @@ export default function BalanceScreen() {
   const handleWithdraw = useCallback(async () => {
     if (!settings || isWithdrawing) return;
 
+    if (!withdrawalsFeature.enabled) {
+      Alert.alert('Alert', 'Withdrawals are currently disabled by admin.');
+      return;
+    }
+
     try {
       setIsWithdrawing(true);
 
@@ -134,7 +141,7 @@ export default function BalanceScreen() {
     } finally {
       setIsWithdrawing(false);
     }
-  }, [canWithdraw, isWithdrawing, loadBalance, settings, withdrawableCoins]);
+  }, [canWithdraw, isWithdrawing, loadBalance, settings, withdrawableCoins, withdrawalsFeature.enabled]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -172,10 +179,16 @@ export default function BalanceScreen() {
           <CustomButton
             title={settings?.stripeConnectOnboardingComplete ? 'Withdraw Balance' : 'Setup Payout Account'}
             onPress={handleWithdraw}
-            disabled={isLoading || isWithdrawing || !settings}
-            containerStyle="w-full bg-[#A3E635]"
-            textStyle="text-black"
+            disabled={isLoading || isWithdrawing || !settings || !withdrawalsFeature.enabled}
+            containerStyle={`w-full ${withdrawalsFeature.enabled ? 'bg-[#A3E635]' : 'bg-[#333]'}`}
+            textStyle={withdrawalsFeature.enabled ? 'text-black' : 'text-[#888]'}
           />
+
+          {!withdrawalsFeature.enabled && (
+            <Text className="text-[#888] text-xs text-center mt-3">
+              Withdrawals are currently disabled by admin.
+            </Text>
+          )}
 
           {settings && (
             <Text className="text-[#888] text-xs text-center mt-3">

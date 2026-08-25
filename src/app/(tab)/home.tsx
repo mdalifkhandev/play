@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { Link, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, InteractionManager, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
@@ -11,6 +12,7 @@ import { getFeed, getForYouFeed } from "../../api/reels/reels.api";
 import { ReelFeedItem } from "../../api/reels/reels.types";
 import { useFeedSection } from "../../hooks/feed/useFeedSection";
 import { avatarSource } from "../../utils/avatar";
+import { usePublicPlatformSettingsQuery } from "../../api/settings";
 
 type ReelListItem = Omit<FeedItemProps, 'isActive' | 'shouldMountVideo'> & { itemType: 'reel' };
 type LiveListItem = {
@@ -30,6 +32,11 @@ type FeedListItem = ReelListItem | LiveListItem | AdListItem;
 function isImageUrl(url?: string | null): url is string {
   if (!url) return false;
   return !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(url);
+}
+
+function isVideoUrl(url?: string | null): url is string {
+  if (!url) return false;
+  return /\.(mp4|mov|m4v|webm)(\?|$)/i.test(url);
 }
 
 function mapBackendReelToFeedItem(reel: ReelFeedItem): ReelListItem {
@@ -90,7 +97,7 @@ function mapBackendFeedItem(reel: ReelFeedItem): ReelListItem | LiveListItem {
   return mapBackendReelToFeedItem(reel);
 }
 
-function insertAdsIntoFeed(reels: Array<ReelListItem | LiveListItem>, ads: AdCampaign[]): FeedListItem[] {
+function insertAdsIntoFeed(reels: Array<ReelListItem | LiveListItem>, ads: AdCampaign[], frequency = 5): FeedListItem[] {
   if (ads.length === 0 || reels.length === 0) return reels;
 
   const mixed: FeedListItem[] = [];
@@ -99,7 +106,7 @@ function insertAdsIntoFeed(reels: Array<ReelListItem | LiveListItem>, ads: AdCam
   reels.forEach((reel, index) => {
     mixed.push(reel);
 
-    if ((index + 1) % 5 === 0 && adIndex < ads.length) {
+    if ((index + 1) % frequency === 0 && adIndex < ads.length) {
       const ad = ads[adIndex];
       mixed.push({ itemType: 'ad', id: `ad-${ad.id}`, ad });
       adIndex += 1;
@@ -134,11 +141,15 @@ function SponsoredAdItem({
     });
   }, [ad.id]);
 
-  const imageUrl = ad.mediaUrl || 'https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=1080';
+  const mediaUrl = ad.mediaUrl || 'https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=1080';
 
   return (
     <View style={{ height, width }} className="bg-black">
-      <Image source={{ uri: imageUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
+      {isVideoUrl(mediaUrl) ? (
+        <SponsoredAdVideo source={mediaUrl} isActive={isActive} />
+      ) : (
+        <Image source={{ uri: mediaUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
+      )}
       <View className="absolute inset-0 bg-black/35" />
 
       <View className="absolute left-4 right-4" style={{ top: insets.top + 78 }}>
@@ -148,17 +159,57 @@ function SponsoredAdItem({
       </View>
 
       <View className="absolute left-5 right-5" style={{ bottom: insets.bottom + 95 }}>
-        <Text className="text-white text-3xl font-inter-bold" numberOfLines={2}>
-          {ad.title || `${ad.category} Ad`}
-        </Text>
-        <Text className="mt-2 text-white/85 text-base leading-6" numberOfLines={3}>
-          {ad.description || `Promoted ${ad.category} campaign.`}
-        </Text>
+        {ad.title ? (
+          <Text className="text-white text-3xl font-inter-bold" numberOfLines={2}>
+            {ad.title}
+          </Text>
+        ) : null}
+        {ad.description ? (
+          <Text className={`${ad.title ? 'mt-2' : ''} text-white/85 text-base leading-6`} numberOfLines={3}>
+            {ad.description}
+          </Text>
+        ) : null}
         <Pressable onPress={handlePress} className="mt-5 h-12 items-center justify-center rounded-2xl bg-[#98FF2F]">
           <Text className="text-black font-inter-bold">Learn more</Text>
         </Pressable>
       </View>
     </View>
+  );
+}
+
+function SponsoredAdVideo({
+  source,
+  isActive,
+}: {
+  source: string;
+  isActive: boolean;
+}) {
+  const player = useVideoPlayer({ uri: source, contentType: 'progressive' }, currentPlayer => {
+    if (!currentPlayer) return;
+    currentPlayer.loop = true;
+    currentPlayer.muted = true;
+  });
+
+  useEffect(() => {
+    try {
+      if (isActive) {
+        player.play();
+      } else {
+        player.pause();
+      }
+    } catch (error) {
+      console.log('Sponsored ad video playback failed:', error);
+    }
+  }, [isActive, player]);
+
+  return (
+    <VideoView
+      player={player}
+      style={{ width: '100%', height: '100%' }}
+      contentFit="cover"
+      nativeControls={false}
+      allowsPictureInPicture={false}
+    />
   );
 }
 
@@ -225,6 +276,7 @@ export default function HomeScreen() {
   const [isScreenActive, setIsScreenActive] = useState(false);
   const [fullscreenItemId, setFullscreenItemId] = useState<string | null>(null);
   const [announcementRefreshKey, setAnnouncementRefreshKey] = useState(0);
+  const publicSettingsQuery = usePublicPlatformSettingsQuery();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -243,13 +295,15 @@ export default function HomeScreen() {
     }
 
     const reels = response.items.map(mapBackendFeedItem);
-    const ads = await getFeedAds(3).then(result => result.items).catch(error => {
+    const adsEnabled = publicSettingsQuery.data?.featureFlags?.ads !== false;
+    const videosBetweenAds = Math.max(1, publicSettingsQuery.data?.videosBetweenAds || 5);
+    const ads = adsEnabled ? await getFeedAds(3).then(result => result.items).catch(error => {
       console.log('Feed ads failed:', error);
       return [];
-    });
+    }) : [];
 
-    return insertAdsIntoFeed(reels, ads);
-  }, [activeTab]);
+    return insertAdsIntoFeed(reels, ads, videosBetweenAds);
+  }, [activeTab, publicSettingsQuery.data?.featureFlags?.ads, publicSettingsQuery.data?.videosBetweenAds]);
 
   const { data, isLoading, isRefreshing, error, refetch } = useFeedSection(fetchReelsData);
   const feedData = data || [];

@@ -15,6 +15,7 @@ import {
   type TrendingCreator,
 } from '../../../api/rewards/rewards.api';
 import { avatarSource } from '../../../utils/avatar';
+import { FeatureGuard } from '../../../components/settings/FeatureGuard';
 
 function compactNumber(value: number) {
   return new Intl.NumberFormat('en-US', {
@@ -98,6 +99,7 @@ export default function RewardScreen() {
   const bottomInset = Math.max(insets.bottom, 20);
 
   return (
+    <FeatureGuard feature="rewards" title="Rewards are unavailable">
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       <View className="flex-row items-center justify-between px-4 py-3 mt-4 mb-3">
         <View className="w-10 h-10 justify-center">
@@ -219,5 +221,6 @@ export default function RewardScreen() {
         </Pressable>
       </View>
     </View>
+    </FeatureGuard>
   );
 }

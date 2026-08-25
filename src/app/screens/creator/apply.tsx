@@ -21,6 +21,7 @@ import {
   type Occupation,
 } from '../../../api/creators';
 import { handleApiError } from '../../../api/client';
+import { FeatureGuard } from '../../../components/settings/FeatureGuard';
 import { useAppStore } from '../../../store';
 
 export default function ApplyScreen() {
@@ -344,6 +345,7 @@ export default function ApplyScreen() {
   };
 
   return (
+    <FeatureGuard feature="creatorApplications" title="Creator applications are unavailable">
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       <Header title="Creator Application" />
 
@@ -778,6 +780,7 @@ export default function ApplyScreen() {
         </View>
       ) : null}
     </View>
+    </FeatureGuard>
   );
 }
 

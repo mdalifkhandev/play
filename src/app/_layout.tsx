@@ -1,4 +1,4 @@
-import { Stack, useRouter, usePathname } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
@@ -19,6 +19,7 @@ import { StripeProvider } from '@stripe/stripe-react-native';
 import { useAppStore } from "../store";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { useRegisterPushNotifications } from "../hooks/notifications/useRegisterPushNotifications";
+import { MaintenanceGate } from "../components/settings/MaintenanceGate";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -114,7 +115,7 @@ export default function RootLayout() {
             merchantIdentifier={process.env.EXPO_PUBLIC_APPLE_MERCHANT_ID || 'merchant.com.anonymous.play'}
           >
             <StatusBar style="light" />
-            <Stack screenOptions={{ headerShown: false }} />
+            <MaintenanceGate />
             <Toaster />
           </StripeProvider>
         </QueryClientProvider>

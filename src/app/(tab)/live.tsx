@@ -5,6 +5,7 @@ import { LiveCategoryBar } from '../../components/live/LiveCategoryBar';
 import { LiveGridItem, LiveStreamData } from '../../components/live/LiveGridItem';
 import { LiveHeader } from '../../components/live/LiveHeader';
 import { AnnouncementNotice } from '../../components/announcements/AnnouncementNotice';
+import { FeatureGuard } from '../../components/settings/FeatureGuard';
 
 
 
@@ -43,28 +44,30 @@ export default function LiveAllScreen() {
   };
 
   return (
-    <View className="flex-1 bg-black">
-      <LiveHeader />
-      <LiveCategoryBar activeCategory={activeCat} onSelect={setActiveCat} />
-      <AnnouncementNotice placement="live_notice" />
+    <FeatureGuard feature="liveStreaming" title="Live is unavailable">
+      <View className="flex-1 bg-black">
+        <LiveHeader />
+        <LiveCategoryBar activeCategory={activeCat} onSelect={setActiveCat} />
+        <AnnouncementNotice placement="live_notice" />
 
-      {isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#FF3B30" />
-        </View>
-      ) : (
-        <FlatList
-          data={streams}
-          keyExtractor={item => item.id}
-          numColumns={2}
-          contentContainerStyle={{ padding: 8, paddingBottom: 20 }}
-          columnWrapperStyle={{ justifyContent: 'space-between' }}
-          renderItem={({ item }) => <LiveGridItem item={item} />}
-          showsVerticalScrollIndicator={false}
-          refreshing={isLoading}
-          onRefresh={fetchStreams}
-        />
-      )}
-    </View>
+        {isLoading ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color="#FF3B30" />
+          </View>
+        ) : (
+          <FlatList
+            data={streams}
+            keyExtractor={item => item.id}
+            numColumns={2}
+            contentContainerStyle={{ padding: 8, paddingBottom: 20 }}
+            columnWrapperStyle={{ justifyContent: 'space-between' }}
+            renderItem={({ item }) => <LiveGridItem item={item} />}
+            showsVerticalScrollIndicator={false}
+            refreshing={isLoading}
+            onRefresh={fetchStreams}
+          />
+        )}
+      </View>
+    </FeatureGuard>
   );
 }

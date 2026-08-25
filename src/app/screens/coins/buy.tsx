@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Header } from '../../../../src/components/ui/Header';
 import { CustomButton } from '../../../../src/components/ui/CustomButton';
 import { getCoinPackages, type CoinPackage as CoinPackageType } from '../../../../src/api/coins/coins.api';
+import { FeatureGuard } from '../../../../src/components/settings/FeatureGuard';
 
 const CoinPackage = ({ 
   coins, 
@@ -86,6 +87,7 @@ export default function BuyCoinsScreen() {
   }, []);
 
   return (
+    <FeatureGuard feature="coinPurchase" title="Coin purchase is unavailable">
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
       <Header title="Buy Coins" />
       
@@ -136,5 +138,6 @@ export default function BuyCoinsScreen() {
         />
       </View>
     </View>
+    </FeatureGuard>
   );
 }

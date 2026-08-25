@@ -8,6 +8,7 @@ import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
 import { cancelMySubscription, getMySubscription, getSubscriptionPlans, type SubscriptionPlan, type SubscriptionPlanId } from '../../../api/subscriptions/subscriptions.api';
 import { handleApiError } from '../../../api/client';
+import { FeatureGuard } from '../../../components/settings/FeatureGuard';
 
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
@@ -114,6 +115,7 @@ export default function SubscriptionScreen() {
   const intervalLabel = getIntervalPriceLabel(selectedPlan?.interval);
 
   return (
+    <FeatureGuard feature="subscriptions" title="Subscriptions are unavailable">
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       <Header title="Subscription" />
 
@@ -260,6 +262,7 @@ export default function SubscriptionScreen() {
 
       </ScrollView>
     </View>
+    </FeatureGuard>
   );
 }
 
