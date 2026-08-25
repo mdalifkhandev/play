@@ -10,7 +10,6 @@ import {
   getReceivedGiftHistory,
   getWithdrawalHistory,
   getWithdrawalSettings,
-  requestCoinWithdrawal,
   requestEarningWithdrawal,
   type CoinTransactionItem,
   type GiftHistoryItem,
@@ -84,16 +83,13 @@ export default function BalanceScreen() {
     loadBalance();
   }, [loadBalance]);
 
-  const withdrawableCoins = settings?.userCoinBalance ?? 0;
   const availableBalanceUsd = settings?.availableBalanceUsd ?? 0;
   const pendingBalanceUsd = settings?.pendingBalanceUsd ?? 0;
-  const pendingWithdrawalCoins = settings?.pendingWithdrawalCoins ?? 0;
   const pendingWithdrawalUsdValue = settings?.pendingWithdrawalUsdValue ?? 0;
   const pendingWithdrawalCount = settings?.pendingWithdrawalCount ?? 0;
   const canWithdraw = useMemo(() => {
-    if (!settings) return false;
-    return withdrawableCoins >= settings.minWithdrawalCoins;
-  }, [settings, withdrawableCoins]);
+    return availableBalanceUsd >= 10;
+  }, [availableBalanceUsd]);
 
   const handleWithdraw = useCallback(async () => {
     if (!settings || isWithdrawing) return;
@@ -137,20 +133,16 @@ export default function BalanceScreen() {
       }
 
       if (!canWithdraw) {
-        Alert.alert('Alert', `Minimum withdrawal amount is ${settings.minWithdrawalCoins} coins or available creator earnings.`);
+        Alert.alert('Alert', 'Minimum withdrawal amount is $10.00.');
         return;
       }
-
-      const result = await requestCoinWithdrawal(withdrawableCoins);
-      Alert.alert('Success', `$${result.amountUsd.toFixed(2)} withdrawal request submitted.`);
-      await loadBalance(true);
     } catch (error) {
       console.error('Failed to withdraw balance:', error);
       Alert.alert('Alert', handleApiError(error, 'Withdrawal could not be submitted.'));
     } finally {
       setIsWithdrawing(false);
     }
-  }, [availableBalanceUsd, canWithdraw, isWithdrawing, loadBalance, settings, withdrawableCoins, withdrawalsFeature.enabled]);
+  }, [availableBalanceUsd, canWithdraw, isWithdrawing, loadBalance, settings, withdrawalsFeature.enabled]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -201,18 +193,18 @@ export default function BalanceScreen() {
 
           {settings && (
             <Text className="text-[#888] text-xs text-center mt-3">
-              {withdrawableCoins.toLocaleString()} coins · Minimum {settings.minWithdrawalCoins.toLocaleString()} coins
+              Minimum $10.00 · Purchased coins are not withdrawable
             </Text>
           )}
 
-          {settings && pendingWithdrawalCoins > 0 && (
+          {settings && pendingWithdrawalUsdValue > 0 && (
             <View className="w-full bg-[#151515] rounded-xl border border-[#222] px-4 py-3 mt-4">
               <View className="flex-row items-center justify-between">
                 <Text className="text-white text-sm font-inter-semibold">Pending payout</Text>
                 <Text className="text-[#A3E635] text-sm font-inter-semibold">${formatUsd(pendingWithdrawalUsdValue)}</Text>
               </View>
               <Text className="text-[#888] text-xs mt-1">
-                {pendingWithdrawalCoins.toLocaleString()} coins in {pendingWithdrawalCount} request{pendingWithdrawalCount === 1 ? '' : 's'}.
+                ${formatUsd(pendingWithdrawalUsdValue)} in {pendingWithdrawalCount} request{pendingWithdrawalCount === 1 ? '' : 's'}.
               </Text>
             </View>
           )}
@@ -280,11 +272,11 @@ export default function BalanceScreen() {
             </Text>
           ) : activeTab === 'All' ? (
             withdrawals.map((withdrawal) => {
-              const isRejected = withdrawal.status === 'rejected' || withdrawal.status === 'failed';
+              const isRejected = withdrawal.status === 'rejected';
               const statusText =
-                withdrawal.status === 'transferred'
+                withdrawal.status === 'completed'
                   ? 'accepted'
-                  : withdrawal.status === 'approved'
+                  : withdrawal.status === 'approved' || withdrawal.status === 'processing'
                     ? 'processing'
                     : withdrawal.status;
 
@@ -299,7 +291,7 @@ export default function BalanceScreen() {
                         Withdrawal {statusText}
                       </Text>
                       <Text className="text-[#888] text-xs mt-0.5" numberOfLines={1}>
-                        {withdrawal.withdrawalType === 'earnings' ? 'Creator earnings' : `${withdrawal.coins.toLocaleString()} coins`} · {formatDate(withdrawal.processedAt || withdrawal.createdAt)}
+                        Creator earnings · {formatDate(withdrawal.processedAt || withdrawal.createdAt)}
                       </Text>
                     </View>
                   </View>

@@ -47,6 +47,7 @@ export interface WithdrawalSettingsResponse {
   coinsPerDollar: number;
   minWithdrawalCoins: number;
   maxWithdrawalCoins: number;
+  minWithdrawalUsd?: number;
   userCoinBalance: number;
   estimatedUsdValue: number;
   pendingWithdrawalCoins?: number;
@@ -87,7 +88,7 @@ export interface GiftHistoryItem {
 
 export interface WithdrawalRequestResponse {
   withdrawalId: string;
-  withdrawalType?: 'coins' | 'earnings' | string;
+  withdrawalType?: 'earnings' | string;
   coins: number;
   coinsPerDollar: number;
   amountUsd: number;
@@ -99,12 +100,12 @@ export interface WithdrawalRequestResponse {
 
 export interface WithdrawalHistoryItem {
   id: string;
-  withdrawalType?: 'coins' | 'earnings' | string;
+  withdrawalType?: 'earnings' | string;
   coins: number;
   coinsPerDollar: number;
   amountUsd: number;
   currency: string;
-  status: 'pending' | 'approved' | 'rejected' | 'transferred' | 'failed' | string;
+  status: 'pending' | 'approved' | 'processing' | 'completed' | 'rejected' | string;
   stripeTransferId?: string;
   adminNotes?: string;
   createdAt: string;
