@@ -13,6 +13,7 @@ import {
 import { useChatSocket } from '../../hooks/chat/useChatSocket';
 import type { Message as SocketMessage } from '../../api/conversations/conversation.types';
 import { avatarSource } from '../../utils/avatar';
+import { AnnouncementNotice } from '../../components/announcements/AnnouncementNotice';
 
 export default function InboxScreen() {
   const insets = useSafeAreaInsets();
@@ -27,9 +28,13 @@ export default function InboxScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [announcementRefreshKey, setAnnouncementRefreshKey] = useState(0);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (refresh = false) => {
     try {
+      if (refresh) {
+        setIsRefreshing(true);
+      }
       const convData = await fetchConversations();
       
       // Transform backend response to match UI
@@ -57,6 +62,11 @@ export default function InboxScreen() {
       setIsRefreshing(false);
     }
   }, [currentUserId]);
+
+  const handleRefresh = () => {
+    setAnnouncementRefreshKey((current) => current + 1);
+    void loadData(true);
+  };
 
   const handleInboxMessage = useCallback((socketMessage: SocketMessage) => {
     console.log('Inbox live message received:', {
@@ -206,6 +216,8 @@ export default function InboxScreen() {
         </View>
       )}
 
+      <AnnouncementNotice placement="inbox_notice" refreshKey={announcementRefreshKey} />
+
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#A3E635" />
@@ -216,7 +228,7 @@ export default function InboxScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
-              onRefresh={loadData}
+              onRefresh={handleRefresh}
               tintColor="#A3E635"
               colors={["#A3E635"]}
             />

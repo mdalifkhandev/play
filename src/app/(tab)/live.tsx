@@ -4,6 +4,7 @@ import { liveStreamApi } from '../../api/live-streams/live-stream.api';
 import { LiveCategoryBar } from '../../components/live/LiveCategoryBar';
 import { LiveGridItem, LiveStreamData } from '../../components/live/LiveGridItem';
 import { LiveHeader } from '../../components/live/LiveHeader';
+import { AnnouncementNotice } from '../../components/announcements/AnnouncementNotice';
 
 
 
@@ -45,6 +46,7 @@ export default function LiveAllScreen() {
     <View className="flex-1 bg-black">
       <LiveHeader />
       <LiveCategoryBar activeCategory={activeCat} onSelect={setActiveCat} />
+      <AnnouncementNotice placement="live_notice" />
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center">

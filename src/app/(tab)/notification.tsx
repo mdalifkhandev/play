@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { BottomSheetModal } from '../../components/ui/BottomSheetModal';
+import { AnnouncementNotice } from '../../components/announcements/AnnouncementNotice';
 import { useNotifications } from '../../hooks/notifications/useNotifications';
 import type { NotificationItem } from '../../api/notifications/notification.types';
 
@@ -34,6 +35,7 @@ export default function NotificationScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
+  const [announcementRefreshKey, setAnnouncementRefreshKey] = useState(0);
   
   const { 
     data: notifications, 
@@ -82,6 +84,11 @@ export default function NotificationScreen() {
     }
   };
 
+  const handleRefresh = () => {
+    setAnnouncementRefreshKey((current) => current + 1);
+    void refetch();
+  };
+
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       {/* Header */}
@@ -94,15 +101,19 @@ export default function NotificationScreen() {
         </View>
       </View>
 
+      <View className="pt-4">
+        <AnnouncementNotice placement="notification_tab" refreshKey={announcementRefreshKey} />
+      </View>
+
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#98FF2F" />
         </View>
       ) : (
         <ScrollView 
-          className="flex-1 px-4 pt-4 pb-24" 
+          className="flex-1 px-4 pb-24" 
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refetch} tintColor="#98FF2F" />}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor="#98FF2F" />}
           onScroll={({ nativeEvent }) => {
             const isCloseToBottom = nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y >= nativeEvent.contentSize.height - 20;
             if (isCloseToBottom) fetchNextPage();

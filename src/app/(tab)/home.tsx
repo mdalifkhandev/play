@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, InteractionManager, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
+import { AnnouncementNotice } from "../../components/announcements/AnnouncementNotice";
 import { getFeedAds, recordAdClick, recordAdImpression, type AdCampaign } from "../../api/ads/ads.api";
 import { getFeed, getForYouFeed } from "../../api/reels/reels.api";
 import { ReelFeedItem } from "../../api/reels/reels.types";
@@ -223,6 +224,7 @@ export default function HomeScreen() {
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [isScreenActive, setIsScreenActive] = useState(false);
   const [fullscreenItemId, setFullscreenItemId] = useState<string | null>(null);
+  const [announcementRefreshKey, setAnnouncementRefreshKey] = useState(0);
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -328,6 +330,11 @@ export default function HomeScreen() {
     setActiveItemIndex(0);
   }, []);
 
+  const handleRefresh = useCallback(() => {
+    setAnnouncementRefreshKey((current) => current + 1);
+    void refetch();
+  }, [refetch]);
+
   useEffect(() => {
     if (!reelId || hasScrolledToRouteReelRef.current === reelId || feedData.length === 0) return;
 
@@ -380,6 +387,12 @@ export default function HomeScreen() {
               contentFit="contain"
             />
           </Pressable>
+        </View>
+      )}
+
+      {!fullscreenItemId && (
+        <View className="absolute left-0 right-0 z-10" style={{ top: insets.top + 50 }}>
+          <AnnouncementNotice placement="home_banner" refreshKey={announcementRefreshKey} />
         </View>
       )}
 
@@ -441,7 +454,7 @@ export default function HomeScreen() {
               : (
                   <RefreshControl
                     refreshing={isRefreshing}
-                    onRefresh={() => refetch()}
+                    onRefresh={handleRefresh}
                     tintColor="#98FF2F"
                     colors={["#98FF2F"]}
                     progressViewOffset={insets.top + 50}

@@ -6,6 +6,7 @@ import { CreatorTools } from '../../components/profile/CreatorTools';
 import { ProfileHeader } from '../../components/profile/ProfileHeader';
 import { ProfileInfo } from '../../components/profile/ProfileInfo';
 import { ProfileTabs } from '../../components/profile/ProfileTabs';
+import { AnnouncementNotice } from '../../components/announcements/AnnouncementNotice';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -28,6 +29,7 @@ export default function ProfileScreen() {
   const [loadedTabs, setLoadedTabs] = useState({ grid: false, bookmark: false, heart: false });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [announcementRefreshKey, setAnnouncementRefreshKey] = useState(0);
 
   const loadProfile = useCallback(async (refresh = false) => {
     try {
@@ -61,6 +63,11 @@ export default function ProfileScreen() {
   useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
+
+  const handleRefresh = () => {
+    setAnnouncementRefreshKey((current) => current + 1);
+    void loadProfile(true);
+  };
 
   const loadProfileTab = useCallback(async (tab: 'grid' | 'bookmark' | 'heart') => {
     if (loadedTabs[tab] || loadingTabs[tab]) return;
@@ -117,12 +124,16 @@ export default function ProfileScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={() => loadProfile(true)}
+            onRefresh={handleRefresh}
             tintColor="#98FF2F"
             colors={["#98FF2F"]}
           />
         }
       >
+        <View className="pt-4">
+          <AnnouncementNotice placement="profile_notice" refreshKey={announcementRefreshKey} />
+        </View>
+
         {isLoading && !profileData ? (
           <View className="py-20 items-center justify-center">
             <ActivityIndicator size="large" color="#98FF2F" />

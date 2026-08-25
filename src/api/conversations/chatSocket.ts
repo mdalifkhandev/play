@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 
+import { refreshAccessToken } from '../client';
 import type {
   ChatSocketAck,
   Message,
@@ -52,6 +53,7 @@ let activeToken: string | null = null;
 const callbackSets = new Set<ChatSocketCallbacks>();
 let lastConnectErrorMessage: string | null = null;
 let lastConnectErrorAt = 0;
+let isRefreshingSocketToken = false;
 
 export function ensureChatSocket(token: string): Socket | null {
   const baseUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -90,6 +92,11 @@ export function ensureChatSocket(token: string): Socket | null {
       code: error?.data?.code || 'SOCKET_CONNECT_ERROR',
       message: error?.message || 'Socket connection failed.',
     };
+
+    if (isSocketAuthError(payload)) {
+      void refreshSocketToken();
+    }
+
     const now = Date.now();
     const shouldNotify =
       payload.message !== lastConnectErrorMessage ||
@@ -132,11 +139,45 @@ export function ensureChatSocket(token: string): Socket | null {
   });
 
   socket.on(CHAT_SOCKET_EVENTS.ERROR, (error: SocketErrorPayload | string) => {
-    notifyError(normalizeSocketError(error));
+    const payload = normalizeSocketError(error);
+    if (isSocketAuthError(payload)) {
+      void refreshSocketToken();
+    }
+    notifyError(payload);
   });
 
   socketInstance = socket;
   return socket;
+}
+
+async function refreshSocketToken(): Promise<void> {
+  if (isRefreshingSocketToken) return;
+
+  try {
+    isRefreshingSocketToken = true;
+    const token = await refreshAccessToken();
+    ensureChatSocket(token);
+  } catch (error) {
+    notifyError({
+      code: 'SOCKET_AUTH_REFRESH_FAILED',
+      message: error instanceof Error ? error.message : 'Socket authentication refresh failed.',
+    });
+  } finally {
+    isRefreshingSocketToken = false;
+  }
+}
+
+function isSocketAuthError(error: SocketErrorPayload): boolean {
+  const code = error.code?.toUpperCase();
+  const message = String(error.message || '').toLowerCase();
+
+  return (
+    code === 'ACCESS_TOKEN_INVALID' ||
+    code === 'ACCESS_TOKEN_EXPIRED' ||
+    code === 'SOCKET_UNAUTHORIZED' ||
+    message.includes('access token is invalid') ||
+    message.includes('access token') && message.includes('expired')
+  );
 }
 
 export function subscribeChatSocket(callbacks: ChatSocketCallbacks): () => void {
