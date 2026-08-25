@@ -79,6 +79,13 @@ export async function getShareProfile(): Promise<ShareProfileData> {
   return dataOf<ShareProfileData>(response);
 }
 
+export async function updatePreferredLanguage(languageCode: string): Promise<{ preferredLanguageCode: string }> {
+  const response = await apiClient.put<{ data: { preferredLanguageCode: string } }>('/users/me/language', {
+    languageCode,
+  });
+  return dataOf<{ preferredLanguageCode: string }>(response);
+}
+
 export async function getMyProfileSummary(): Promise<MyProfileSummaryData> {
   const { user } = await getMe();
   const followState = await getFollowState(user.id);

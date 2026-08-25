@@ -6,6 +6,7 @@ export type ProfileUser = {
   phoneNumber?: string;
   dateOfBirth?: string;
   coinBalance?: number;
+  preferredLanguageCode?: string;
   subscription?: {
     plan?: 'monthly' | 'yearly';
     status: 'none' | 'active' | 'expired' | 'canceled';
