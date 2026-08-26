@@ -211,6 +211,11 @@ export default function SubscriptionScreen() {
           <Text className="text-white text-xl font-bold mb-2">{selectedPlan?.name}</Text>
 
           <View className="flex-row items-end mb-8 mt-2">
+            {getOriginalPrice(price, selectedPlan?.discountLabel) && (
+              <Text className="text-[#888] text-xl font-semibold line-through mr-2 mb-[2px]">
+                ${getOriginalPrice(price, selectedPlan?.discountLabel)?.toFixed(2)}
+              </Text>
+            )}
             <Text className="text-white text-3xl font-bold">${price.toFixed(2)}</Text>
             <Text className="text-[#888] text-base mb-1 ml-1">{intervalLabel}</Text>
           </View>
@@ -301,6 +306,26 @@ function getDiscountLabel(label?: string | number | null) {
   if (trimmed.includes('%') || /off/i.test(trimmed)) return trimmed;
   if (/^\d+(\.\d+)?$/.test(trimmed)) return `${trimmed}% OFF`;
   return trimmed;
+}
+
+function getOriginalPrice(price: number, label?: string | number | null): number | null {
+  if (!label || !price) return null;
+  const trimmed = String(label).trim().toLowerCase();
+  
+  const match = trimmed.match(/(\d+(\.\d+)?)/);
+  if (match) {
+    const amount = parseFloat(match[1]);
+    if (trimmed.includes('%') || /^\d+(\.\d+)?$/.test(String(label).trim())) {
+      // Percentage discount: original = price / (1 - discount%)
+      if (amount > 0 && amount < 100) {
+        return price / (1 - amount / 100);
+      }
+    } else if (trimmed.includes('$') || trimmed.includes('off') || trimmed.includes('save')) {
+      // Fixed amount off: original = price + discount
+      return price + amount;
+    }
+  }
+  return null;
 }
 
 function getFeatureIcon(feature: string): {
