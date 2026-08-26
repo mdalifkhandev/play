@@ -43,3 +43,4 @@ example
 /android
 /test
 google-services.json
+.env
