@@ -82,6 +82,7 @@ export type ReelFeedItem = {
   stats: {
     likes: number;
     comments: number;
+    saves?: number;
     shares: number;
     views: number;
   };

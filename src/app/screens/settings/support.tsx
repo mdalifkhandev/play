@@ -7,9 +7,11 @@ import { CustomButton } from '../../../components/ui/CustomButton';
 import { createSupportRequest } from '../../../api/support/support.api';
 import { handleApiError } from '../../../api/client';
 import { toast } from 'sonner-native';
+import { useKeyboardBottomInset } from '../../../hooks/common/useKeyboardBottomInset';
 
 export default function SupportScreen() {
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardBottomInset();
   const [problemText, setProblemText] = useState('');
   const [isSending, setIsSending] = useState(false);
 
@@ -44,7 +46,13 @@ export default function SupportScreen() {
       className="flex-1 bg-[#0A0A0A]"
     >
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingBottom: Math.max(insets.bottom + keyboardHeight + 80, 120),
+        }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         className="px-6 pt-16"
       >
         <Header showBackButton={true} title="Support Requests" containerStyle="mt-0 px-0 mb-12" />
@@ -79,9 +87,10 @@ export default function SupportScreen() {
         </View>
 
         <CustomButton
-          title={isSending ? 'Sending...' : 'Send to admin'}
+          title="Send to admin"
           variant="primary"
           disabled={isSending}
+          isLoading={isSending}
           onPress={handleSubmit}
         />
 

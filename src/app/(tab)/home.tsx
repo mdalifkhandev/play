@@ -3,14 +3,14 @@ import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Link, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, InteractionManager, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
+import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
 import { AnnouncementNotice } from "../../components/announcements/AnnouncementNotice";
 import { getFeedAds, recordAdClick, recordAdImpression, type AdCampaign } from "../../api/ads/ads.api";
 import { getFeed, getFollowingFeed, getForYouFeed } from "../../api/reels/reels.api";
 import { ReelFeedItem } from "../../api/reels/reels.types";
-import { useFeedSection } from "../../hooks/feed/useFeedSection";
+import { useFeedSection, type FeedSectionPage } from "../../hooks/feed/useFeedSection";
 import { avatarSource } from "../../utils/avatar";
 import { usePublicPlatformSettingsQuery } from "../../api/settings";
 import { useAppStore } from "../../store";
@@ -40,18 +40,27 @@ function isVideoUrl(url?: string | null): url is string {
   return /\.(mp4|mov|m4v|webm)(\?|$)/i.test(url);
 }
 
+function optimizedCloudinaryImageUrl(url?: string | null, width = 720, height = 1280): string | undefined {
+  if (!url) return undefined;
+  if (!/res\.cloudinary\.com/i.test(url) || !url.includes('/upload/')) return url;
+  if (/\/upload\/[^/]*(?:f_auto|q_auto|w_\d+|h_\d+)/i.test(url)) return url;
+
+  return url.replace('/upload/', `/upload/f_auto,q_auto:eco,c_fill,w_${width},h_${height}/`);
+}
+
 function mapBackendReelToFeedItem(reel: ReelFeedItem): ReelListItem {
   const hasPlayableVideo = reel.mediaType !== 'photo' && !isImageUrl(reel.videoUrl);
+  const thumbnailUrl = optimizedCloudinaryImageUrl(reel.thumbnailUrl);
   const source = hasPlayableVideo
     ? reel.videoUrl
-    : reel.thumbnailUrl || reel.videoUrl;
+    : thumbnailUrl || reel.videoUrl;
 
   return {
     id: reel.id,
     itemType: 'reel',
     type: hasPlayableVideo ? 'video' : 'image',
     source,
-    thumbnailUrl: isImageUrl(reel.thumbnailUrl) ? reel.thumbnailUrl : undefined,
+    thumbnailUrl: isImageUrl(thumbnailUrl) ? thumbnailUrl : undefined,
     user: {
       id: reel.user.id,
       username: reel.user.displayName || reel.user.username || reel.user.email || '',
@@ -63,7 +72,7 @@ function mapBackendReelToFeedItem(reel: ReelFeedItem): ReelListItem {
     stats: {
       likes: reel.stats.likes,
       comments: reel.stats.comments,
-      bookmarks: 0,
+      bookmarks: reel.stats.saves || 0,
       shares: reel.stats.shares,
       views: reel.stats.views,
     },
@@ -77,7 +86,7 @@ function mapBackendLiveToFeedItem(reel: ReelFeedItem): LiveListItem {
     id: reel.id,
     itemType: 'live',
     liveStreamId: reel.liveStreamId || reel.id.replace(/^live-/, ''),
-    source: reel.thumbnailUrl || reel.videoUrl || reel.user.avatarUrl || '',
+    source: optimizedCloudinaryImageUrl(reel.thumbnailUrl) || reel.videoUrl || optimizedCloudinaryImageUrl(reel.user.avatarUrl, 240, 240) || '',
     user: {
       id: reel.user.id,
       username: reel.user.displayName || reel.user.username || reel.user.email || '',
@@ -98,7 +107,12 @@ function mapBackendFeedItem(reel: ReelFeedItem): ReelListItem | LiveListItem {
   return mapBackendReelToFeedItem(reel);
 }
 
-function insertAdsIntoFeed(reels: Array<ReelListItem | LiveListItem>, ads: AdCampaign[], frequency = 5): FeedListItem[] {
+function insertAdsIntoFeed(
+  reels: Array<ReelListItem | LiveListItem>,
+  ads: AdCampaign[],
+  frequency = 5,
+  pageKey = 'first',
+): FeedListItem[] {
   if (ads.length === 0 || reels.length === 0) return reels;
 
   const mixed: FeedListItem[] = [];
@@ -109,7 +123,7 @@ function insertAdsIntoFeed(reels: Array<ReelListItem | LiveListItem>, ads: AdCam
 
     if ((index + 1) % frequency === 0 && adIndex < ads.length) {
       const ad = ads[adIndex];
-      mixed.push({ itemType: 'ad', id: `ad-${ad.id}`, ad });
+      mixed.push({ itemType: 'ad', id: `ad-${ad.id}-${pageKey}-${adIndex}`, ad });
       adIndex += 1;
     }
   });
@@ -117,12 +131,36 @@ function insertAdsIntoFeed(reels: Array<ReelListItem | LiveListItem>, ads: AdCam
   return mixed;
 }
 
+function FeedSkeleton() {
+  return (
+    <View className="flex-1 bg-black px-5 justify-end" style={{ paddingBottom: 120 }}>
+      <View className="absolute inset-0 bg-[#090909]" />
+      <View className="absolute left-4 right-4 top-20 flex-row justify-center">
+        <View className="h-4 w-16 rounded-full bg-white/15" />
+        <View className="ml-5 h-4 w-20 rounded-full bg-white/10" />
+        <View className="ml-5 h-4 w-10 rounded-full bg-white/10" />
+      </View>
+      <View className="mb-5 h-12 w-12 rounded-full bg-white/15" />
+      <View className="h-5 w-44 rounded-full bg-white/20" />
+      <View className="mt-3 h-4 w-72 rounded-full bg-white/12" />
+      <View className="mt-2 h-4 w-56 rounded-full bg-white/10" />
+      <View className="absolute right-5 bottom-32 gap-6">
+        <View className="h-10 w-10 rounded-full bg-white/15" />
+        <View className="h-10 w-10 rounded-full bg-white/15" />
+        <View className="h-10 w-10 rounded-full bg-white/15" />
+      </View>
+    </View>
+  );
+}
+
 function SponsoredAdItem({
   ad,
   isActive,
+  shouldMountMedia,
 }: {
   ad: AdCampaign;
   isActive: boolean;
+  shouldMountMedia: boolean;
 }) {
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -143,13 +181,26 @@ function SponsoredAdItem({
   }, [ad.id]);
 
   const mediaUrl = ad.mediaUrl || 'https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=1080';
+  const imageUrl = optimizedCloudinaryImageUrl(mediaUrl);
+  const isVideoAd = isVideoUrl(mediaUrl);
+  const shouldRenderVideo = shouldMountMedia && isVideoUrl(mediaUrl);
 
   return (
     <View style={{ height, width }} className="bg-black">
-      {isVideoUrl(mediaUrl) ? (
+      {shouldRenderVideo ? (
         <SponsoredAdVideo source={mediaUrl} isActive={isActive} />
+      ) : isVideoAd ? (
+        <View className="absolute inset-0 items-center justify-center bg-[#050505]">
+          <Ionicons name="play-circle-outline" size={54} color="#98FF2F" />
+        </View>
       ) : (
-        <Image source={{ uri: mediaUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
+        <Image
+          source={{ uri: imageUrl || mediaUrl }}
+          className="absolute inset-0"
+          style={{ width: '100%', height: '100%' }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
       )}
       <View className="absolute inset-0 bg-black/35" />
 
@@ -231,7 +282,13 @@ function LiveFeedCard({
       onPress={() => router.push({ pathname: '/screens/live/[id]', params: { id: item.liveStreamId } } as never)}
     >
       {item.source ? (
-        <Image source={{ uri: item.source }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
+        <Image
+          source={{ uri: item.source }}
+          className="absolute inset-0"
+          style={{ width: '100%', height: '100%' }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
       ) : (
         <View className="absolute inset-0 bg-[#151515]" />
       )}
@@ -282,25 +339,33 @@ export default function HomeScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const fetchReelsData = useCallback(async () => {
+  const fetchReelsData = useCallback(async (cursor?: string): Promise<FeedSectionPage<FeedListItem>> => {
+    const pageKey = cursor ? encodeURIComponent(cursor).slice(0, 16) : 'first';
+
     if (activeTab === 'following') {
-      const response = await getFollowingFeed();
-      return response.items.map(mapBackendFeedItem);
+      const response = await getFollowingFeed(cursor);
+      return {
+        items: response.items.map(mapBackendFeedItem),
+        nextCursor: response.nextCursor,
+      };
     }
 
     let response;
     try {
-      response = await getForYouFeed();
+      response = await getForYouFeed(cursor);
     } catch (error) {
       console.log('For You feed failed; falling back to regular feed.', error);
-      response = await getFeed();
+      response = await getFeed(cursor);
     }
 
     const reels = response.items.map(mapBackendFeedItem);
     const adsEnabled = publicSettingsQuery.data?.featureFlags?.ads !== false;
     const isPremiumUser = Boolean(currentUser?.subscription?.isPremium);
     if (!adsEnabled || isPremiumUser) {
-      return reels;
+      return {
+        items: reels,
+        nextCursor: response.nextCursor,
+      };
     }
 
     const videosBetweenAds = Math.max(1, publicSettingsQuery.data?.videosBetweenAds || 5);
@@ -309,11 +374,21 @@ export default function HomeScreen() {
       return [];
     });
 
-    return insertAdsIntoFeed(reels, ads, videosBetweenAds);
+    return {
+      items: insertAdsIntoFeed(reels, ads, videosBetweenAds, pageKey),
+      nextCursor: response.nextCursor,
+    };
   }, [activeTab, currentUser?.subscription?.isPremium, publicSettingsQuery.data?.featureFlags?.ads, publicSettingsQuery.data?.videosBetweenAds]);
 
-  const { data, isLoading, isRefreshing, error, refetch } = useFeedSection(fetchReelsData);
-  const feedData = data || [];
+  const {
+    data: feedData,
+    isLoading,
+    isRefreshing,
+    isLoadingMore,
+    error,
+    refetch,
+    loadMore,
+  } = useFeedSection(fetchReelsData);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const nextVisibleItem = viewableItems
@@ -458,9 +533,7 @@ export default function HomeScreen() {
       )}
 
       {isLoading && feedData.length === 0 ? (
-        <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#98FF2F" />
-        </View>
+        <FeedSkeleton />
       ) : error ? (
         <View className="flex-1 justify-center items-center">
           <Text className="text-white text-base font-inter-medium">Error: {error}</Text>
@@ -500,14 +573,18 @@ export default function HomeScreen() {
           data={feedData}
           renderItem={({ item, index }) => (
             item.itemType === 'ad' ? (
-              <SponsoredAdItem ad={item.ad} isActive={isScreenActive && index === activeItemIndex} />
+              <SponsoredAdItem
+                ad={item.ad}
+                isActive={isScreenActive && index === activeItemIndex}
+                shouldMountMedia={isScreenActive && Math.abs(index - activeItemIndex) <= 1}
+              />
             ) : item.itemType === 'live' ? (
               <LiveFeedCard item={item} isActive={isScreenActive && index === activeItemIndex} />
             ) : (
               <FeedItem 
                 {...item} 
                 isActive={isScreenActive && index === activeItemIndex} 
-                shouldMountVideo={isScreenActive && index === activeItemIndex}
+                shouldMountVideo={isScreenActive && Math.abs(index - activeItemIndex) <= 1}
                 isFullscreen={fullscreenItemId === item.id}
                 onFullscreenChange={(nextIsFullscreen) => setFullscreenItemId(nextIsFullscreen ? item.id : null)}
               />
@@ -521,10 +598,20 @@ export default function HomeScreen() {
           decelerationRate="fast"
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.8}
+          ListFooterComponent={
+            isLoadingMore ? (
+              <View style={{ height: windowHeight }} className="items-center justify-center bg-black">
+                <ActivityIndicator size="large" color="#98FF2F" />
+                <Text className="mt-3 text-white/60 text-sm font-inter-medium">Loading more...</Text>
+              </View>
+            ) : null
+          }
           getItemLayout={getItemLayout}
-          initialNumToRender={1}
-          maxToRenderPerBatch={1}
-          windowSize={3}
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          windowSize={5}
           removeClippedSubviews
           updateCellsBatchingPeriod={80}
           refreshControl={

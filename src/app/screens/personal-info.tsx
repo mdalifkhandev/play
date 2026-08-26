@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Platform, KeyboardAvoidingView, Pressable, Image, TextInput, Alert, Keyboard } from 'react-native';
+import { View, Text, ScrollView, Platform, KeyboardAvoidingView, Pressable, Image, TextInput, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header } from '../../components/ui/Header';
 import { CustomInput } from '../../components/inputs/CustomInput';
@@ -12,6 +12,7 @@ import { handleApiError } from '../../api/client';
 import { toast } from 'sonner-native';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useKeyboardBottomInset } from '../../hooks/common/useKeyboardBottomInset';
 
 export default function PersonalInfoScreen() {
   const insets = useSafeAreaInsets();
@@ -39,21 +40,7 @@ export default function PersonalInfoScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  React.useEffect(() => {
-    const showSub = Keyboard.addListener('keyboardDidShow', event => {
-      setKeyboardHeight(event.endCoordinates.height);
-    });
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
+  const keyboardHeight = useKeyboardBottomInset();
 
   const hasChanges = useMemo(() => {
     return (
@@ -317,9 +304,10 @@ export default function PersonalInfoScreen() {
 
         {hasChanges && (
           <CustomButton
-            title={isLoading ? "Updating..." : "Complete"}
+            title="Complete"
             onPress={handleUpdate}
             disabled={isLoading}
+            isLoading={isLoading}
             containerStyle="mb-4"
           />
         )}

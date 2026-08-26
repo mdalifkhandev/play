@@ -672,7 +672,13 @@ function FeedVideo({
   return (
     <Pressable className="absolute inset-0" onPress={handlePress}>
       {!hasFirstFrame && isImageThumbnail(thumbnailUrl) ? (
-        <Image source={{ uri: thumbnailUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
+        <Image
+          source={{ uri: thumbnailUrl }}
+          className="absolute inset-0"
+          style={{ width: '100%', height: '100%' }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
       ) : (
         hasError ? <FeedFallback showSpinner={false} showPlayIcon /> : null
       )}
@@ -998,7 +1004,13 @@ export const FeedItem = memo(({
         ) : (
           <View className="absolute inset-0">
             {isImageThumbnail(thumbnailUrl) ? (
-              <Image source={{ uri: thumbnailUrl }} className="absolute inset-0" style={{ width: '100%', height: '100%' }} contentFit="cover" />
+              <Image
+                source={{ uri: thumbnailUrl }}
+                className="absolute inset-0"
+                style={{ width: '100%', height: '100%' }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
             ) : (
               <FeedFallback />
             )}
@@ -1011,6 +1023,7 @@ export const FeedItem = memo(({
             className="absolute inset-0"
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
+            cachePolicy="memory-disk"
           />
         </Pressable>
       ) : (

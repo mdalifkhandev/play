@@ -23,6 +23,7 @@ import {
 import { handleApiError } from '../../../api/client';
 import { FeatureGuard } from '../../../components/settings/FeatureGuard';
 import { useAppStore } from '../../../store';
+import { useKeyboardBottomInset } from '../../../hooks/common/useKeyboardBottomInset';
 
 export default function ApplyScreen() {
   const router = useRouter();
@@ -58,23 +59,7 @@ export default function ApplyScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [idFrontUri, setIdFrontUri] = useState<string | null>(null);
   const [idBackUri, setIdBackUri] = useState<string | null>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  React.useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, event => {
-      setKeyboardHeight(event.endCoordinates.height);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
+  const keyboardHeight = useKeyboardBottomInset();
 
   const loadOccupations = React.useCallback(async (query = '') => {
     setIsLoadingOccupations(true);
@@ -532,17 +517,13 @@ export default function ApplyScreen() {
         />
 
         <CustomButton 
-          title={isSubmitting ? 'SUBMITTING...' : 'SUBMIT APPLICATION'}
+          title="SUBMIT APPLICATION"
           onPress={handleSubmit}
           disabled={isSubmitting}
+          isLoading={isSubmitting}
           containerStyle="bg-[#E4FB52] mb-6"
           textStyle="text-black"
         />
-        {isSubmitting ? (
-          <View className="items-center -mt-3 mb-6">
-            <ActivityIndicator color="#E4FB52" />
-          </View>
-        ) : null}
       </ScrollView>
 
       <Modal

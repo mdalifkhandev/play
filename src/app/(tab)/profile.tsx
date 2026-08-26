@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CreatorCard } from '../../components/profile/CreatorCard';
@@ -10,104 +10,74 @@ import { AnnouncementNotice } from '../../components/announcements/AnnouncementN
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { getMyLikedReels, getMyProfileSummary, getMyReels, getMySavedReels } from '../../api/profile/profile.api';
 import type { MyProfileSummaryData } from '../../api/profile/profile.types';
-import { getCreatorEligibility, type CreatorEligibility } from '../../api/creators';
+import type { CreatorEligibility } from '../../api/creators';
 import { handleApiError } from '../../api/client';
-import type { ReelFeedItem } from '../../api/reels/reels.types';
+import {
+  useCreatorEligibilityQuery,
+  useMyLikedReelsQuery,
+  useMyProfileSummaryQuery,
+  useMyReelsQuery,
+  useMySavedReelsQuery,
+} from '../../api/profile/profile.query';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [profileData, setProfileData] = useState<MyProfileSummaryData | null>(null);
-  const [creatorEligibility, setCreatorEligibility] = useState<CreatorEligibility | null>(null);
-  const [posts, setPosts] = useState<ReelFeedItem[]>([]);
-  const [savedPosts, setSavedPosts] = useState<ReelFeedItem[]>([]);
-  const [likedPosts, setLikedPosts] = useState<ReelFeedItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadingTabs, setLoadingTabs] = useState({ grid: false, bookmark: false, heart: false });
-  const [loadedTabs, setLoadedTabs] = useState({ grid: false, bookmark: false, heart: false });
+  const [activeLoadedTabs, setActiveLoadedTabs] = useState({ grid: true, bookmark: false, heart: false });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [announcementRefreshKey, setAnnouncementRefreshKey] = useState(0);
+  const profileQuery = useMyProfileSummaryQuery();
+  const creatorEligibilityQuery = useCreatorEligibilityQuery();
+  const postsQuery = useMyReelsQuery(activeLoadedTabs.grid);
+  const savedPostsQuery = useMySavedReelsQuery(activeLoadedTabs.bookmark);
+  const likedPostsQuery = useMyLikedReelsQuery(activeLoadedTabs.heart);
+  const posts = useMemo(() => postsQuery.data?.items || [], [postsQuery.data?.items]);
+  const savedPosts = useMemo(() => savedPostsQuery.data?.items || [], [savedPostsQuery.data?.items]);
+  const likedPosts = useMemo(() => likedPostsQuery.data?.items || [], [likedPostsQuery.data?.items]);
+  const profileData = useMemo<MyProfileSummaryData | null>(() => {
+    const data = profileQuery.data;
+    if (!data) return null;
 
-  const loadProfile = useCallback(async (refresh = false) => {
-    try {
-      if (refresh) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
-      }
-
-      const data = await getMyProfileSummary();
-
-      setProfileData(data);
-      getCreatorEligibility()
-        .then(setCreatorEligibility)
-        .catch(creatorError => console.log('Creator eligibility load failed:', creatorError?.message ?? creatorError));
-      setError(null);
-      if (refresh) {
-        setPosts([]);
-        setSavedPosts([]);
-        setLikedPosts([]);
-        setLoadedTabs({ grid: false, bookmark: false, heart: false });
-      }
-    } catch (profileError) {
-      setError(handleApiError(profileError, 'Could not load profile.'));
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadProfile();
-  }, [loadProfile]);
+    return {
+      ...data,
+      stats: {
+        ...data.stats,
+        reelsCount: posts.length,
+        likesCount: posts.reduce((total, reel) => total + (reel.stats?.likes || 0), 0),
+      },
+    };
+  }, [posts, profileQuery.data]);
+  const creatorEligibility = creatorEligibilityQuery.data as CreatorEligibility | null | undefined;
+  const isLoading = profileQuery.isLoading;
+  const error = profileQuery.error
+    ? handleApiError(profileQuery.error, 'Could not load profile.')
+    : null;
 
   const handleRefresh = () => {
     setAnnouncementRefreshKey((current) => current + 1);
-    void loadProfile(true);
+    setIsRefreshing(true);
+    Promise.all([
+      profileQuery.refetch(),
+      creatorEligibilityQuery.refetch(),
+      postsQuery.refetch(),
+      activeLoadedTabs.bookmark ? savedPostsQuery.refetch() : Promise.resolve(),
+      activeLoadedTabs.heart ? likedPostsQuery.refetch() : Promise.resolve(),
+    ])
+      .catch(refreshError => console.log('Profile refresh failed:', refreshError))
+      .finally(() => setIsRefreshing(false));
   };
 
   const loadProfileTab = useCallback(async (tab: 'grid' | 'bookmark' | 'heart') => {
-    if (loadedTabs[tab] || loadingTabs[tab]) return;
-
-    setLoadingTabs(current => ({ ...current, [tab]: true }));
-
-    try {
-      if (tab === 'grid') {
-        const response = await getMyReels();
-        const items = response.items || [];
-        setPosts(items);
-        setProfileData(current => current ? {
-          ...current,
-          stats: {
-            ...current.stats,
-            reelsCount: items.length,
-            likesCount: items.reduce((total, reel) => total + (reel.stats?.likes || 0), 0),
-          },
-        } : current);
-      } else if (tab === 'bookmark') {
-        const response = await getMySavedReels();
-        setSavedPosts(response.items || []);
-      } else {
-        const response = await getMyLikedReels();
-        setLikedPosts(response.items || []);
-      }
-
-      setLoadedTabs(current => ({ ...current, [tab]: true }));
-    } catch (tabError) {
-      console.log('Profile tab load failed:', handleApiError(tabError, 'Could not load profile tab.'));
-    } finally {
-      setLoadingTabs(current => ({ ...current, [tab]: false }));
-    }
-  }, [loadedTabs, loadingTabs]);
+    setActiveLoadedTabs(current => ({ ...current, [tab]: true }));
+  }, []);
 
   useEffect(() => {
-    if (profileData && !loadedTabs.grid && !loadingTabs.grid) {
-      void loadProfileTab('grid');
+    const tabError = postsQuery.error || savedPostsQuery.error || likedPostsQuery.error;
+    if (tabError) {
+      console.log('Profile tab load failed:', handleApiError(tabError, 'Could not load profile tab.'));
     }
-  }, [loadProfileTab, loadedTabs.grid, loadingTabs.grid, profileData]);
+  }, [likedPostsQuery.error, postsQuery.error, savedPostsQuery.error]);
 
   const user = profileData?.user;
   const profile = user?.profile;
@@ -170,16 +140,16 @@ export default function ProfileScreen() {
             <CreatorTools />
           </>
         ) : (
-          <CreatorCard eligibility={creatorEligibility} />
+          <CreatorCard eligibility={creatorEligibility ?? null} />
         )}
 
         <ProfileTabs
           posts={posts}
           savedPosts={savedPosts}
           likedPosts={likedPosts}
-          isLoadingPosts={loadingTabs.grid}
-          isLoadingSavedPosts={loadingTabs.bookmark}
-          isLoadingLikedPosts={loadingTabs.heart}
+          isLoadingPosts={postsQuery.isLoading || postsQuery.isFetching}
+          isLoadingSavedPosts={savedPostsQuery.isLoading || savedPostsQuery.isFetching}
+          isLoadingLikedPosts={likedPostsQuery.isLoading || likedPostsQuery.isFetching}
           onTabChange={loadProfileTab}
         />
       </ScrollView>

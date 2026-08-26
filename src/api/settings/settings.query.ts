@@ -11,7 +11,8 @@ export function usePublicPlatformSettingsQuery() {
   return useQuery({
     queryKey: settingsQueryKeys.public(),
     queryFn: getPublicPlatformSettings,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchInterval: 120_000,
   });
 }
