@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
 import { AnnouncementNotice } from "../../components/announcements/AnnouncementNotice";
 import { getFeedAds, recordAdClick, recordAdImpression, type AdCampaign } from "../../api/ads/ads.api";
-import { getFeed, getForYouFeed } from "../../api/reels/reels.api";
+import { getFeed, getFollowingFeed, getForYouFeed } from "../../api/reels/reels.api";
 import { ReelFeedItem } from "../../api/reels/reels.types";
 import { useFeedSection } from "../../hooks/feed/useFeedSection";
 import { avatarSource } from "../../utils/avatar";
@@ -284,7 +284,7 @@ export default function HomeScreen() {
 
   const fetchReelsData = useCallback(async () => {
     if (activeTab === 'following') {
-      const response = await getFeed();
+      const response = await getFollowingFeed();
       return response.items.map(mapBackendFeedItem);
     }
 
@@ -464,15 +464,33 @@ export default function HomeScreen() {
       ) : error ? (
         <View className="flex-1 justify-center items-center">
           <Text className="text-white text-base font-inter-medium">Error: {error}</Text>
-          <Pressable onPress={() => refetch()} className="mt-4 px-4 py-2 bg-[#98FF2F] rounded-lg">
-            <Text className="text-black font-semibold">Retry</Text>
+          <Pressable
+            onPress={handleRefresh}
+            disabled={isRefreshing}
+            className={`mt-4 min-w-28 flex-row items-center justify-center rounded-lg px-4 py-2 ${isRefreshing ? 'bg-[#98FF2F]/70' : 'bg-[#98FF2F]'}`}
+          >
+            {isRefreshing ? <ActivityIndicator size="small" color="#000" /> : null}
+            <Text className={`text-black font-semibold ${isRefreshing ? 'ml-2' : ''}`}>
+              {isRefreshing ? 'Retrying...' : 'Retry'}
+            </Text>
           </Pressable>
         </View>
       ) : feedData.length === 0 ? (
         <View className="flex-1 justify-center items-center">
-          <Text className="text-white text-base font-inter-medium">No reels found</Text>
-          <Pressable onPress={() => refetch()} className="mt-4 px-4 py-2 bg-[#98FF2F] rounded-lg">
-            <Text className="text-black font-semibold">Refresh</Text>
+          {isRefreshing ? (
+            <ActivityIndicator size="large" color="#98FF2F" />
+          ) : (
+            <Text className="text-white text-base font-inter-medium">No reels found</Text>
+          )}
+          <Pressable
+            onPress={handleRefresh}
+            disabled={isRefreshing}
+            className={`mt-4 min-w-28 flex-row items-center justify-center rounded-lg px-4 py-2 ${isRefreshing ? 'bg-[#98FF2F]/70' : 'bg-[#98FF2F]'}`}
+          >
+            {isRefreshing ? <ActivityIndicator size="small" color="#000" /> : null}
+            <Text className={`text-black font-semibold ${isRefreshing ? 'ml-2' : ''}`}>
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Text>
           </Pressable>
         </View>
       ) : (
