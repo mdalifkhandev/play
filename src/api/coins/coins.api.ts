@@ -98,8 +98,9 @@ export interface WithdrawalHistoryItem {
   coinsPerDollar: number;
   amountUsd: number;
   currency: string;
-  status: 'pending' | 'approved' | 'processing' | 'completed' | 'rejected' | string;
+  status: 'pending' | 'approved' | 'processing' | 'completed' | 'rejected' | 'failed' | string;
   stripeTransferId?: string;
+  failureReason?: string;
   adminNotes?: string;
   createdAt: string;
   processedAt?: string;

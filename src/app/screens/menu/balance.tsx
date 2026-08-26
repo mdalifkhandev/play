@@ -273,18 +273,21 @@ export default function BalanceScreen() {
           ) : activeTab === 'All' ? (
             withdrawals.map((withdrawal) => {
               const isRejected = withdrawal.status === 'rejected';
+              const isFailed = withdrawal.status === 'failed';
               const statusText =
                 withdrawal.status === 'completed'
                   ? 'accepted'
                   : withdrawal.status === 'approved' || withdrawal.status === 'processing'
                     ? 'processing'
+                    : isFailed
+                      ? 'failed'
                     : withdrawal.status;
 
               return (
                 <View key={withdrawal.id} className="flex-row items-center justify-between px-4 py-3 border-b border-[#222]">
                   <View className="flex-row items-center flex-1">
                     <View className="w-10 h-10 rounded-full bg-[#252525] items-center justify-center mr-3">
-                      <Ionicons name={isRejected ? 'close-circle-outline' : 'cash-outline'} size={18} color={isRejected ? '#fb7185' : '#A3E635'} />
+                      <Ionicons name={isRejected || isFailed ? 'close-circle-outline' : 'cash-outline'} size={18} color={isRejected || isFailed ? '#fb7185' : '#A3E635'} />
                     </View>
                     <View className="flex-1">
                       <Text className="text-white text-sm font-inter-semibold" numberOfLines={1}>
@@ -296,8 +299,8 @@ export default function BalanceScreen() {
                     </View>
                   </View>
                   <View className="items-end ml-3">
-                    <Text className={`${isRejected ? 'text-red-400' : 'text-[#A3E635]'} text-sm font-inter-semibold`}>
-                      {isRejected ? '-' : '+'}${formatUsd(withdrawal.amountUsd)}
+                    <Text className={`${isRejected || isFailed ? 'text-red-400' : 'text-[#A3E635]'} text-sm font-inter-semibold`}>
+                      {isRejected || isFailed ? '-' : '+'}${formatUsd(withdrawal.amountUsd)}
                     </Text>
                     <Text className="text-[#888] text-xs mt-0.5">{withdrawal.status}</Text>
                   </View>
