@@ -138,6 +138,15 @@ export default function ChatScreen() {
     }
   }, [id, currentUserId]);
 
+  const handleReadReceipt = useCallback((event: { conversationId: string; userId?: string; readBy?: string; messageIds: string[]; readAt?: string }) => {
+    const actorId = event.userId || event.readBy;
+    if (event.conversationId === id && actorId && actorId !== currentUserId) {
+      setMessages((prev) => 
+        prev.map((m) => event.messageIds.includes(m.id) ? { ...m, isRead: true } : m)
+      );
+    }
+  }, [id, currentUserId]);
+
   const handleError = useCallback((error: { code: string; message: string }) => {
     console.log('Chat socket status:', error.message);
   }, []);
@@ -169,6 +178,7 @@ export default function ChatScreen() {
   const { connect } = useChatSocket({
     onNewMessage: handleNewMessage,
     onTyping: handleTyping,
+    onReadReceipt: handleReadReceipt,
     onBlockStatusChanged: handleBlockStatusChanged,
     onError: handleError,
   });

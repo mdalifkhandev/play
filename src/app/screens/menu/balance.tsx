@@ -167,8 +167,8 @@ export default function BalanceScreen() {
       >
         <View className="items-center mt-6">
           <Pressable className="flex-row items-center mb-4">
-            <Text className="text-[#888] text-sm mr-1">Available balance USD</Text>
-            <Ionicons name="caret-down" size={14} color="#888" />
+            <Text className="text-[#888] text-sm mr-1">Available balance </Text>
+            {/* <Ionicons name="caret-down" size={14} color="#888" /> */}
           </Pressable>
 
           {isLoading ? (

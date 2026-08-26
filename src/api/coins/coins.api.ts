@@ -38,19 +38,15 @@ export interface ConvertDiamondsResponse {
   converted: true;
   diamondsConverted: number;
   amountUsd: number;
-  coinBalance: number;
+  availableBalanceUsd: number;
   diamondBalance: number;
   diamondsPerDollar: number;
 }
 
 export interface WithdrawalSettingsResponse {
   coinsPerDollar: number;
-  minWithdrawalCoins: number;
-  maxWithdrawalCoins: number;
-  minWithdrawalUsd?: number;
-  userCoinBalance: number;
-  estimatedUsdValue: number;
-  pendingWithdrawalCoins?: number;
+  minWithdrawalUsd: number;
+  maxWithdrawalUsd: number;
   pendingWithdrawalUsdValue?: number;
   pendingWithdrawalCount?: number;
   availableBalanceUsd?: number;
@@ -89,11 +85,8 @@ export interface GiftHistoryItem {
 export interface WithdrawalRequestResponse {
   withdrawalId: string;
   withdrawalType?: 'earnings' | string;
-  coins: number;
-  coinsPerDollar: number;
   amountUsd: number;
   status: string;
-  remainingCoinBalance?: number;
   remainingAvailableBalanceUsd?: number;
   createdAt: string;
 }
@@ -188,11 +181,6 @@ export async function convertDiamonds(diamonds: number): Promise<ConvertDiamonds
 
 export async function getWithdrawalSettings(): Promise<WithdrawalSettingsResponse> {
   const response = await apiClient.get<{ data: WithdrawalSettingsResponse }>('/coins/withdraw/settings');
-  return response.data.data;
-}
-
-export async function requestCoinWithdrawal(coins: number): Promise<WithdrawalRequestResponse> {
-  const response = await apiClient.post<{ data: WithdrawalRequestResponse }>('/coins/withdraw', { coins });
   return response.data.data;
 }
 

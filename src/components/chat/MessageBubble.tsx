@@ -210,9 +210,21 @@ export function MessageBubble({ msg }: { msg: MessageType }) {
             onOpenProfile={(profileKey) => router.push(`/screens/user/${encodeURIComponent(profileKey)}`)}
           />
         ) : null}
-        <Text className={`text-[10px] ${hasAttachment ? 'px-1 mt-1' : 'mt-1'}`} style={{ color: timeColor, alignSelf: 'flex-end' }}>
-          {msg.time}
-        </Text>
+        <View className={`flex-row items-center justify-end ${hasAttachment ? 'px-1 mt-1' : 'mt-1'}`}>
+          <Text className="text-[10px]" style={{ color: timeColor, marginRight: 4 }}>
+            {msg.time}
+          </Text>
+          {isMe && !msg.id.startsWith('optimistic-') && (
+            <Ionicons
+              name={msg.isRead ? 'checkmark-done' : 'checkmark'}
+              size={14}
+              color={msg.isRead ? '#4DA3FF' : timeColor}
+            />
+          )}
+          {isMe && msg.id.startsWith('optimistic-') && (
+            <Ionicons name="time-outline" size={12} color={timeColor} />
+          )}
+        </View>
       </View>
     </View>
   );
