@@ -13,6 +13,7 @@ import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { CustomButton } from "../../components/ui/CustomButton";
 import { Header } from "../../components/ui/Header";
+import { AnnouncementNotice } from "../../components/announcements/AnnouncementNotice";
 
 export default function SignUp() {
   const [email, setEmail] = useState('');
@@ -197,6 +198,8 @@ export default function SignUp() {
     >
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 24 }} className="px-6 pt-16">
         <Header showBackButton={true} />
+
+        <AnnouncementNotice placement="login_notice" />
 
         <Text className="text-3xl font-inter-bold text-white mb-2">Sign Up</Text>
         <Text className="text-gray-400 font-inter-regular mb-8">It only takes a minute to create your account</Text>

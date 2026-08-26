@@ -13,6 +13,7 @@ import { GoogleIcon } from "../../components/icons/GoogleIcon";
 import { CustomInput } from "../../components/inputs/CustomInput";
 import { CustomButton } from "../../components/ui/CustomButton";
 import { Header } from "../../components/ui/Header";
+import { AnnouncementNotice } from "../../components/announcements/AnnouncementNotice";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -188,6 +189,8 @@ export default function Login() {
         showsVerticalScrollIndicator={false}
       >
         <Header showBackButton={true} />
+
+        <AnnouncementNotice placement="login_notice" />
 
         <Text className="text-3xl font-inter-bold text-white mb-2">Welcome Back</Text>
         <Text className="text-gray-400 font-inter-regular mb-10">Login to your account</Text>
