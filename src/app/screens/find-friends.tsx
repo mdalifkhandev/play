@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, TextInput, View, Image as RNImage } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -10,7 +10,7 @@ import { handleApiError } from '../../api/client';
 import { discoverUsers, followUser, unfollowUser } from '../../api/profile/profile.api';
 import type { DiscoverUser } from '../../api/profile/profile.types';
 import { Header } from '../../components/ui/Header';
-import { avatarSource } from '../../utils/avatar';
+import { avatarSource, defaultUserAvatar } from '../../utils/avatar';
 
 export default function FindFriendsScreen() {
   const router = useRouter();
@@ -137,8 +137,8 @@ export default function FindFriendsScreen() {
                 onPress={() => openProfile(item)}
                 className="mb-3 flex-row items-center rounded-2xl bg-white/[0.06] py-3 pl-2 pr-3"
               >
-                <View className="h-[60px] w-[60px] items-center justify-center rounded-full bg-white/10">
-                  <Image source={avatarSource(item.avatarUrl)} className="h-14 w-14 rounded-full" contentFit="cover" />
+                <View className="h-[60px] w-[60px] items-center justify-center rounded-full bg-white/10 overflow-hidden">
+                  <RNImage source={avatarSource(item.avatarUrl)} className="h-14 w-14 rounded-full bg-[#1E1E1E]" style={{ width: 56, height: 56, borderRadius: 28 }} resizeMode="cover" />
                 </View>
 
                 <View className="ml-3 flex-1">

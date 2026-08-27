@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, Animated, Dimensions, Switch, ScrollView, InteractionManager } from 'react-native';
+import { View, Text, Modal, Pressable, Animated, Dimensions, Switch, ScrollView, InteractionManager, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '../../store';
+import { getKidsModeStatus } from '../../api/kids-mode/kids-mode.api';
+import { toast } from 'sonner-native';
 
 const { width } = Dimensions.get('window');
 
@@ -20,6 +22,7 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
   const logoutAction = useAppStore((state) => state.logout);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isLoadingKidsMode, setIsLoadingKidsMode] = useState(false);
   const isKidsMode = useAppStore((state) => state.isKidsModeActive);
 
   const handleLogout = async () => {
@@ -138,18 +141,35 @@ export function ProfileMenu({ visible, onClose }: ProfileMenuProps) {
                   <Ionicons name="happy-outline" size={22} color="white" />
                   <Text className="text-white text-base ml-4 font-medium">Kids Mode</Text>
                 </View>
-                <Switch 
-                  trackColor={{ false: "#333", true: "#83D616" }}
-                  thumbColor="#FFF"
-                  value={isKidsMode} 
-                  onValueChange={(val) => {
-                    if (val) {
-                      navigateTo('/screens/kids-mode/intro');
-                    } else {
-                      navigateTo('/screens/kids-mode/confirm-pin?action=exit');
-                    }
-                  }}
-                />
+                {isLoadingKidsMode ? (
+                  <View className="pr-2"><ActivityIndicator size="small" color="#83D616" /></View>
+                ) : (
+                  <Switch 
+                    trackColor={{ false: "#333", true: "#83D616" }}
+                    thumbColor="#FFF"
+                    value={isKidsMode} 
+                    onValueChange={async (val) => {
+                      if (val) {
+                        try {
+                          setIsLoadingKidsMode(true);
+                          const status = await getKidsModeStatus();
+                          if (status.configured) {
+                            navigateTo('/screens/kids-mode/confirm-pin?action=enter');
+                          } else {
+                            navigateTo('/screens/kids-mode/intro');
+                          }
+                        } catch (error) {
+                          toast.error('Failed to check Kids Mode status');
+                          navigateTo('/screens/kids-mode/intro');
+                        } finally {
+                          setIsLoadingKidsMode(false);
+                        }
+                      } else {
+                        navigateTo('/screens/kids-mode/confirm-pin?action=exit');
+                      }
+                    }}
+                  />
+                )}
               </View>
 
               <View className="h-[1px] bg-[#222] my-2" />

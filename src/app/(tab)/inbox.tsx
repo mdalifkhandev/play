@@ -12,7 +12,7 @@ import {
 } from '../../api/conversations/conversation.api';
 import { useChatSocket } from '../../hooks/chat/useChatSocket';
 import type { Message as SocketMessage } from '../../api/conversations/conversation.types';
-import { avatarSource } from '../../utils/avatar';
+import { avatarSource, defaultUserAvatar } from '../../utils/avatar';
 import { AnnouncementNotice } from '../../components/announcements/AnnouncementNotice';
 
 export default function InboxScreen() {
@@ -249,7 +249,7 @@ export default function InboxScreen() {
                       <View className="flex-row items-center flex-1">
                         <Image
                           source={avatarSource(user.avatarUrl)}
-                          style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12 }}
+                          style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12, backgroundColor: '#1E1E1E' }}
                           contentFit="cover"
                         />
                         <View className="flex-1 pr-4">
@@ -293,7 +293,7 @@ export default function InboxScreen() {
                       <View className="relative">
                         <Image
                           source={avatarSource(chat.avatar)}
-                          style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12 }}
+                          style={{ width: 56, height: 56, borderRadius: 28, marginRight: 12, backgroundColor: '#1E1E1E' }}
                           contentFit="cover"
                         />
                         {chat.isOnline && (
