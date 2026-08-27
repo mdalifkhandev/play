@@ -2,7 +2,8 @@ import React from 'react';
 import { Dimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { Text } from 'react-native';
+import { Text, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import type { ReelFeedItem } from '../../api/reels/reels.types';
 
 const { width } = Dimensions.get('window');
@@ -16,6 +17,7 @@ type PostCard = {
   key: string;
   imageUri: string;
   views: number;
+  originalPost: ReelFeedItem;
 };
 
 const safeString = (value: unknown) => typeof value === 'string' ? value : '';
@@ -55,10 +57,13 @@ const toPostCard = (value: unknown, index: number): PostCard | null => {
     key: id || `post-${index}`,
     imageUri: isImageUri(imageUri) ? imageUri : '',
     views,
+    originalPost: post as ReelFeedItem,
   };
 };
 
 export function PostsTab({ posts = [] }: PostsTabProps) {
+  const router = useRouter();
+
   const cards = (Array.isArray(posts) ? posts : [])
     .map(toPostCard)
     .filter((card): card is PostCard => card !== null);
@@ -76,7 +81,14 @@ export function PostsTab({ posts = [] }: PostsTabProps) {
     <View className="flex-row flex-wrap mt-2">
       {cards.map((post, index) => {
         return (
-          <View key={`${post.key}-${index}`} style={{ width: ITEM_WIDTH, height: ITEM_WIDTH * 1.5, padding: 1 }}>
+          <Pressable 
+            key={`${post.key}-${index}`} 
+            style={{ width: ITEM_WIDTH, height: ITEM_WIDTH * 1.5, padding: 1 }}
+            onPress={() => {
+              const encoded = encodeURIComponent(JSON.stringify(post.originalPost));
+              router.push(`/screens/reels/viewer?data=${encoded}`);
+            }}
+          >
             {post.imageUri ? (
               <Image
                 source={post.imageUri}
@@ -91,7 +103,7 @@ export function PostsTab({ posts = [] }: PostsTabProps) {
               <Ionicons name="play-outline" size={14} color="#FFF" />
               <Text className="text-white text-xs font-semibold ml-1">{post.views}</Text>
             </View>
-          </View>
+          </Pressable>
         );
       })}
     </View>
