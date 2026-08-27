@@ -5,6 +5,7 @@ import { getSavedTracks, toggleSavedTrack } from '../../api/music/music.api';
 import type { MusicTrack } from '../../api/music/music.types';
 import { createAudioPlayer } from 'expo-audio';
 import { useRouter } from 'expo-router';
+import { createRemoteAudioSource, normalizeRemoteAudioUrl, REMOTE_AUDIO_PLAYER_OPTIONS } from '../../utils/audioSource';
 
 const formatDuration = (seconds: number) => {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.round(seconds)) : 0;
@@ -48,7 +49,10 @@ export function SoundsTab({ onCountChange }: SoundsTabProps) {
       setIsLoading(true);
       const data = await getSavedTracks({ limit: 50 });
       if (data && data.tracks) {
-        setTracks(data.tracks as MusicTrack[]);
+        setTracks(data.tracks.map((track) => ({
+          ...(track as MusicTrack),
+          audioPreviewUrl: normalizeRemoteAudioUrl(track.audioPreviewUrl),
+        })));
         onCountChange?.(data.tracks.length);
       }
     } catch (e) {
@@ -80,7 +84,11 @@ export function SoundsTab({ onCountChange }: SoundsTabProps) {
     setPlayingId(null);
 
     try {
-      const newSound = createAudioPlayer(track.audioPreviewUrl);
+      const audioSource = createRemoteAudioSource(track.audioPreviewUrl);
+      if (!audioSource) {
+        throw new Error('Audio preview URL is missing.');
+      }
+      const newSound = createAudioPlayer(audioSource, REMOTE_AUDIO_PLAYER_OPTIONS);
       newSound.play();
       activePlayerRef.current = newSound;
 
@@ -88,7 +96,12 @@ export function SoundsTab({ onCountChange }: SoundsTabProps) {
         if (activePlayerRef.current !== newSound) return;
 
         if (status.error) {
-          console.log('Audio playback error:', status.error);
+          console.log('Audio playback error:', {
+            error: status.error,
+            trackId: track.providerTrackId,
+            title: track.title,
+            audioPreviewUrl: track.audioPreviewUrl,
+          });
           setLoadingId(null);
           setPlayingId(null);
         }

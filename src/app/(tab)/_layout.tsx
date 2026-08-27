@@ -1,8 +1,32 @@
 import { Image } from "expo-image";
 import { Tabs } from "expo-router";
+import type { ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppStore } from "../../store";
 import { Ionicons } from '@expo/vector-icons';
+
+const TAB_ICONS = {
+  homeActive: require('../../../assets/icon/home-active.svg'),
+  homeInactive: require('../../../assets/icon/home-inactive.svg'),
+  messageActive: require('../../../assets/icon/message-active.svg'),
+  messageInactive: require('../../../assets/icon/message-inactive.svg'),
+  create: require('../../../assets/icon/create1.svg'),
+  notificationActive: require('../../../assets/icon/notification-active.svg'),
+  notificationInactive: require('../../../assets/icon/notification-inactive.svg'),
+  profileActive: require('../../../assets/icon/profile-active.svg'),
+  profileInactive: require('../../../assets/icon/profile-inactive.svg'),
+} as const;
+
+function TabIcon({ source, color, size = 24 }: { source: number; color?: ColorValue; size?: number }) {
+  return (
+    <Image
+      source={source}
+      style={{ width: size, height: size, tintColor: color }}
+      contentFit="contain"
+      cachePolicy="memory-disk"
+    />
+  );
+}
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -29,7 +53,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <Image source={focused ? require('../../../assets/icon/home-active.svg') : require('../../../assets/icon/home-inactive.svg')} style={{ width: 24, height: 24, tintColor: color }} contentFit="contain" />
+            <TabIcon source={focused ? TAB_ICONS.homeActive : TAB_ICONS.homeInactive} color={color} />
           ),
         }}
       />
@@ -53,7 +77,7 @@ export default function TabLayout() {
           title: 'Inbox',
           href: !isKidsModeActive ? '/(tab)/inbox' : null,
           tabBarIcon: ({ color, focused }) => (
-            <Image source={focused ? require('../../../assets/icon/message-active.svg') : require('../../../assets/icon/message-inactive.svg')} style={{ width: 24, height: 24, tintColor: color }} contentFit="contain" />
+            <TabIcon source={focused ? TAB_ICONS.messageActive : TAB_ICONS.messageInactive} color={color} />
           ),
         }}
       />
@@ -63,7 +87,7 @@ export default function TabLayout() {
           title: '',
           href: !isKidsModeActive ? '/(tab)/create' : null,
           tabBarIcon: () => (
-            <Image source={require('../../../assets/icon/create1.svg')} style={{ width: 50, height: 50, marginTop: 2 }} contentFit="contain" />
+            <Image source={TAB_ICONS.create} style={{ width: 50, height: 50, marginTop: 2 }} contentFit="contain" cachePolicy="memory-disk" />
           ),
         }}
       />
@@ -73,7 +97,7 @@ export default function TabLayout() {
           title: 'Notification',
           href: !isKidsModeActive ? '/(tab)/notification' : null,
           tabBarIcon: ({ color, focused }) => (
-            <Image source={focused ? require('../../../assets/icon/notification-active.svg') : require('../../../assets/icon/notification-inactive.svg')} style={{ width: 24, height: 24, tintColor: color }} contentFit="contain" />
+            <TabIcon source={focused ? TAB_ICONS.notificationActive : TAB_ICONS.notificationInactive} color={color} />
           ),
         }}
       />
@@ -83,7 +107,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <Image source={focused ? require('../../../assets/icon/profile-active.svg') : require('../../../assets/icon/profile-inactive.svg')} style={{ width: 24, height: 24, tintColor: color }} contentFit="contain" />
+            <TabIcon source={focused ? TAB_ICONS.profileActive : TAB_ICONS.profileInactive} color={color} />
           ),
         }}
       />

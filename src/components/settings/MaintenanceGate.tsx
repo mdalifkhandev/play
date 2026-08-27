@@ -1,4 +1,4 @@
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,14 +7,6 @@ import { usePublicPlatformSettingsQuery } from '../../api/settings';
 export function MaintenanceGate() {
   const query = usePublicPlatformSettingsQuery();
   const settings = query.data;
-
-  if (query.isLoading) {
-    return (
-      <View className="flex-1 bg-black items-center justify-center">
-        <ActivityIndicator size="large" color="#A3FF12" />
-      </View>
-    );
-  }
 
   if (settings?.maintenanceMode) {
     return (

@@ -13,6 +13,7 @@ export function usePublicPlatformSettingsQuery() {
     queryFn: getPublicPlatformSettings,
     staleTime: 60_000,
     gcTime: 5 * 60_000,
+    retry: false,
     refetchInterval: 120_000,
   });
 }

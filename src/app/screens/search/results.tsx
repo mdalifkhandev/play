@@ -13,6 +13,7 @@ import { searchConversationUsers } from '../../../api/conversations/conversation
 import { searchMusicTracks } from '../../../api/music/music.api';
 import { SoundListItem } from '../../../components/ui/SoundListItem';
 import { avatarSource } from '../../../utils/avatar';
+import { createRemoteAudioSource, REMOTE_AUDIO_PLAYER_OPTIONS } from '../../../utils/audioSource';
 
 const TABS = ['Top', 'Users', 'Video', 'Live', 'Sound'];
 
@@ -108,7 +109,11 @@ export default function SearchResultsScreen() {
     setPlayingId(null);
 
     try {
-      const newSound = createAudioPlayer(item.audioPreviewUrl);
+      const audioSource = createRemoteAudioSource(item.audioPreviewUrl);
+      if (!audioSource) {
+        throw new Error('Audio preview URL is missing.');
+      }
+      const newSound = createAudioPlayer(audioSource, REMOTE_AUDIO_PLAYER_OPTIONS);
       activePlayerRef.current = newSound;
       isPlayerReadyRef.current = false;
       newSound.play();

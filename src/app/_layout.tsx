@@ -1,6 +1,6 @@
 import { useRouter, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import * as Sentry from "@sentry/react-native";
 import { 
@@ -41,7 +41,7 @@ ErrorUtils.setGlobalHandler((error, isFatal) => {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      retry: 1,
       refetchOnWindowFocus: false,
     },
   },
@@ -57,6 +57,7 @@ export default function RootLayout() {
   const token = useAppStore((state) => state.token);
   const user = useAppStore((state) => state.user);
   const userId = user?.id || user?._id || null;
+  const [fontWaitExpired, setFontWaitExpired] = useState(false);
 
   useRegisterPushNotifications(hasHydrated && isAuthenticated && Boolean(token), userId);
 
@@ -68,10 +69,18 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if ((loaded || error) && hasHydrated) {
+    const timeout = setTimeout(() => {
+      setFontWaitExpired(true);
+    }, 1200);
+
+    return () => clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
+    if ((loaded || error || fontWaitExpired) && hasHydrated) {
       SplashScreen.hideAsync();
     }
-  }, [hasHydrated, loaded, error]);
+  }, [fontWaitExpired, hasHydrated, loaded, error]);
 
   // Kids Mode Watchdog Timer
   useEffect(() => {
@@ -102,7 +111,7 @@ export default function RootLayout() {
     return () => clearInterval(interval);
   }, [isKidsModeActive, kidsModeExpireTimestamp, router, pathname]);
 
-  if ((!loaded && !error) || !hasHydrated) {
+  if ((!loaded && !error && !fontWaitExpired) || !hasHydrated) {
     return null;
   }
 

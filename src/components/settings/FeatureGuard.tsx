@@ -1,4 +1,4 @@
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { usePublicPlatformSettingsQuery, type PublicPlatformSettings } from '../../api/settings';
@@ -23,14 +23,6 @@ export function FeatureGuard({
   children: React.ReactNode;
 }) {
   const query = usePublicPlatformSettingsQuery();
-
-  if (query.isLoading) {
-    return (
-      <View className="flex-1 bg-black items-center justify-center">
-        <ActivityIndicator size="large" color="#A3FF12" />
-      </View>
-    );
-  }
 
   if (query.data?.featureFlags?.[feature] === false) {
     return (

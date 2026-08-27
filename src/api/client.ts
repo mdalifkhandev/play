@@ -220,6 +220,10 @@ apiClient.interceptors.response.use(
 export const handleApiError = (error: any, defaultMessage: string = 'Something went wrong') => {
   const errorData = error?.response?.data?.error;
   const status = error?.response?.status;
+
+  if (!error?.response && error?.message === 'Network Error') {
+    return 'Network Error: app cannot reach the backend API. Check tunnel/backend server and phone internet.';
+  }
   
   if (errorData?.fieldErrors && errorData.fieldErrors.length > 0) {
     return errorData.fieldErrors[0].message;
