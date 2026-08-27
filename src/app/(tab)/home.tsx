@@ -434,13 +434,14 @@ export default function HomeScreen() {
       tabBarStyle: fullscreenItemId
         ? { display: 'none' }
         : {
-            backgroundColor: '#121212',
-            borderTopWidth: 0,
-            height: 60 + insets.bottom,
-            paddingBottom: insets.bottom,
-            paddingTop: 10,
-            marginBottom: 5,
-          },
+          position: 'absolute',
+          backgroundColor: '#121212',
+          borderTopWidth: 0,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom,
+          paddingTop: 10,
+          marginBottom: 5,
+        },
     });
   }, [fullscreenItemId, insets.bottom, navigation]);
 
@@ -497,7 +498,7 @@ export default function HomeScreen() {
         >
           <View style={{ width: 32 }} />
           <View className="flex-row gap-5 items-center">
-            
+
             <Pressable onPress={() => handleTabChange('foryou')} className="relative items-center">
               <Text className={`text-base font-semibold ${activeTab === 'foryou' ? 'text-white' : 'text-white/60'}`}>For You</Text>
               {activeTab === 'foryou' && (
@@ -581,9 +582,9 @@ export default function HomeScreen() {
             ) : item.itemType === 'live' ? (
               <LiveFeedCard item={item} isActive={isScreenActive && index === activeItemIndex} />
             ) : (
-              <FeedItem 
-                {...item} 
-                isActive={isScreenActive && index === activeItemIndex} 
+              <FeedItem
+                {...item}
+                isActive={isScreenActive && index === activeItemIndex}
                 shouldMountVideo={isScreenActive && Math.abs(index - activeItemIndex) <= 1}
                 isFullscreen={fullscreenItemId === item.id}
                 onFullscreenChange={(nextIsFullscreen) => setFullscreenItemId(nextIsFullscreen ? item.id : null)}
@@ -618,14 +619,14 @@ export default function HomeScreen() {
             fullscreenItemId
               ? undefined
               : (
-                  <RefreshControl
-                    refreshing={isRefreshing}
-                    onRefresh={handleRefresh}
-                    tintColor="#98FF2F"
-                    colors={["#98FF2F"]}
-                    progressViewOffset={insets.top + 50}
-                  />
-                )
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  tintColor="#98FF2F"
+                  colors={["#98FF2F"]}
+                  progressViewOffset={insets.top + 50}
+                />
+              )
           }
         />
       )}
