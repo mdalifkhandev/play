@@ -24,15 +24,29 @@ export interface LiveStreamResponseDTO {
   streamKey: string;
   viewerCount: number;
   startedAt?: string;
+  endedAt?: string;
+  recording?: {
+    status: string;
+    mode?: 'mix' | 'individual';
+    startedAt?: string;
+    stoppedAt?: string;
+    fileList?: unknown;
+    cloudinaryUrl?: string;
+    cloudinaryPublicId?: string;
+    playbackUrls?: string[];
+    errorMessage?: string;
+  };
 }
 
 export interface StreamTokenResponseDTO {
+  appId: string;
   streamId: string;
   channelName: string;
   token: string;
   uid: number;
   hostUid: number;
   role: 'host' | 'viewer';
+  expiresInSeconds: number;
 }
 
 export interface LiveStreamCommentResponseDTO {

@@ -35,6 +35,7 @@ export default function LiveSingleScreen() {
   const agoraEngineRef = useRef<IRtcEngine | null>(null);
   const lastLikeTimeRef = useRef<number>(0);
   const isLeavingRef = useRef(false);
+  const tokenRenewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [streamInfo, setStreamInfo] = useState<{ hostId: string; hostAvatar?: string; hostName: string; viewers: string, duration: number } | null>(null);
 
@@ -100,6 +101,7 @@ export default function LiveSingleScreen() {
 
     const releaseAgoraEngine = () => {
       try {
+        clearAgoraTokenRenewTimer();
         agoraEngineRef.current?.leaveChannel();
         agoraEngineRef.current?.release();
       } catch (error) {
@@ -147,11 +149,13 @@ export default function LiveSingleScreen() {
 
             const freshTokenData = await liveStreamApi.getStreamToken(id as string);
             agoraEngineRef.current?.renewToken(freshTokenData.token);
+            scheduleAgoraTokenRenew(freshTokenData.expiresInSeconds, renewAgoraToken);
             console.log('Agora viewer token renewed');
           } catch (tokenError) {
             console.log('Agora viewer token renew failed:', tokenError);
           }
         };
+        scheduleAgoraTokenRenew(tokenData.expiresInSeconds, renewAgoraToken);
 
         engine.registerEventHandler({
           onJoinChannelSuccess: () => {
@@ -366,6 +370,19 @@ export default function LiveSingleScreen() {
       Alert.alert(error.message);
     }
   };
+
+  function clearAgoraTokenRenewTimer() {
+    if (!tokenRenewTimerRef.current) return;
+    clearTimeout(tokenRenewTimerRef.current);
+    tokenRenewTimerRef.current = null;
+  }
+
+  function scheduleAgoraTokenRenew(expiresInSeconds: number | undefined, renew: () => void) {
+    clearAgoraTokenRenewTimer();
+    const safeTtlSeconds = Math.max(60, Number(expiresInSeconds) || 3600);
+    const renewAfterMs = Math.max(30_000, (safeTtlSeconds - 300) * 1000);
+    tokenRenewTimerRef.current = setTimeout(renew, renewAfterMs);
+  }
 
   const handleSelectGift = (gift: any) => {
     const success = useAppStore.getState().deductCoins(gift.price);

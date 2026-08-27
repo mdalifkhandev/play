@@ -35,6 +35,7 @@ export default function LiveHostScreen() {
   const lastLikeTimeRef = useRef<number>(0);
   const isInitializingRef = useRef(false);
   const isEndingRef = useRef(false);
+  const tokenRenewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isJoined, setIsJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -342,11 +343,13 @@ export default function LiveHostScreen() {
           const freshTokenData = await liveStreamApi.getStreamToken(streamId as string);
           agoraEngineRef.current?.renewToken(freshTokenData.token);
           setTokenInfo(freshTokenData);
+          scheduleAgoraTokenRenew(freshTokenData.expiresInSeconds, renewAgoraToken);
           console.log('Agora host token renewed');
         } catch (tokenError) {
           console.log('Agora host token renew failed:', tokenError);
         }
       };
+      scheduleAgoraTokenRenew(tokenData.expiresInSeconds, renewAgoraToken);
 
       // 3. Initialize Agora
       const appId = process.env.EXPO_PUBLIC_AGORA_APP_ID;
@@ -420,6 +423,7 @@ export default function LiveHostScreen() {
 
   function cleanupAgoraEngine() {
     try {
+      clearAgoraTokenRenewTimer();
       if (agoraEngineRef.current) {
         agoraEngineRef.current.leaveChannel();
         agoraEngineRef.current.release();
@@ -429,6 +433,19 @@ export default function LiveHostScreen() {
     } catch (e) {
       console.error('Error cleaning up live engine', e);
     }
+  }
+
+  function clearAgoraTokenRenewTimer() {
+    if (!tokenRenewTimerRef.current) return;
+    clearTimeout(tokenRenewTimerRef.current);
+    tokenRenewTimerRef.current = null;
+  }
+
+  function scheduleAgoraTokenRenew(expiresInSeconds: number | undefined, renew: () => void) {
+    clearAgoraTokenRenewTimer();
+    const safeTtlSeconds = Math.max(60, Number(expiresInSeconds) || 3600);
+    const renewAfterMs = Math.max(30_000, (safeTtlSeconds - 300) * 1000);
+    tokenRenewTimerRef.current = setTimeout(renew, renewAfterMs);
   }
 
   const endLiveStream = async () => {
