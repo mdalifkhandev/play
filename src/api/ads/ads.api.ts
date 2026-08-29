@@ -15,6 +15,7 @@ export type AdCampaignStatus =
 
 export type AdAudienceType = 'same_interest' | 'interest_in_topic' | 'all_users';
 export type AdAreaType = 'city' | 'country' | 'world';
+export type AdCtaType = 'none' | 'learn_more' | 'send_message';
 
 export type CreateAdCampaignRequest = {
   category: string;
@@ -32,11 +33,20 @@ export type CreateAdCampaignRequest = {
   title?: string;
   description?: string;
   destinationUrl?: string;
+  ctaType?: AdCtaType;
+  ctaLabel?: string;
 };
 
 export type AdCampaign = CreateAdCampaignRequest & {
   id: string;
   ownerId: string;
+  owner?: {
+    id: string;
+    email?: string;
+    displayName?: string;
+    username?: string;
+    photoUrl?: string;
+  } | null;
   status: AdCampaignStatus;
   adminReason: string | null;
   startsAt: string | null;

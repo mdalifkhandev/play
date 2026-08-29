@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import React from 'react';
-import { ActivityIndicator, View, Text, Pressable } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -8,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { toast } from 'sonner-native';
 import { handleApiError } from '../../../api/client';
-import { createAdCampaign, uploadAdMedia, type AdAreaType, type AdAudienceType, type AdUploadStep } from '../../../api/ads/ads.api';
+import { createAdCampaign, uploadAdMedia, type AdAreaType, type AdAudienceType, type AdCtaType, type AdUploadStep } from '../../../api/ads/ads.api';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
 import { FeatureGuard } from '../../../components/settings/FeatureGuard';
@@ -27,14 +28,19 @@ export default function AdsUploadScreen() {
     city?: string;
     country?: string;
   }>();
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [uploadStep, setUploadStep] = React.useState<AdUploadStep | 'submitting' | 'idle'>('idle');
-  const [selectedMedia, setSelectedMedia] = React.useState<{
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadStep, setUploadStep] = useState<AdUploadStep | 'submitting' | 'idle'>('idle');
+  const [title, setTitle] = useState('Feed ad request');
+  const [description, setDescription] = useState('Ad campaign submitted from mobile app.');
+  const [ctaType, setCtaType] = useState<AdCtaType>('none');
+  const [ctaLabel, setCtaLabel] = useState('Learn more');
+  const [destinationUrl, setDestinationUrl] = useState('');
+  const [selectedMedia, setSelectedMedia] = useState<{
     uri: string;
     type: 'image' | 'video';
     fileName?: string | null;
   } | null>(null);
-  const [uploadProgress, setUploadProgress] = React.useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const uploadStatusText =
     uploadStep === 'preparing'
       ? 'Preparing upload...'
@@ -53,7 +59,7 @@ export default function AdsUploadScreen() {
     },
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (selectedMedia?.type !== 'video') return;
 
     try {
@@ -103,6 +109,10 @@ export default function AdsUploadScreen() {
       toast.error('Please upload an ad media first');
       return;
     }
+    if (ctaType === 'learn_more' && !destinationUrl.trim()) {
+      toast.error('Please enter button link');
+      return;
+    }
 
     setIsSubmitting(true);
     setUploadProgress(0);
@@ -130,8 +140,11 @@ export default function AdsUploadScreen() {
         mediaAssetId: uploaded.mediaAssetId,
         mediaKey: uploaded.mediaKey || undefined,
         mediaUrl: uploaded.mediaUrl || selectedMedia.uri,
-        title: 'Feed ad request',
-        description: 'Ad campaign submitted from mobile app.',
+        title: title.trim() || undefined,
+        description: description.trim() || undefined,
+        destinationUrl: ctaType === 'learn_more' ? destinationUrl.trim() : undefined,
+        ctaType,
+        ctaLabel: ctaType === 'none' ? undefined : ctaLabel.trim() || (ctaType === 'send_message' ? 'Send message' : 'Learn more'),
       });
       console.log('[AD_UPLOAD] campaign created');
       toast.success('Ad request sent for admin review');
@@ -150,11 +163,11 @@ export default function AdsUploadScreen() {
     <View className="flex-1 bg-[#050505]" style={{ paddingTop: insets.top }}>
       <Header title="Ads Management" />
 
-      <View className="flex-1 px-5 mt-4">
+      <ScrollView className="flex-1 px-5 mt-4" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 170 }}>
         <Text className="text-white text-lg font-medium mb-4">Upload Ad</Text>
 
         <Pressable
-          className="flex-1 bg-[#0F0F0F] border border-[#222] rounded-3xl items-center justify-center mb-24 overflow-hidden"
+          className="h-80 bg-[#0F0F0F] border border-[#222] rounded-3xl items-center justify-center overflow-hidden"
           onPress={pickAdMedia}
           disabled={isSubmitting}
         >
@@ -197,7 +210,91 @@ export default function AdsUploadScreen() {
           </Text>
 
         </Pressable>
-      </View>
+
+        <View className="mt-5 gap-4">
+          <View>
+            <Text className="mb-2 text-sm font-inter-semibold text-white/70">Title</Text>
+            <TextInput
+              className="rounded-2xl border border-white/10 bg-[#101010] px-4 py-3 text-white"
+              placeholder="Ad title"
+              placeholderTextColor="#777"
+              value={title}
+              onChangeText={setTitle}
+              maxLength={120}
+            />
+          </View>
+
+          <View>
+            <Text className="mb-2 text-sm font-inter-semibold text-white/70">Details</Text>
+            <TextInput
+              className="min-h-24 rounded-2xl border border-white/10 bg-[#101010] px-4 py-3 text-white"
+              placeholder="Ad details"
+              placeholderTextColor="#777"
+              value={description}
+              onChangeText={setDescription}
+              maxLength={500}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
+
+          <View>
+            <Text className="mb-2 text-sm font-inter-semibold text-white/70">Button</Text>
+            <View className="flex-row gap-2">
+              {[
+                { value: 'none' as const, label: 'No button' },
+                { value: 'learn_more' as const, label: 'Link' },
+                { value: 'send_message' as const, label: 'Send message' },
+              ].map((option) => (
+                <Pressable
+                  key={option.value}
+                  className={`flex-1 items-center rounded-full px-3 py-2 ${ctaType === option.value ? 'bg-[#A3E635]' : 'bg-white/10'}`}
+                  onPress={() => {
+                    setCtaType(option.value);
+                    if (option.value === 'send_message') setCtaLabel('Send message');
+                    if (option.value === 'learn_more') setCtaLabel('Learn more');
+                  }}
+                  disabled={isSubmitting}
+                >
+                  <Text className={`text-xs font-inter-bold ${ctaType === option.value ? 'text-black' : 'text-white'}`} numberOfLines={1}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {ctaType !== 'none' && (
+            <View>
+              <Text className="mb-2 text-sm font-inter-semibold text-white/70">Button text</Text>
+              <TextInput
+                className="rounded-2xl border border-white/10 bg-[#101010] px-4 py-3 text-white"
+                placeholder={ctaType === 'send_message' ? 'Send message' : 'Learn more'}
+                placeholderTextColor="#777"
+                value={ctaLabel}
+                onChangeText={setCtaLabel}
+                maxLength={40}
+              />
+            </View>
+          )}
+
+          {ctaType === 'learn_more' && (
+            <View>
+              <Text className="mb-2 text-sm font-inter-semibold text-white/70">Button link</Text>
+              <TextInput
+                className="rounded-2xl border border-white/10 bg-[#101010] px-4 py-3 text-white"
+                placeholder="https://example.com"
+                placeholderTextColor="#777"
+                value={destinationUrl}
+                onChangeText={setDestinationUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+            </View>
+          )}
+        </View>
+      </ScrollView>
 
       <View className="absolute bottom-10 left-5 right-5">
         <CustomButton 

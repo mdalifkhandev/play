@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Link, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
+import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, Linking, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
 import { AnnouncementNotice } from "../../components/announcements/AnnouncementNotice";
@@ -14,6 +14,8 @@ import { useFeedSection, type FeedSectionPage } from "../../hooks/feed/useFeedSe
 import { avatarSource } from "../../utils/avatar";
 import { usePublicPlatformSettingsQuery } from "../../api/settings";
 import { useAppStore } from "../../store";
+import { createConversation } from "../../api/conversations/conversation.api";
+import { toast } from "sonner-native";
 
 type ReelListItem = Omit<FeedItemProps, 'isActive' | 'shouldMountVideo'> & { itemType: 'reel' };
 type LiveListItem = {
@@ -164,6 +166,9 @@ function SponsoredAdItem({
 }) {
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const currentUser = useAppStore((state) => state.user);
+  const currentUserId = currentUser?.id || currentUser?._id;
   const impressionRecordedRef = useRef(false);
 
   useEffect(() => {
@@ -174,16 +179,50 @@ function SponsoredAdItem({
     });
   }, [ad.id, isActive]);
 
-  const handlePress = useCallback(() => {
+  const handlePress = useCallback(async () => {
     void recordAdClick(ad.id).catch(error => {
       console.log('Record ad click failed:', error);
     });
-  }, [ad.id]);
+
+    if (ad.ctaType === 'send_message') {
+      if (currentUserId && ad.ownerId === currentUserId) {
+        toast.info('This is your ad. Viewers can message you from this button.');
+        return;
+      }
+
+      try {
+        const conversation = await createConversation(ad.ownerId);
+        const partner = conversation.participant;
+        router.push({
+          pathname: '/screens/chat/[id]',
+          params: {
+            id: conversation.id,
+            userId: partner?.id || ad.ownerId,
+            name: partner?.displayName || partner?.username || ad.owner?.displayName || ad.owner?.username || 'User',
+            username: partner?.username || ad.owner?.username || '',
+            avatar: partner?.avatarUrl || ad.owner?.photoUrl || '',
+          },
+        });
+      } catch (error) {
+        console.log('Open ad message failed:', error);
+      }
+      return;
+    }
+
+    if (ad.ctaType === 'learn_more' && ad.destinationUrl) {
+      void Linking.openURL(ad.destinationUrl).catch(error => {
+        console.log('Open ad link failed:', error);
+      });
+    }
+  }, [ad.ctaType, ad.destinationUrl, ad.id, ad.owner?.displayName, ad.owner?.photoUrl, ad.owner?.username, ad.ownerId, currentUserId, router]);
 
   const mediaUrl = ad.mediaUrl || 'https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=1080';
   const imageUrl = optimizedCloudinaryImageUrl(mediaUrl);
   const isVideoAd = isVideoUrl(mediaUrl);
   const shouldRenderVideo = shouldMountMedia && isVideoUrl(mediaUrl);
+  const shouldShowButton = ad.ctaType === 'learn_more' || ad.ctaType === 'send_message';
+  const isOwnMessageAd = ad.ctaType === 'send_message' && Boolean(currentUserId && ad.ownerId === currentUserId);
+  const buttonLabel = ad.ctaLabel || (ad.ctaType === 'send_message' ? 'Send message' : 'Learn more');
 
   return (
     <View style={{ height, width }} className="bg-black">
@@ -221,9 +260,16 @@ function SponsoredAdItem({
             {ad.description}
           </Text>
         ) : null}
-        <Pressable onPress={handlePress} className="mt-5 h-12 items-center justify-center rounded-2xl bg-[#98FF2F]">
-          <Text className="text-black font-inter-bold">Learn more</Text>
-        </Pressable>
+        {shouldShowButton ? (
+          <Pressable
+            onPress={handlePress}
+            className={`mt-5 h-12 items-center justify-center rounded-2xl ${isOwnMessageAd ? 'bg-white/20' : 'bg-[#98FF2F]'}`}
+          >
+            <Text className={`font-inter-bold ${isOwnMessageAd ? 'text-white/70' : 'text-black'}`}>
+              {isOwnMessageAd ? 'Viewers can message you' : buttonLabel}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
