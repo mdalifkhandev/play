@@ -146,7 +146,7 @@ export default function CreateScreen() {
         let coverImage;
 
         const result = await liveStreamApi.createStream({
-          title: `Live Stream ${new Date().toLocaleTimeString()}`,
+          title: `Live Stream 0000 ${new Date().toLocaleTimeString()}`,
           category: 'General',
           coverImage,
         });
