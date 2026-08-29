@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { searchMusicTracks } from '../../api/music/music.api';
 import type { MusicTrack } from '../../api/music/music.types';
 import { handleApiError } from '../../api/client';
+import { normalizeRemoteAudioUrl } from '../../utils/audioSource';
 
 const MUSIC_PAGE_SIZE = 50;
 const musicSearchCache = new Map<string, {
@@ -55,7 +56,9 @@ export function useMusicSearch(activeTab: string, initialQuery: string = '') {
         order: activeTab === 'Trending' ? 'popularity_total' : activeTab === 'Mood' ? 'popularity_week' : 'releasedate',
       });
       
-      const playableTracks = result.tracks.filter(track => track.downloadAllowed);
+      const playableTracks = result.tracks
+        .map((track) => ({ ...track, audioPreviewUrl: normalizeRemoteAudioUrl(track.audioPreviewUrl) }))
+        .filter((track) => Boolean(track.audioPreviewUrl));
       
       const nextTracks = isFirstPage ? playableTracks : [...tracks, ...playableTracks];
       setTracks(nextTracks);

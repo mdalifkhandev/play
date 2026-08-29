@@ -10,6 +10,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useMusicSearch } from '../../../hooks/music/useMusicSearch';
 import { toggleSavedTrack, getSavedTracks } from '../../../api/music/music.api';
 import type { MusicTrack } from '../../../api/music/music.types';
+import { createRemoteAudioSource, normalizeRemoteAudioUrl } from '../../../utils/audioSource';
 
 const formatDuration = (seconds: number) => {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.round(seconds)) : 0;
@@ -94,7 +95,10 @@ export default function SoundScreen() {
     getSavedTracks({ limit: 50 }).then(data => {
       if (data && data.tracks) {
         setSavedTracks(new Set(data.tracks.map(t => t.providerTrackId)));
-        setSavedTrackObjects(data.tracks as MusicTrack[]);
+        setSavedTrackObjects(data.tracks.map((track) => ({
+          ...(track as MusicTrack),
+          audioPreviewUrl: normalizeRemoteAudioUrl(track.audioPreviewUrl),
+        })));
       }
     }).catch(e => console.log('Failed to load saved tracks', e));
   }, []);
@@ -187,7 +191,11 @@ export default function SoundScreen() {
     setLoadingId(track.providerTrackId);
 
     try {
-      audioPlayer.replace(track.audioPreviewUrl);
+      const audioSource = createRemoteAudioSource(track.audioPreviewUrl);
+      if (!audioSource) {
+        throw new Error('Audio preview URL is missing.');
+      }
+      audioPlayer.replace(audioSource);
       audioPlayer.play();
 
       let hasInitialized = false;

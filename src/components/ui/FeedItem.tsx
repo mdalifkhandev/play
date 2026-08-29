@@ -686,7 +686,7 @@ function FeedVideo({
         <VideoView
           player={player}
           className="absolute inset-0"
-          style={{ width: '100%', height: '100%', opacity: hasError ? 0 : 1 }}
+          style={{ width: '100%', height: '100%', opacity: hasError || !hasFirstFrame ? 0 : 1 }}
           nativeControls={false}
           contentFit="cover"
           surfaceType="textureView"
@@ -774,6 +774,11 @@ export const FeedItem = memo(({
   const playbackProgress = playbackTime.duration > 0
     ? Math.min(1, Math.max(0, playbackTime.currentTime / playbackTime.duration))
     : 0;
+  const isVideoInitialLoading =
+    type === 'video' &&
+    videoBufferingState.isBuffering &&
+    !videoBufferingState.hasError &&
+    !videoBufferingState.hasFirstFrame;
 
   const handlePlaybackUpdate = useCallback((currentTime: number, duration: number) => {
     setPlaybackTime(prev => {
@@ -1203,7 +1208,7 @@ export const FeedItem = memo(({
         ) : null}
       </View>
 
-      {feedOverlayText?.text ? (
+      {feedOverlayText?.text && !isVideoInitialLoading ? (
         <View
           className="absolute items-center"
           pointerEvents="none"
@@ -1228,9 +1233,8 @@ export const FeedItem = memo(({
         </View>
       ) : null}
 
-      {/* Global Loading Spinner for the Video - Rendered on TOP of text */}
-      {type === 'video' && videoBufferingState.isBuffering && !videoBufferingState.hasError && !videoBufferingState.hasFirstFrame && isImageThumbnail(thumbnailUrl) && (
-        <View className="absolute inset-0 items-center justify-center bg-black/20" pointerEvents="none" style={{ zIndex: 9999, elevation: 100 }}>
+      {isVideoInitialLoading && isImageThumbnail(thumbnailUrl) && (
+        <View className="absolute inset-0 items-center justify-center" pointerEvents="none" style={{ zIndex: 30, elevation: 30 }}>
           <ActivityIndicator size="large" color="#98FF2F" />
         </View>
       )}

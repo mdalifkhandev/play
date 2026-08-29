@@ -325,7 +325,10 @@ export default function CreateScreen() {
         </View>
 
         {/* Floating Capture Overlay */}
-        <View className="absolute bottom-6 left-0 right-0 z-10">
+        <View
+          className="absolute left-0 right-0 z-10"
+          style={{ bottom: insets.bottom + 74 }}
+        >
           <View className="flex-row justify-center items-center mb-6 gap-6 h-8">
             {mainMode === 'Photo' && (
               <View className="bg-white px-4 rounded-full">
@@ -355,7 +358,18 @@ export default function CreateScreen() {
             )}
           </View>
 
-          <View className="flex-row items-center justify-center relative">
+          <View className="flex-row items-center justify-center relative px-8">
+            <Pressable
+              className="absolute left-8 flex-row items-center bg-black/55 rounded-lg px-2 py-1.5 h-10"
+              onPress={pickFromGallery}
+              disabled={isRecording || isStartingLive}
+            >
+              <View className="w-6 h-6 bg-white rounded flex-row overflow-hidden border border-gray-400 mr-2 items-center justify-center">
+                <Ionicons name="image" size={14} color="#666" />
+              </View>
+              <Text className="text-white font-inter-semibold text-xs">UPLOAD</Text>
+            </Pressable>
+
             <Pressable
               onPress={handleRecordAction}
               disabled={!isCameraReady || isStoppingRecording || isStartingLive}
@@ -376,44 +390,36 @@ export default function CreateScreen() {
               <Ionicons name="camera-reverse-outline" size={26} color="#FFF" />
             </Pressable>
           </View>
+
+          {!isRecording && (
+            <View className="mt-5 flex-row items-center justify-center gap-8">
+              {['Photo', 'Video', 'Live'].map((m) => (
+                <Pressable
+                  key={m}
+                  onPress={() => {
+                    setMainMode(m as any);
+                  }}
+                  className="min-w-12 items-center"
+                >
+                  <Text
+                    className={
+                      mainMode === m
+                        ? 'text-white font-inter-bold text-[15px]'
+                        : 'text-white/65 font-inter-semibold text-[15px]'
+                    }
+                  >
+                    {m}
+                  </Text>
+                  {mainMode === m && <View className="mt-1 h-1 w-5 rounded-full bg-[#98FF2F]" />}
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
       </View>
 
       {/* Bottom Mode Navigation Bar */}
-      <View className="h-24 bg-black flex-row items-center justify-between px-6 pb-6">
-        <Pressable
-          className="flex-row items-center bg-[#333] rounded-lg px-2 py-1.5 h-10 mt-5"
-          onPress={pickFromGallery}
-        >
-          <View className="w-6 h-6 bg-white rounded flex-row overflow-hidden border border-gray-400 mr-2 items-center justify-center">
-            <Ionicons name="image" size={14} color="#666" />
-          </View>
-          <Text className="text-white font-inter-semibold text-xs">UPLOAD</Text>
-        </Pressable>
-
-        <View className="flex-row items-center gap-6 absolute left-32 right-0 justify-center">
-          {['Photo', 'Video', 'Live'].map((m) => (
-            <Pressable
-              key={m}
-              onPress={() => {
-                if (isRecording) return;
-                setMainMode(m as any);
-              }}
-            >
-              <Text
-                className={
-                  mainMode === m
-                    ? 'text-white font-inter-bold text-[15px]'
-                    : 'text-gray-400 font-inter-semibold text-[15px]'
-                }
-              >
-                {m}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-      </View>
+      <View className="h-2 bg-black" />
     </View>
   );
 }
