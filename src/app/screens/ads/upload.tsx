@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import React from 'react';
-import { ActivityIndicator, ScrollView, Text, TextInput, Pressable, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -160,10 +160,21 @@ export default function AdsUploadScreen() {
 
   return (
     <FeatureGuard feature="ads" title="Ads are unavailable">
-    <View className="flex-1 bg-[#050505]" style={{ paddingTop: insets.top }}>
+    <KeyboardAvoidingView
+      className="flex-1 bg-[#050505]"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      style={{ paddingTop: insets.top }}
+    >
       <Header title="Ads Management" />
 
-      <ScrollView className="flex-1 px-5 mt-4" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 170 }}>
+      <ScrollView
+        className="flex-1 px-5 mt-4"
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        contentContainerStyle={{ paddingBottom: 28 }}
+      >
         <Text className="text-white text-lg font-medium mb-4">Upload Ad</Text>
 
         <Pressable
@@ -296,7 +307,7 @@ export default function AdsUploadScreen() {
         </View>
       </ScrollView>
 
-      <View className="absolute bottom-10 left-5 right-5">
+      <View className="px-5 pt-3 bg-[#050505]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
         <CustomButton 
           title={isSubmitting ? "Sending..." : "Send Request"}
           onPress={submitAd}
@@ -322,7 +333,7 @@ export default function AdsUploadScreen() {
           </View>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
     </FeatureGuard>
   );
 }
