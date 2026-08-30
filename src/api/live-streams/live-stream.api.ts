@@ -79,6 +79,13 @@ export const liveStreamApi = {
     return res.data.data;
   },
 
+  updateCover: async (streamId: string, coverImage: string): Promise<LiveStreamResponseDTO> => {
+    const res = await apiClient.patch<{ data: LiveStreamResponseDTO }>(`/live-streams/${streamId}/cover`, {
+      coverImage,
+    });
+    return res.data.data;
+  },
+
   getStreamToken: async (streamId: string): Promise<StreamTokenResponseDTO> => {
     const res = await apiClient.post<{ data: StreamTokenResponseDTO }>(`/live-streams/${streamId}/token`);
     return res.data.data;

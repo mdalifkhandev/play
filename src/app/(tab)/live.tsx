@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FlatList, View, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { liveStreamApi } from '../../api/live-streams/live-stream.api';
 import { LiveCategoryBar } from '../../components/live/LiveCategoryBar';
 import { LiveGridItem, LiveStreamData } from '../../components/live/LiveGridItem';
@@ -18,6 +20,12 @@ export default function LiveAllScreen() {
     fetchStreams();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchStreams();
+    }, [])
+  );
+
   const fetchStreams = async () => {
     try {
       setIsLoading(true);
@@ -25,7 +33,7 @@ export default function LiveAllScreen() {
       
       const realStreams: LiveStreamData[] = data.items.map(s => ({
         id: s.id,
-        thumbnail: s.coverImage || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400',
+        thumbnail: s.coverImage || '',
         hostName: s.hostId?.displayName || s.hostId?.username || 'Unknown',
         hostAvatar: s.hostId?.avatarUrl || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100',
         viewers: s.viewerCount ? `${s.viewerCount}` : '0',

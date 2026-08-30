@@ -11,7 +11,7 @@ const ITEM_WIDTH = Math.floor((width - 16 - 24) / 2);
 
 export type LiveStreamData = {
   id: string;
-  thumbnail: string;
+  thumbnail?: string;
   hostName: string;
   hostAvatar: string;
   viewers: string;
@@ -58,7 +58,14 @@ export function LiveGridItem({ item, variant = 'live' }: { item: LiveStreamData,
         <View style={{ width: ITEM_WIDTH, aspectRatio: 3 / 4 }} className="relative">
           {item.thumbnail ? (
             <Image source={{ uri: item.thumbnail }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} contentFit="cover" />
-          ) : null}
+          ) : (
+            <View className="absolute inset-0 items-center justify-center bg-[#111] px-4">
+              <Ionicons name="radio-outline" size={34} color="#98FF2F" />
+              <Text className="mt-2 text-center text-xs font-semibold text-white" numberOfLines={2}>
+                Live preview unavailable
+              </Text>
+            </View>
+          )}
           {item.isVideo && item.videoUrl && (
             <VideoView
               player={player}

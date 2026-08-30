@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, Share } from 'react-native';
 import * as Linking from 'expo-linking';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { liveStreamApi } from '../../../api/live-streams/live-stream.api';
 import { getMyProfileData } from '../../../api/profile/profile.api';
@@ -23,6 +24,7 @@ import { LiveBottomActions } from '../../../components/live/LiveBottomActions';
 import { FeatureGuard } from '../../../components/settings/FeatureGuard';
 import { Image } from 'expo-image';
 import { avatarSource } from '../../../utils/avatar';
+import { uploadImage } from '../../../utils/uploadMedia';
 
 export default function LiveHostScreen() {
   const { streamId } = useLocalSearchParams<{ streamId: string }>();
@@ -36,6 +38,12 @@ export default function LiveHostScreen() {
   const isInitializingRef = useRef(false);
   const isEndingRef = useRef(false);
   const tokenRenewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveCoverUpdatedRef = useRef(false);
+  const snapshotPromiseRef = useRef<{
+    path: string;
+    resolve: (path: string) => void;
+    reject: (error: Error) => void;
+  } | null>(null);
 
   const [isJoined, setIsJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -372,6 +380,7 @@ export default function LiveHostScreen() {
         onJoinChannelSuccess: (_connection, elapsed) => {
           console.log('Agora JoinChannelSuccess', elapsed);
           setIsJoined(true);
+          scheduleLiveCoverCapture(tokenData.uid);
         },
         onUserJoined: (_connection, uid) => {
           // Audience joining doesn't trigger this in Agora, relying on backend polling
@@ -382,6 +391,19 @@ export default function LiveHostScreen() {
         onError: (err, msg) => {
           console.error('Agora Error:', err, msg);
           setError(`Agora Error: ${msg}`);
+        },
+        onSnapshotTaken: (_connection, uid, filePath, width, height, errCode) => {
+          console.log('Agora snapshot result:', { uid, filePath, width, height, errCode });
+          const pending = snapshotPromiseRef.current;
+          const normalizedFilePath = filePath.replace(/^file:\/\//, '');
+          if (!pending || pending.path !== normalizedFilePath) return;
+
+          snapshotPromiseRef.current = null;
+          if (errCode === 0) {
+            pending.resolve(filePath);
+          } else {
+            pending.reject(new Error(`Agora snapshot failed with code ${errCode}`));
+          }
         },
         onTokenPrivilegeWillExpire: () => {
           renewAgoraToken();
@@ -447,6 +469,72 @@ export default function LiveHostScreen() {
     const renewAfterMs = Math.max(30_000, (safeTtlSeconds - 300) * 1000);
     tokenRenewTimerRef.current = setTimeout(renew, renewAfterMs);
   }
+
+  const scheduleLiveCoverCapture = (localUid?: number) => {
+    [2500, 6000, 10000].forEach((delayMs) => {
+      setTimeout(() => {
+        captureAndUpdateLiveCover(localUid).catch((snapshotError) => {
+          console.log('Live running snapshot update failed:', {
+            message: snapshotError?.message,
+            status: snapshotError?.response?.status,
+            data: snapshotError?.response?.data,
+          });
+        });
+      }, delayMs);
+    });
+  };
+
+  const captureAndUpdateLiveCover = async (localUid?: number) => {
+    if (liveCoverUpdatedRef.current || !streamId || !agoraEngineRef.current) return;
+    const snapshotDirectory = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+    if (!snapshotDirectory) return;
+
+    const snapshotPath = await takeAgoraSnapshot(snapshotDirectory, localUid);
+
+    const uploadUri = snapshotPath.startsWith('file://') ? snapshotPath : `file://${snapshotPath}`;
+    const uploadedUrl = await uploadImage(uploadUri, 'image/jpeg');
+    await liveStreamApi.updateCover(streamId as string, uploadedUrl);
+    liveCoverUpdatedRef.current = true;
+    console.log('Live running frame thumbnail updated:', uploadedUrl);
+  };
+
+  const takeAgoraSnapshot = async (snapshotDirectory: string, localUid?: number): Promise<string> => {
+    const candidateUids = Array.from(new Set([0, Number(localUid || tokenInfo?.uid || 0)].filter((uid) => Number.isFinite(uid))));
+    let lastError: unknown;
+
+    for (const uid of candidateUids) {
+      try {
+        return await takeAgoraSnapshotForUid(uid, snapshotDirectory);
+      } catch (error) {
+        lastError = error;
+        console.log('Agora snapshot uid failed:', { uid, error });
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Agora snapshot failed.');
+  };
+
+  const takeAgoraSnapshotForUid = (uid: number, snapshotDirectory: string): Promise<string> => {
+    const snapshotUri = `${snapshotDirectory}live-cover-${streamId}-${uid}-${Date.now()}.jpg`;
+    const snapshotNativePath = snapshotUri.replace(/^file:\/\//, '');
+
+    return new Promise<string>((resolve, reject) => {
+      snapshotPromiseRef.current = { path: snapshotNativePath, resolve, reject };
+      const result = agoraEngineRef.current?.takeSnapshot(uid, snapshotNativePath);
+
+      if (result !== 0) {
+        snapshotPromiseRef.current = null;
+        reject(new Error(`Agora takeSnapshot returned ${result}`));
+        return;
+      }
+
+      setTimeout(() => {
+        if (snapshotPromiseRef.current?.path !== snapshotNativePath) return;
+        snapshotPromiseRef.current = null;
+        reject(new Error('Agora snapshot timed out.'));
+      }, 5000);
+    });
+  };
 
   const endLiveStream = async () => {
     if (isEndingRef.current) return;

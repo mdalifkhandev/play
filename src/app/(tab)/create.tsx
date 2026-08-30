@@ -143,12 +143,10 @@ export default function CreateScreen() {
       try {
         isStartingLiveRef.current = true;
         setIsStartingLive(true);
-        let coverImage;
 
         const result = await liveStreamApi.createStream({
           title: `Live Stream 0000 ${new Date().toLocaleTimeString()}`,
           category: 'General',
-          coverImage,
         });
         
         // Ensure router push matches the actual file path we are going to create

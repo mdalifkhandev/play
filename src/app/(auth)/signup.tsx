@@ -194,9 +194,16 @@ export default function SignUp() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       className="flex-1 bg-[#121212]"
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 24 }} className="px-6 pt-16">
+      <ScrollView
+        className="px-6 pt-16"
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 160 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={false}
+      >
         <Header showBackButton={true} />
 
         <AnnouncementNotice placement="login_notice" />
@@ -289,13 +296,29 @@ export default function SignUp() {
           )}
         </View>
 
-        <View className="flex-row justify-center mt-[24px]">
+        <View className="flex-row justify-center mt-[24px] mb-4">
           <Text className="text-gray-400 font-inter-regular">Already have an account? </Text>
-          <Pressable onPress={() => router.back()}>
+          <Pressable onPress={() => router.replace('/(auth)/login')}>
             <Text className="text-[#98D83A] font-inter-bold">Login</Text>
           </Pressable>
         </View>
       </ScrollView>
+
+      {isAuthBusy && (
+        <View className="absolute inset-0 items-center justify-center bg-black/55 px-8">
+          <View className="w-full max-w-[280px] items-center rounded-2xl border border-white/10 bg-[#181818] px-6 py-7">
+            <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-[#98FF2F]">
+              <ActivityIndicator size="large" color="#0A0A0A" />
+            </View>
+            <Text className="text-center text-lg font-inter-bold text-white">
+              Creating account
+            </Text>
+            <Text className="mt-2 text-center text-sm font-inter-regular text-gray-400">
+              Please wait while we prepare your verification code.
+            </Text>
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }

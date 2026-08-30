@@ -2,6 +2,16 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { apiClient } from '../api/client';
 
 export async function uploadImage(uri: string, mimeType: string = 'image/jpeg'): Promise<string> {
+  const fileInfo = await FileSystem.getInfoAsync(uri);
+  if (!fileInfo.exists || typeof fileInfo.size !== 'number') {
+    throw new Error('Image file is missing or unreadable.');
+  }
+  if (fileInfo.size <= 0) {
+    throw new Error('Image file is empty.');
+  }
+
+  const fileName = uri.split('/').pop() || `image-${Date.now()}.jpg`;
+
   const prepareResponse = await apiClient.post<{
     data: {
       uploadUrl: string;
@@ -12,8 +22,12 @@ export async function uploadImage(uri: string, mimeType: string = 'image/jpeg'):
       uploadId: string;
     };
   }>('/media/upload-url', {
+    fileName,
+    contentType: mimeType,
     mimeType,
-    mediaType: 'IMAGE',
+    mediaType: 'image',
+    fileSize: fileInfo.size,
+    fileSizeBytes: fileInfo.size,
   });
 
   const uploadData = prepareResponse.data.data;
