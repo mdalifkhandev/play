@@ -21,6 +21,19 @@ export interface SupportRequest {
   updatedAt: string;
 }
 
+export interface SupportMessage {
+  id: string;
+  senderUserId: string;
+  senderType: 'user' | 'staff';
+  message: string;
+  createdAt: string;
+}
+
+export interface SupportRequestDetail {
+  request: SupportRequest;
+  messages: SupportMessage[];
+}
+
 export interface CreateSupportRequestInput {
   category: SupportCategory;
   subject: string;
@@ -29,5 +42,30 @@ export interface CreateSupportRequestInput {
 
 export async function createSupportRequest(input: CreateSupportRequestInput): Promise<SupportRequest> {
   const response = await apiClient.post<{ data: { request: SupportRequest } }>('/support-requests', input);
+  return response.data.data.request;
+}
+
+export async function listSupportRequests(params: { page?: number; limit?: number; status?: SupportRequestStatus } = {}) {
+  const response = await apiClient.get<{
+    data: {
+      items: SupportRequest[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    };
+  }>('/support-requests', { params });
+  return response.data.data;
+}
+
+export async function getSupportRequest(id: string): Promise<SupportRequestDetail> {
+  const response = await apiClient.get<{ data: SupportRequestDetail }>(`/support-requests/${id}`);
+  return response.data.data;
+}
+
+export async function replyToSupportRequest(id: string, message: string): Promise<SupportRequestDetail> {
+  const response = await apiClient.post<{ data: SupportRequestDetail }>(`/support-requests/${id}/messages`, { message });
+  return response.data.data;
+}
+
+export async function closeSupportRequest(id: string): Promise<SupportRequest> {
+  const response = await apiClient.post<{ data: { request: SupportRequest } }>(`/support-requests/${id}/close`);
   return response.data.data.request;
 }

@@ -60,6 +60,25 @@ export default function NotificationScreen() {
       markAsRead([item._id]);
     }
 
+    const supportRequestId =
+      typeof item.data?.supportRequestId === 'string'
+        ? item.data.supportRequestId
+        : item.type === 'system' && item.relatedEntityId
+          ? item.relatedEntityId
+          : undefined;
+
+    if (
+      supportRequestId &&
+      (item.data?.deepLink === `/screens/settings/support/${supportRequestId}` ||
+        item.title?.toLowerCase().includes('support'))
+    ) {
+      router.push({
+        pathname: '/screens/settings/support/[id]',
+        params: { id: supportRequestId },
+      });
+      return;
+    }
+
     if (item.type === 'follow' && item.actorId?._id) {
       router.push({
         pathname: '/screens/user/[id]',

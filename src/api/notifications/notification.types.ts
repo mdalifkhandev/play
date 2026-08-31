@@ -35,6 +35,13 @@ export interface NotificationItem {
   title?: string;
   body?: string;
   relatedEntityId?: string;
+  data?: {
+    deepLink?: string;
+    supportRequestId?: string;
+    ticketNumber?: string;
+    status?: string;
+    [key: string]: unknown;
+  };
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
