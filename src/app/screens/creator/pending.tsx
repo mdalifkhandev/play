@@ -1,19 +1,92 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { ActivityIndicator, RefreshControl, View, Text, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header } from '../../../components/ui/Header';
+import { getCreatorEligibility, type CreatorEligibility } from '../../../api/creators';
 
 export default function PendingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [eligibility, setEligibility] = React.useState<CreatorEligibility | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const isMountedRef = React.useRef(true);
+
+  const loadStatus = React.useCallback(async ({ refresh = false }: { refresh?: boolean } = {}) => {
+    if (!isMountedRef.current) return;
+
+    if (refresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+
+    try {
+      const data = await getCreatorEligibility();
+      if (!isMountedRef.current) return;
+
+      setEligibility(data);
+
+      if (data.status === 'approved') {
+        router.replace('/screens/creator/success');
+        return;
+      }
+
+      if (data.status === 'rejected') {
+        router.replace('/screens/creator/criteria');
+      }
+    } catch (error: any) {
+      console.log('Creator application status refresh failed:', error?.message ?? error);
+    } finally {
+      if (!isMountedRef.current) return;
+
+      if (refresh) {
+        setIsRefreshing(false);
+      } else {
+        setIsLoading(false);
+      }
+    }
+  }, [router]);
+
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    void loadStatus();
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [loadStatus]);
+
+  const applicationDate = eligibility?.application?.createdAt
+    ? new Date(eligibility.application.createdAt).toLocaleDateString()
+    : '-';
+  const isHeld = eligibility?.status === 'held';
 
   return (
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       <Header title="Application Status" />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, alignItems: 'center' }}>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, alignItems: 'center', flexGrow: 1 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => loadStatus({ refresh: true })}
+            tintColor="#E4FB52"
+            colors={['#E4FB52']}
+            progressBackgroundColor="#151515"
+          />
+        }
+      >
+        {isLoading ? (
+          <View className="flex-1 items-center justify-center py-24">
+            <ActivityIndicator color="#E4FB52" />
+            <Text className="mt-3 text-[#888] text-sm">Checking application status...</Text>
+          </View>
+        ) : (
+        <>
         
         {/* Hourglass Icon */}
         <View className="mt-12 mb-8 items-center justify-center">
@@ -28,10 +101,12 @@ export default function PendingScreen() {
         </View>
 
         <Text className="text-white text-2xl font-bold mb-3 text-center">
-          Application Under Review
+          {isHeld ? 'Application On Hold' : 'Application Under Review'}
         </Text>
         <Text className="text-[#888] text-center text-sm leading-5 mb-12 px-4">
-          Our team is currently evaluating your creative profile and portfolio assets.
+          {isHeld
+            ? eligibility?.application?.adminReason || 'Admin team paused this application for additional review.'
+            : 'Our team is currently evaluating your creative profile and portfolio assets.'}
         </Text>
 
         {/* Stepper */}
@@ -47,7 +122,7 @@ export default function PendingScreen() {
             </View>
             <View className="flex-1 pt-1">
               <Text className="text-[#E4FB52] text-base font-semibold mb-1">Step 1: Submitted</Text>
-              <Text className="text-[#888] text-xs">Completed on October 24, 2023</Text>
+              <Text className="text-[#888] text-xs">Completed on {applicationDate}</Text>
             </View>
           </View>
 
@@ -78,14 +153,8 @@ export default function PendingScreen() {
             </View>
           </View>
         </View>
-
-        {/* Simulate Approval Button (For testing) */}
-        <Pressable 
-          onPress={() => router.push('/screens/creator/success')}
-          className="mt-12 bg-[#222] px-6 py-3 rounded-xl border border-[#333]"
-        >
-          <Text className="text-[#888] text-xs font-medium">Simulate Approval (Test)</Text>
-        </Pressable>
+        </>
+        )}
 
       </ScrollView>
     </View>

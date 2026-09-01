@@ -59,7 +59,44 @@ export default function ApplyScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [idFrontUri, setIdFrontUri] = useState<string | null>(null);
   const [idBackUri, setIdBackUri] = useState<string | null>(null);
+  const [isCheckingApplication, setIsCheckingApplication] = useState(true);
   const keyboardHeight = useKeyboardBottomInset();
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const checkExistingApplication = async () => {
+      try {
+        const eligibility = await getCreatorEligibility();
+        if (!isMounted) return;
+
+        if (eligibility.status === 'pending' || eligibility.status === 'held') {
+          router.replace('/screens/creator/pending');
+          return;
+        }
+
+        if (eligibility.status === 'approved') {
+          router.replace('/screens/creator/success');
+          return;
+        }
+
+        if (!eligibility.canApply && eligibility.status !== 'rejected') {
+          router.replace('/screens/creator/criteria');
+          return;
+        }
+      } catch (error) {
+        console.log('Creator application status check failed:', handleApiError(error, 'Could not check creator status.'));
+      } finally {
+        if (isMounted) setIsCheckingApplication(false);
+      }
+    };
+
+    void checkExistingApplication();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   const loadOccupations = React.useCallback(async (query = '') => {
     setIsLoadingOccupations(true);
@@ -334,6 +371,12 @@ export default function ApplyScreen() {
     <View className="flex-1 bg-[#0A0A0A]" style={{ paddingTop: insets.top }}>
       <Header title="Creator Application" />
 
+      {isCheckingApplication ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color="#E4FB52" />
+          <Text className="mt-3 text-[#888] text-sm">Checking application status...</Text>
+        </View>
+      ) : (
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 20,
@@ -525,6 +568,7 @@ export default function ApplyScreen() {
           textStyle="text-black"
         />
       </ScrollView>
+      )}
 
       <Modal
         visible={isOccupationSheetOpen}

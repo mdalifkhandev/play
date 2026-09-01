@@ -56,9 +56,24 @@ export function CreatorCard({ eligibility: eligibilityProp }: { eligibility?: Cr
       ? "You're a creator"
       : effectiveEligibility?.status === 'pending'
         ? 'Creator application pending'
+        : effectiveEligibility?.status === 'held'
+          ? 'Creator application on hold'
         : effectiveEligibility?.status === 'rejected'
           ? 'Creator application needs review'
           : "You're on your creator path";
+  const openCreatorFlow = () => {
+    if (effectiveEligibility?.status === 'pending' || effectiveEligibility?.status === 'held') {
+      router.push('/screens/creator/pending');
+      return;
+    }
+
+    if (effectiveEligibility?.status === 'approved') {
+      router.push('/screens/creator/success');
+      return;
+    }
+
+    router.push('/screens/creator/criteria');
+  };
 
   if (isHidden) {
     return (
@@ -78,7 +93,7 @@ export function CreatorCard({ eligibility: eligibilityProp }: { eligibility?: Cr
   }
 
   return (
-    <Pressable onPress={() => router.push('/screens/creator/criteria')} className="mt-8 mx-4 bg-[#141414] p-4 rounded-2xl border border-[#222] border-l-4 overflow-hidden">
+    <Pressable onPress={openCreatorFlow} className="mt-8 mx-4 bg-[#141414] p-4 rounded-2xl border border-[#222] border-l-4 overflow-hidden">
       <Pressable
         onPress={hideCard}
         hitSlop={10}

@@ -34,7 +34,6 @@ export default function AnalyticScreen() {
         <Text className="text-white text-base font-bold flex-1 text-center">Analytic</Text>
         <View className="w-10 h-10 justify-center items-end">
           <Pressable className="pr-2 -mr-2">
-            <Ionicons name="settings-outline" size={24} color="white" />
           </Pressable>
         </View>
       </View>
