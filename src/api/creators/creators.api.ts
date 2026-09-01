@@ -42,6 +42,45 @@ export type CreatorEligibility = {
   requirements: CreatorRequirement[];
 };
 
+export type CreatorAnalyticsRange = '7d' | '28d' | '60d' | '90d';
+
+export type CreatorAnalytics = {
+  range: CreatorAnalyticsRange;
+  summary: {
+    reels: number;
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+    saves: number;
+    followers: number;
+    newFollowers: number;
+    engagementRate: number;
+    earningsUsd: number;
+    pendingEarningsUsd: number;
+    availableEarningsUsd: number;
+  };
+  trend: Array<{
+    date: string;
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+    saves: number;
+  }>;
+  topReels: Array<{
+    id: string;
+    title: string;
+    thumbnailUrl?: string;
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+    saves: number;
+    publishedAt: string | null;
+  }>;
+};
+
 export type CreateCreatorApplicationRequest = {
   fullName: string;
   email: string;
@@ -90,6 +129,13 @@ const dataOf = <T>(response: { data?: { data?: T } }) => response.data?.data as 
 export async function getCreatorEligibility(): Promise<CreatorEligibility> {
   const response = await apiClient.get<{ data: CreatorEligibility }>('/creators/me/eligibility');
   return dataOf<CreatorEligibility>(response);
+}
+
+export async function getMyCreatorAnalytics(range: CreatorAnalyticsRange = '7d'): Promise<CreatorAnalytics> {
+  const response = await apiClient.get<{ data: CreatorAnalytics }>('/creators/me/analytics', {
+    params: { range },
+  });
+  return dataOf<CreatorAnalytics>(response);
 }
 
 export async function submitCreatorApplication(input: CreateCreatorApplicationRequest) {
