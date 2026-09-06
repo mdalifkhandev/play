@@ -79,13 +79,6 @@
           "enableGooglePay": false
         }
       ],
-      [
-        "@sentry/react-native/expo",
-        {
-          "organization": "play-all",
-          "project": "play"
-        }
-      ],
       "@react-native-community/datetimepicker"
     ],
     "experiments": {

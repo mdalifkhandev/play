@@ -2,7 +2,6 @@ import { useRouter, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
-import * as Sentry from "@sentry/react-native";
 import { 
   useFonts, 
   Inter_100Thin, 
@@ -24,17 +23,9 @@ import { MaintenanceGate } from "../components/settings/MaintenanceGate";
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
-  Sentry.init({
-    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-    enableNative: true,
-  });
-}
-
 const defaultErrorHandler = ErrorUtils.getGlobalHandler();
 ErrorUtils.setGlobalHandler((error, isFatal) => {
   console.error('Unhandled JS Exception:', error);
-  Sentry.captureException(error);
   defaultErrorHandler(error, isFatal);
 });
 

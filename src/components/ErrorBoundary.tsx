@@ -2,7 +2,6 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import * as Sentry from '@sentry/react-native';
 
 interface Props {
   children: ReactNode;
@@ -25,7 +24,6 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error in application:', error, errorInfo);
-    Sentry.captureException(error);
   }
 
   public render() {
