@@ -83,6 +83,14 @@ export default function SignUp() {
       { email, password, confirmPassword, acceptTerms },
       {
         onSuccess: (response) => {
+          const accessToken = response.data?.data?.tokens?.accessToken;
+          const refreshToken = response.data?.data?.tokens?.refreshToken;
+          const user = response.data?.data?.user;
+
+          if (accessToken && refreshToken && user) {
+            setAuth(accessToken, refreshToken, user);
+          }
+
           toast.success('Signup Successful!');
           router.push({ pathname: '/(auth)/verify-otp', params: { type: 'signup', email } });
         },

@@ -9,6 +9,7 @@ import { apiClient, handleApiError } from "../../../src/api/client";
 import { CustomButton } from "../../components/ui/CustomButton";
 import { Header } from "../../components/ui/Header";
 import { useResendOtpMutation, useVerifyOtpMutation, useVerifyResetCodeMutation } from "../../../src/api/auth";
+import { useAppStore } from "../../../src/store";
 
 export default function VerifyOtp() {
   const { type, email: paramEmail } = useLocalSearchParams<{ type: string; email: string }>();
@@ -31,6 +32,7 @@ export default function VerifyOtp() {
   const verifyMutation = useVerifyOtpMutation();
   const resendMutation = useResendOtpMutation();
   const verifyResetMutation = useVerifyResetCodeMutation();
+  const setAuth = useAppStore((state) => state.setAuth);
 
   const handleResend = () => {
     if (timeLeft > 0 || resendMutation.isPending) return;
@@ -72,7 +74,15 @@ export default function VerifyOtp() {
       verifyMutation.mutate(
         { email, code },
         {
-          onSuccess: () => {
+          onSuccess: (response: any) => {
+            const accessToken = response.data?.data?.tokens?.accessToken;
+            const refreshToken = response.data?.data?.tokens?.refreshToken;
+            const user = response.data?.data?.user;
+
+            if (accessToken && refreshToken && user) {
+              setAuth(accessToken, refreshToken, user);
+            }
+
             toast.success('Email verified successfully!');
             router.push("/(auth)/profile-setup");
           },
