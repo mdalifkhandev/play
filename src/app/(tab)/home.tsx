@@ -50,11 +50,20 @@ function optimizedCloudinaryImageUrl(url?: string | null, width = 720, height = 
   return url.replace('/upload/', `/upload/f_auto,q_auto:eco,c_fill,w_${width},h_${height}/`);
 }
 
+function optimizedCloudinaryVideoUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  if (!/res\.cloudinary\.com/i.test(url) || !url.includes('/upload/')) return url;
+  if (/\/upload\/[^/]*(?:f_auto|q_auto|w_\d+|h_\d+|c_)/i.test(url)) return url;
+
+  return url.replace('/upload/', '/upload/f_auto,q_auto:eco,c_limit,w_720,h_1280/');
+}
+
 function mapBackendReelToFeedItem(reel: ReelFeedItem): ReelListItem {
   const hasPlayableVideo = reel.mediaType !== 'photo' && !isImageUrl(reel.videoUrl);
   const thumbnailUrl = optimizedCloudinaryImageUrl(reel.thumbnailUrl);
+  const optimizedVideo = hasPlayableVideo ? (optimizedCloudinaryVideoUrl(reel.videoUrl) || reel.videoUrl) : reel.videoUrl;
   const source = hasPlayableVideo
-    ? reel.videoUrl
+    ? optimizedVideo
     : thumbnailUrl || reel.videoUrl;
 
   return {
@@ -535,6 +544,70 @@ export default function HomeScreen() {
     });
   }, [feedData, reelId]);
 
+  // Proactively prefetch thumbnails and avatars for upcoming reels
+  useEffect(() => {
+    if (!feedData || feedData.length === 0) return;
+
+    const startIndex = Math.max(0, activeItemIndex);
+    const endIndex = Math.min(feedData.length, startIndex + 5);
+    const urlsToPrefetch: string[] = [];
+
+    for (let i = startIndex; i < endIndex; i++) {
+      const item = feedData[i];
+      if (item.itemType === 'reel') {
+        if (item.thumbnailUrl) urlsToPrefetch.push(item.thumbnailUrl);
+        if (item.user?.profileImage) urlsToPrefetch.push(item.user.profileImage);
+      } else if (item.itemType === 'live') {
+        if (item.source) urlsToPrefetch.push(item.source);
+        if (item.user?.profileImage) urlsToPrefetch.push(item.user.profileImage);
+      }
+    }
+
+    if (urlsToPrefetch.length > 0) {
+      void Promise.all(
+        urlsToPrefetch.map(url => Image.prefetch(url).catch(() => false))
+      );
+    }
+  }, [activeItemIndex, feedData]);
+
+  const handleFullscreenChange = useCallback((itemId: string, nextIsFullscreen: boolean) => {
+    setFullscreenItemId(nextIsFullscreen ? itemId : null);
+  }, []);
+
+  const renderFeedItem = useCallback(({ item, index }: { item: FeedListItem; index: number }) => {
+    const isCurrentActive = isScreenActive && index === activeItemIndex;
+    const shouldMount = isScreenActive && Math.abs(index - activeItemIndex) <= 1;
+
+    if (item.itemType === 'ad') {
+      return (
+        <SponsoredAdItem
+          ad={item.ad}
+          isActive={isCurrentActive}
+          shouldMountMedia={shouldMount}
+        />
+      );
+    }
+
+    if (item.itemType === 'live') {
+      return (
+        <LiveFeedCard
+          item={item}
+          isActive={isCurrentActive}
+        />
+      );
+    }
+
+    return (
+      <FeedItem
+        {...item}
+        isActive={isCurrentActive}
+        shouldMountVideo={shouldMount}
+        isFullscreen={fullscreenItemId === item.id}
+        onFullscreenChange={(nextIsFullscreen) => handleFullscreenChange(item.id, nextIsFullscreen)}
+      />
+    );
+  }, [activeItemIndex, fullscreenItemId, handleFullscreenChange, isScreenActive]);
+
   return (
     <View className="flex-1 bg-black">
       {!fullscreenItemId && (
@@ -618,25 +691,7 @@ export default function HomeScreen() {
           ref={listRef}
           key={activeTab}
           data={feedData}
-          renderItem={({ item, index }) => (
-            item.itemType === 'ad' ? (
-              <SponsoredAdItem
-                ad={item.ad}
-                isActive={isScreenActive && index === activeItemIndex}
-                shouldMountMedia={isScreenActive && Math.abs(index - activeItemIndex) <= 1}
-              />
-            ) : item.itemType === 'live' ? (
-              <LiveFeedCard item={item} isActive={isScreenActive && index === activeItemIndex} />
-            ) : (
-              <FeedItem
-                {...item}
-                isActive={isScreenActive && index === activeItemIndex}
-                shouldMountVideo={isScreenActive && Math.abs(index - activeItemIndex) <= 1}
-                isFullscreen={fullscreenItemId === item.id}
-                onFullscreenChange={(nextIsFullscreen) => setFullscreenItemId(nextIsFullscreen ? item.id : null)}
-              />
-            )
-          )}
+          renderItem={renderFeedItem}
           keyExtractor={(item) => item.id}
           pagingEnabled
           showsVerticalScrollIndicator={false}
@@ -660,7 +715,7 @@ export default function HomeScreen() {
           maxToRenderPerBatch={2}
           windowSize={5}
           removeClippedSubviews
-          updateCellsBatchingPeriod={80}
+          updateCellsBatchingPeriod={50}
           refreshControl={
             fullscreenItemId
               ? undefined

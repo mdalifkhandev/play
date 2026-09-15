@@ -548,7 +548,7 @@ function FeedVideo({
         console.log('Feed video play failed:', error);
         setHasError(true);
       }
-    }, 120);
+    }, 40);
   }, [hasError, isActive, player]);
 
   useEffect(() => {
@@ -594,7 +594,7 @@ function FeedVideo({
               setIsBuffering(false);
               onBufferingChange?.(false, true, hasError);
             }
-          }, 350);
+          }, 120);
         }
         playSafely();
       }
@@ -951,9 +951,10 @@ export const FeedItem = memo(({
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     if (shouldMountVideo) {
+      const delay = isActive ? 0 : 60;
       timer = setTimeout(() => {
         setShouldRenderVideo(true);
-      }, 220);
+      }, delay);
     } else {
       setShouldRenderVideo(false);
     }
@@ -961,7 +962,7 @@ export const FeedItem = memo(({
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [shouldMountVideo]);
+  }, [isActive, shouldMountVideo]);
 
   useEffect(() => {
     if (
@@ -1015,6 +1016,7 @@ export const FeedItem = memo(({
                 style={{ width: '100%', height: '100%' }}
                 contentFit="cover"
                 cachePolicy="memory-disk"
+                priority="high"
               />
             ) : (
               <FeedFallback />
@@ -1157,6 +1159,9 @@ export const FeedItem = memo(({
               source={avatarSource(user.profileImage)}
               className="w-9 h-9 rounded-full border border-white"
               style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: 'white' }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              priority="high"
             />
             <View className="flex-1 ml-2.5">
               <View className="flex-row items-center">
@@ -1260,6 +1265,20 @@ export const FeedItem = memo(({
         onClose={() => setIsReportSheetOpen(false)}
       />
     </View>
+  );
+}, (prev, next) => {
+  return (
+    prev.id === next.id &&
+    prev.isActive === next.isActive &&
+    prev.shouldMountVideo === next.shouldMountVideo &&
+    prev.isFullscreen === next.isFullscreen &&
+    prev.source === next.source &&
+    prev.stats.likes === next.stats.likes &&
+    prev.stats.comments === next.stats.comments &&
+    prev.stats.bookmarks === next.stats.bookmarks &&
+    prev.stats.shares === next.stats.shares &&
+    prev.viewerState?.isLiked === next.viewerState?.isLiked &&
+    prev.viewerState?.isSaved === next.viewerState?.isSaved
   );
 });
 

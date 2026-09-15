@@ -37,6 +37,9 @@ export type CreateAdCampaignRequest = {
   ctaLabel?: string;
 };
 
+export type AdPaymentStatus = 'unpaid' | 'paid' | 'failed' | 'refunded';
+export type AdPaymentProvider = 'stripe' | 'coins';
+
 export type AdCampaign = CreateAdCampaignRequest & {
   id: string;
   ownerId: string;
@@ -48,6 +51,10 @@ export type AdCampaign = CreateAdCampaignRequest & {
     photoUrl?: string;
   } | null;
   status: AdCampaignStatus;
+  paymentStatus?: AdPaymentStatus;
+  paymentProvider?: AdPaymentProvider;
+  paidAt?: string | null;
+  paymentAmountUsd?: number | null;
   adminReason: string | null;
   startsAt: string | null;
   endsAt: string | null;
@@ -259,6 +266,39 @@ export const adminUpdateAdStatus = async (
   );
   return response.data.data;
 };
+
+export interface AdPaymentIntentResponse {
+  clientSecret: string;
+  paymentIntentId: string;
+  publishableKey: string;
+  amount: number;
+  currency: string;
+  adId: string;
+}
+
+export interface PayAdWithCoinsResponse {
+  ad: AdCampaign;
+  coinBalance: number;
+  coinsDeducted: number;
+}
+
+export const createAdPaymentIntent = async (adId: string): Promise<AdPaymentIntentResponse> => {
+  const response = await apiClient.post<{ data: AdPaymentIntentResponse }>(`/ads/${adId}/payment/stripe-intent`);
+  return response.data.data;
+};
+
+export const verifyAdStripePayment = async (adId: string, paymentIntentId: string): Promise<AdCampaign> => {
+  const response = await apiClient.post<{ data: AdCampaign }>(`/ads/${adId}/payment/verify-stripe`, {
+    paymentIntentId,
+  });
+  return response.data.data;
+};
+
+export const payAdWithCoins = async (adId: string): Promise<PayAdWithCoinsResponse> => {
+  const response = await apiClient.post<{ data: PayAdWithCoinsResponse }>(`/ads/${adId}/payment/pay-coins`);
+  return response.data.data;
+};
+
 
 async function createUploadFile(uri: string, mediaType: 'image' | 'video') {
   const info = await FileSystem.getInfoAsync(uri);

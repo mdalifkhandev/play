@@ -39,11 +39,14 @@ export default function CoinsSuccessScreen() {
 
       </View>
       
-      <View className="px-6 w-full">
+      <View
+        className="px-6 w-full"
+        style={{ paddingBottom: Math.max(insets.bottom + 16, 32) }}
+      >
         <CustomButton 
           title="Back to feed" 
           variant="primary" 
-          onPress={() => router.push('/home')} 
+          onPress={() => router.replace('/')} 
         />
       </View>
     </View>

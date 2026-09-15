@@ -34,12 +34,15 @@ export default function SuccessScreen() {
 
       </View>
 
-      <View className="px-5 mb-10">
+      <View
+        className="px-5 w-full"
+        style={{ paddingBottom: Math.max(insets.bottom + 16, 32) }}
+      >
         <CustomButton 
           title="Back to feed"
           onPress={() => router.replace('/')}
-          containerStyle="bg-[#A3E635] w-full py-4"
-          textStyle="text-black font-bold text-base"
+          containerStyle="bg-[#A3E635] w-full py-4 rounded-xl"
+          textStyle="text-black font-inter-bold text-base"
         />
       </View>
 

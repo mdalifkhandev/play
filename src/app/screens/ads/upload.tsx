@@ -127,7 +127,7 @@ export default function AdsUploadScreen() {
       const uploaded = await uploadAdMedia(selectedMedia.uri, selectedMedia.type, setUploadProgress, setUploadStep);
       console.log('[AD_UPLOAD] media upload completed', uploaded);
       setUploadStep('submitting');
-      await createAdCampaign({
+      const campaign = await createAdCampaign({
         category: params.category || 'Food',
         days: Number(params.days || 7),
         budgetUsd: Number(params.budgetUsd || 100),
@@ -146,9 +146,17 @@ export default function AdsUploadScreen() {
         ctaType,
         ctaLabel: ctaType === 'none' ? undefined : ctaLabel.trim() || (ctaType === 'send_message' ? 'Send message' : 'Learn more'),
       });
-      console.log('[AD_UPLOAD] campaign created');
-      toast.success('Ad request sent for admin review');
-      router.back();
+      console.log('[AD_UPLOAD] campaign created', campaign.id);
+      router.push({
+        pathname: '/screens/ads/payment-method',
+        params: {
+          adId: campaign.id,
+          budgetUsd: String(campaign.budgetUsd || params.budgetUsd || 100),
+          days: String(campaign.days || params.days || 7),
+          title: campaign.title || title.trim() || 'Ad Campaign',
+          category: campaign.category || 'General',
+        },
+      });
     } catch (error) {
       console.log('[AD_UPLOAD] failed', error);
       toast.error(handleApiError(error, 'Failed to send ad request'));
@@ -309,7 +317,7 @@ export default function AdsUploadScreen() {
 
       <View className="px-5 pt-3 bg-[#050505]" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
         <CustomButton 
-          title={isSubmitting ? "Sending..." : "Send Request"}
+          title={isSubmitting ? "Uploading media..." : "Proceed to Payment"}
           onPress={submitAd}
           disabled={isSubmitting}
           containerStyle="bg-[#A3E635] w-full py-4 rounded-xl"
