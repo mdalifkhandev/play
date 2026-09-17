@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, ScrollView, Text, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { toast } from 'sonner-native';
 import { initStripe, useStripe } from '@stripe/stripe-react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +13,6 @@ import { useAppStore } from '../../../store';
 
 export default function AdsCardDetailsScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const params = useLocalSearchParams<{
     adId?: string;
     budgetUsd?: string;

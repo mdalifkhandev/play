@@ -102,6 +102,42 @@ export type UploadedAdMedia = {
 
 export type AdUploadStep = 'preparing' | 'uploading' | 'verifying';
 
+export type AdPackage = {
+  id: string;
+  name: string;
+  days: number;
+  priceUsd: number;
+  targetUsers: number;
+  description?: string;
+  isPopular: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const getAdPackages = async (): Promise<AdPackage[]> => {
+  const response = await apiClient.get<{ data: AdPackage[] }>('/ads/packages');
+  return response.data.data;
+};
+
+export type AdCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  icon?: string;
+  description?: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const getAdCategories = async (): Promise<AdCategory[]> => {
+  const response = await apiClient.get<{ data: AdCategory[] }>('/ads/categories');
+  return response.data.data;
+};
+
 export const createAdCampaign = async (data: CreateAdCampaignRequest) => {
   const response = await apiClient.post<{ data: AdCampaign }>('/ads', data);
   return response.data.data;

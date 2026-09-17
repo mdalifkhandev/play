@@ -18,6 +18,10 @@ interface AppState {
   // Coin System
   coinBalance: number;
   
+  // Feed refresh trigger
+  homeRefreshTrigger: number;
+  triggerHomeRefresh: () => void;
+
   // Actions
   setAuth: (token: string, refreshToken: string, user: any) => void;
   setHasHydrated: (hasHydrated: boolean) => void;
@@ -42,7 +46,9 @@ export const useAppStore = create<AppState>()(
       kidsModeExpireTimestamp: null,
       kidsModeDurationMs: null,
       coinBalance: 0,
+      homeRefreshTrigger: 0,
 
+      triggerHomeRefresh: () => set((state) => ({ homeRefreshTrigger: state.homeRefreshTrigger + 1 })),
       setAuth: (token, refreshToken, user) => set({ isAuthenticated: true, token, refreshToken, user }),
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
       setKidsModeActive: (active: boolean) => set((state) => {

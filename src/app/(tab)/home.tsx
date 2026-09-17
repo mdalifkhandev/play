@@ -1,9 +1,25 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
+import { LinearGradient } from "expo-linear-gradient";
 import { Link, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, AppState, AppStateStatus, BackHandler, FlatList, Linking, Pressable, RefreshControl, Text, useWindowDimensions, View, ViewToken } from "react-native";
+import {
+  ActivityIndicator,
+  AppState,
+  AppStateStatus,
+  BackHandler,
+  FlatList,
+  Linking,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+  ViewToken,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FeedItem, FeedItemProps } from "../../components/ui/FeedItem";
 import { AnnouncementNotice } from "../../components/announcements/AnnouncementNotice";
@@ -179,6 +195,7 @@ function SponsoredAdItem({
   const currentUser = useAppStore((state) => state.user);
   const currentUserId = currentUser?.id || currentUser?._id;
   const impressionRecordedRef = useRef(false);
+  const [isMuted, setIsMuted] = useState(true);
 
   useEffect(() => {
     if (!isActive || impressionRecordedRef.current) return;
@@ -232,14 +249,16 @@ function SponsoredAdItem({
   const shouldShowButton = ad.ctaType === 'learn_more' || ad.ctaType === 'send_message';
   const isOwnMessageAd = ad.ctaType === 'send_message' && Boolean(currentUserId && ad.ownerId === currentUserId);
   const buttonLabel = ad.ctaLabel || (ad.ctaType === 'send_message' ? 'Send message' : 'Learn more');
+  const advertiserName = ad.owner?.displayName || ad.owner?.username || 'Sponsored Page';
+  const advertiserAvatar = ad.owner?.photoUrl;
 
   return (
     <View style={{ height, width }} className="bg-black">
       {shouldRenderVideo ? (
-        <SponsoredAdVideo source={mediaUrl} isActive={isActive} />
+        <SponsoredAdVideo source={mediaUrl} isActive={isActive} isMuted={isMuted} />
       ) : isVideoAd ? (
         <View className="absolute inset-0 items-center justify-center bg-[#050505]">
-          <Ionicons name="play-circle-outline" size={54} color="#98FF2F" />
+          <Ionicons name="play-circle-outline" size={54} color="#A3E635" />
         </View>
       ) : (
         <Image
@@ -250,33 +269,88 @@ function SponsoredAdItem({
           cachePolicy="memory-disk"
         />
       )}
-      <View className="absolute inset-0 bg-black/35" />
 
-      <View className="absolute left-4 right-4" style={{ top: insets.top + 78 }}>
-        <View className="self-start rounded-full bg-[#98FF2F] px-3 py-1">
-          <Text className="text-black text-xs font-inter-bold">Sponsored</Text>
+      {/* Subtle Background Darkener */}
+      <View className="absolute inset-0 bg-black/30" />
+
+      {/* Facebook-style Sponsored Top Header */}
+      <View
+        className="absolute left-4 right-4 flex-row items-center justify-between"
+        style={{ top: insets.top + 60 }}
+      >
+        <View className="flex-row items-center gap-2.5 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/15">
+          <Image
+            source={avatarSource(advertiserAvatar)}
+            className="w-7 h-7 rounded-full border border-white/30"
+            contentFit="cover"
+          />
+          <View>
+            <View className="flex-row items-center gap-1">
+              <Text className="text-white text-xs font-inter-bold" numberOfLines={1}>
+                {advertiserName}
+              </Text>
+              <Ionicons name="checkmark-circle" size={12} color="#A3E635" />
+            </View>
+            <View className="flex-row items-center gap-1">
+              <Text className="text-[#A3E635] text-[10px] font-inter-bold">Sponsored</Text>
+              <Text className="text-white/40 text-[9px]">•</Text>
+              <Ionicons name="globe-outline" size={10} color="#AAA" />
+            </View>
+          </View>
         </View>
+
+        {isVideoAd && (
+          <Pressable
+            onPress={() => setIsMuted(!isMuted)}
+            className="h-8 w-8 items-center justify-center rounded-full bg-black/50 border border-white/20 active:bg-black/70"
+          >
+            <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={16} color="#FFF" />
+          </Pressable>
+        )}
       </View>
 
+      {/* Facebook-style Bottom Gradient for Text Legibility */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.88)']}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 280,
+        }}
+        pointerEvents="none"
+      />
+
+      {/* Bottom Ad Content */}
       <View className="absolute left-5 right-5" style={{ bottom: insets.bottom + 95 }}>
         {ad.title ? (
-          <Text className="text-white text-3xl font-inter-bold" numberOfLines={2}>
+          <Text className="text-white text-2xl font-inter-bold shadow-lg mb-1" numberOfLines={2}>
             {ad.title}
           </Text>
         ) : null}
         {ad.description ? (
-          <Text className={`${ad.title ? 'mt-2' : ''} text-white/85 text-base leading-6`} numberOfLines={3}>
+          <Text className="text-white/85 text-sm leading-5 font-inter shadow-md" numberOfLines={3}>
             {ad.description}
           </Text>
         ) : null}
         {shouldShowButton ? (
           <Pressable
             onPress={handlePress}
-            className={`mt-5 h-12 items-center justify-center rounded-2xl ${isOwnMessageAd ? 'bg-white/20' : 'bg-[#98FF2F]'}`}
+            className={`mt-4 h-12 flex-row items-center justify-between px-5 rounded-2xl shadow-xl shadow-black/50 active:opacity-90 ${
+              isOwnMessageAd ? 'bg-white/20' : 'bg-[#A3E635]'
+            }`}
           >
-            <Text className={`font-inter-bold ${isOwnMessageAd ? 'text-white/70' : 'text-black'}`}>
+            <Text className={`font-inter-bold text-sm ${isOwnMessageAd ? 'text-white/70' : 'text-black'}`}>
               {isOwnMessageAd ? 'Viewers can message you' : buttonLabel}
             </Text>
+            {!isOwnMessageAd && (
+              <Ionicons
+                name={ad.ctaType === 'send_message' ? 'chatbubble-ellipses' : 'arrow-forward-outline'}
+                size={18}
+                color="#000"
+              />
+            )}
           </Pressable>
         ) : null}
       </View>
@@ -287,15 +361,23 @@ function SponsoredAdItem({
 function SponsoredAdVideo({
   source,
   isActive,
+  isMuted,
 }: {
   source: string;
   isActive: boolean;
+  isMuted: boolean;
 }) {
   const player = useVideoPlayer({ uri: source, contentType: 'progressive' }, currentPlayer => {
     if (!currentPlayer) return;
     currentPlayer.loop = true;
-    currentPlayer.muted = true;
+    currentPlayer.muted = isMuted;
   });
+
+  useEffect(() => {
+    if (player) {
+      player.muted = isMuted;
+    }
+  }, [isMuted, player]);
 
   useEffect(() => {
     try {
@@ -614,6 +696,7 @@ export default function HomeScreen() {
         <View
           className="absolute left-4 right-4 z-10 flex-row justify-between items-center "
           style={{ top: insets.top + 10 }}
+          pointerEvents="box-none"
         >
           <View style={{ width: 32 }} />
           <View className="flex-row gap-5 items-center">
@@ -647,7 +730,7 @@ export default function HomeScreen() {
       )}
 
       {!fullscreenItemId && (
-        <View className="absolute left-0 right-0 z-10" style={{ top: insets.top + 50 }}>
+        <View className="absolute left-0 right-0 z-10" style={{ top: insets.top + 50 }} pointerEvents="box-none">
           <AnnouncementNotice placement="home_banner" refreshKey={announcementRefreshKey} />
         </View>
       )}
@@ -655,7 +738,18 @@ export default function HomeScreen() {
       {isLoading && feedData.length === 0 ? (
         <FeedSkeleton />
       ) : error ? (
-        <View className="flex-1 justify-center items-center">
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor="#98FF2F"
+              colors={["#98FF2F"]}
+              progressViewOffset={Platform.OS === 'android' ? insets.top + 15 : insets.top + 50}
+            />
+          }
+        >
           <Text className="text-white text-base font-inter-medium">Error: {error}</Text>
           <Pressable
             onPress={handleRefresh}
@@ -667,9 +761,20 @@ export default function HomeScreen() {
               {isRefreshing ? 'Retrying...' : 'Retry'}
             </Text>
           </Pressable>
-        </View>
+        </ScrollView>
       ) : feedData.length === 0 ? (
-        <View className="flex-1 justify-center items-center">
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor="#98FF2F"
+              colors={["#98FF2F"]}
+              progressViewOffset={Platform.OS === 'android' ? insets.top + 15 : insets.top + 50}
+            />
+          }
+        >
           {isRefreshing ? (
             <ActivityIndicator size="large" color="#98FF2F" />
           ) : (
@@ -685,7 +790,7 @@ export default function HomeScreen() {
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Text>
           </Pressable>
-        </View>
+        </ScrollView>
       ) : (
         <FlatList
           ref={listRef}
@@ -698,6 +803,9 @@ export default function HomeScreen() {
           snapToInterval={windowHeight}
           snapToAlignment="start"
           decelerationRate="fast"
+          bounces={true}
+          alwaysBounceVertical={true}
+          overScrollMode="always"
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           onEndReached={loadMore}
@@ -723,9 +831,10 @@ export default function HomeScreen() {
                 <RefreshControl
                   refreshing={isRefreshing}
                   onRefresh={handleRefresh}
+                  enabled={!fullscreenItemId && activeItemIndex === 0}
                   tintColor="#98FF2F"
                   colors={["#98FF2F"]}
-                  progressViewOffset={insets.top + 50}
+                  progressViewOffset={Platform.OS === 'android' ? insets.top + 15 : insets.top + 50}
                 />
               )
           }

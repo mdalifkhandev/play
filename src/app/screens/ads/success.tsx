@@ -2,13 +2,12 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Header } from '../../../components/ui/Header';
 import { CustomButton } from '../../../components/ui/CustomButton';
 
 export default function AdsSuccessScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const params = useLocalSearchParams<{
     adId?: string;
     budgetUsd?: string;

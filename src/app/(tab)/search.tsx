@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getKidsFeed } from '../../api/reels/reels.api';
@@ -23,21 +23,25 @@ export default function KidsModeSearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [reels, setReels] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchKidsFeed = async (refresh = false) => {
+    try {
+      if (refresh) setIsRefreshing(true);
+      else setIsLoading(true);
+      const data = await getKidsFeed();
+      if (data && data.items) {
+        setReels(data.items);
+      }
+    } catch (error) {
+      console.error("Failed to load kids feed:", error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchKidsFeed = async () => {
-      try {
-        setIsLoading(true);
-        const data = await getKidsFeed();
-        if (data && data.items) {
-          setReels(data.items);
-        }
-      } catch (error) {
-        console.error("Failed to load kids feed:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchKidsFeed();
   }, []);
 
@@ -90,7 +94,18 @@ export default function KidsModeSearchScreen() {
           <ActivityIndicator size="large" color="#98D83A" />
         </View>
       ) : (
-        <ScrollView className="flex-1 px-2 mt-4" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          className="flex-1 px-2 mt-4"
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => fetchKidsFeed(true)}
+              tintColor="#98D83A"
+              colors={["#98D83A"]}
+            />
+          }
+        >
           <View className="flex-row flex-wrap pb-20 justify-between">
             {reels.map((r: any) => (
               <LiveGridItem key={r.id} item={mapReelToGridItem(r)} variant="search" />

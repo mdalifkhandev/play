@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { Image } from "expo-image";
-import { Tabs } from "expo-router";
+import { Tabs, router, usePathname } from "expo-router";
 import type { ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppStore } from "../../store";
@@ -31,6 +32,32 @@ function TabIcon({ source, color, size = 24 }: { source: number; color?: ColorVa
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const isKidsModeActive = useAppStore((state) => state.isKidsModeActive);
+  const kidsModeExpireTimestamp = useAppStore((state) => state.kidsModeExpireTimestamp);
+  const pathname = usePathname();
+
+  // Kids Mode Watchdog Timer (Runs safely inside NavigationContainer)
+  useEffect(() => {
+    if (!isKidsModeActive || !kidsModeExpireTimestamp) return;
+
+    const checkTime = () => {
+      if (Date.now() >= kidsModeExpireTimestamp) {
+        const isUnlocking = 
+          pathname.includes('/screens/kids-mode/time-up') ||
+          pathname.includes('/screens/kids-mode/confirm-pin') ||
+          pathname.includes('/screens/kids-mode/forgot-pin') ||
+          pathname.includes('/screens/kids-mode/verify-otp') ||
+          pathname.includes('/screens/kids-mode/reset-pin');
+          
+        if (!isUnlocking) {
+          router.push('/screens/kids-mode/time-up');
+        }
+      }
+    };
+
+    checkTime();
+    const interval = setInterval(checkTime, 5000);
+    return () => clearInterval(interval);
+  }, [isKidsModeActive, kidsModeExpireTimestamp, pathname]);
 
   return (
     <Tabs
@@ -57,6 +84,13 @@ export default function TabLayout() {
             <TabIcon source={focused ? TAB_ICONS.homeActive : TAB_ICONS.homeInactive} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            if (navigation.isFocused()) {
+              useAppStore.getState().triggerHomeRefresh();
+            }
+          },
+        })}
       />
 
       {/* Kids Mode Search Tab */}
