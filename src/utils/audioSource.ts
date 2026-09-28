@@ -1,7 +1,7 @@
 import type { AudioPlayerOptions, AudioSource } from 'expo-audio';
 
 export const REMOTE_AUDIO_PLAYER_OPTIONS: AudioPlayerOptions = {
-  downloadFirst: true,
+  downloadFirst: false,
   preferredForwardBufferDuration: 10,
   updateInterval: 250,
 };
